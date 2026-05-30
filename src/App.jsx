@@ -12,13 +12,7 @@ const ID    = () => Date.now().toString(36) + Math.random().toString(36).slice(2
 // ESTADO GLOBAL
 // ─────────────────────────────────────────
 let G = {
-  productos: [
-    {id:"demo1",ean:"7701101300176",codigo:"00009",nombre:"HAMBURGUESA ZENU",referencia:"30 und",categoria:"CARNES FRIAS",subcategoria:"HAMBURGUESA",subgrupo:"RES",determinada:"BODEGA",saldo:12,costo:18500,proveedor:"ZENU",nit:"860001697"},
-    {id:"demo2",ean:"7700612220201",codigo:"00011",nombre:"MOLIPOLLO MAC POLLO",referencia:"500 grs",categoria:"CARNES FRIAS",subcategoria:"MOLIPOLLO",subgrupo:"POLLO",determinada:"BODEGA",saldo:8,costo:12000,proveedor:"MAC POLLO",nit:"860001698"},
-    {id:"demo3",ean:"7700512500069",codigo:"00016",nombre:"NUGGETS DE POLLO KLIK",referencia:"800 grs",categoria:"CARNES FRIAS",subcategoria:"NUGGETS",subgrupo:"POLLO",determinada:"BODEGA",saldo:15,costo:22000,proveedor:"KLIK",nit:"860001699"},
-    {id:"demo4",ean:"7707296930716",codigo:"00097",nombre:"SALSA BBQ TOMATICO",referencia:"1000 grs",categoria:"SALSAS Y CONSERVAS",subcategoria:"SALSA BBQ",subgrupo:"",determinada:"SALA DE VENTAS",saldo:25,costo:14000,proveedor:"TOMATICO",nit:"860001705"},
-    {id:"demo5",ean:"330",codigo:"00330",nombre:"HUEVO AAA",referencia:"CUBETA 30 und",categoria:"PERECEDEROS",subcategoria:"HUEVO",subgrupo:"HUEVO",determinada:"BODEGA",saldo:50,costo:24000,proveedor:"",nit:""},
-  ],
+  productos: [],
   usuarios: [
     {id:"u1",nombre:"ADMIN",pass:"admin123",rol:"admin",activo:true,creado:TODAY()},
     {id:"u2",nombre:"JUAN",pass:"123",rol:"capturador",activo:true,creado:TODAY()},
@@ -476,10 +470,6 @@ function Login({lf,setLf,err,onLogin,lastSaved}){
                 <span style={{fontSize:12,color:"#64748b",marginTop:4,display:"block"}}>En la próxima versión podrás recuperarla por correo.</span>
               </div>
             )}
-          </div>
-
-          <div style={{marginTop:16,padding:"10px 14px",background:"#f1f5f9",borderRadius:10,fontSize:12,color:"#64748b",textAlign:"center",lineHeight:1.8}}>
-            <b style={{color:"#374151"}}>Demo:</b> ADMIN/admin123 · JUAN/123 · MARIA/123
           </div>
         </div>
       </div>
@@ -1195,6 +1185,12 @@ function VConteos({G,rerender,showToast,usuario}){
   const [modForm,setModForm]=useState({obs:"",usuarioC1:"",usuarioC2:""});
   const [editC2,setEditC2]=useState(null);
   const [c2Val,setC2Val]=useState("");
+  const [modalCaps,setModalCaps]=useState(null); // {conteoId, ronda, nombre}
+  const [busqCaps,setBusqCaps]=useState("");
+  const [modalComp,setModalComp]=useState(null); // conteo para comparativo
+  const [busqComp,setBusqComp]=useState("");
+  const caps=Object.values(G.capturas);
+  const getCapsRonda=(conteoId,ronda)=>caps.filter(c=>c.conteoId===conteoId&&c.ronda===ronda);
 
   const crear=()=>{
     if(!G.inventario)return showToast("Primero crea un inventario","err");
@@ -1291,9 +1287,10 @@ function VConteos({G,rerender,showToast,usuario}){
                       <td style={{padding:"10px 12px"}}><Badge color={c.tipo==="2conteos"?"#2563eb":"#16a34a"} small>{c.tipo==="2conteos"?"2 Conteos":"1 Conteo"}</Badge></td>
                       <td style={{padding:"10px 12px",fontWeight:600,color:"#2563eb"}}>{c.usuarioC1||"—"}</td>
                       <td style={{padding:"10px 12px"}}>
-                        <div style={{display:"inline-flex",alignItems:"center",justifyContent:"center",minWidth:36,height:22,borderRadius:6,background:c1Cerrado?"#16a34a":"#94a3b8",padding:"0 8px"}}>
-                          <span style={{color:"white",fontSize:10,fontWeight:800}}>{c1Cerrado?"OK":"?"}</span>
-                        </div>
+                        <button onClick={()=>c1Cerrado&&setModalCaps({conteoId:c.id,ronda:"C1",nombre:c.nombre})} title={c1Cerrado?"Ver capturas C1":""}
+                          style={{display:"inline-flex",alignItems:"center",justifyContent:"center",minWidth:40,height:22,borderRadius:6,background:c1Cerrado?"#16a34a":"#94a3b8",border:"none",padding:"0 8px",cursor:c1Cerrado?"pointer":"default"}}>
+                          <span style={{color:"white",fontSize:10,fontWeight:800}}>{c1Cerrado?"OK 👁":"?"}</span>
+                        </button>
                       </td>
                       <td style={{padding:"10px 12px",fontWeight:600,color:"#16a34a"}}>
                         {c.tipo==="2conteos"?(
@@ -1305,9 +1302,10 @@ function VConteos({G,rerender,showToast,usuario}){
                       </td>
                       <td style={{padding:"10px 12px"}}>
                         {c.tipo==="2conteos"&&c.usuarioC2?(
-                          <div style={{display:"inline-flex",alignItems:"center",justifyContent:"center",minWidth:36,height:22,borderRadius:6,background:c2Cerrado?"#16a34a":"#94a3b8",padding:"0 8px"}}>
-                            <span style={{color:"white",fontSize:10,fontWeight:800}}>{c2Cerrado?"OK":"?"}</span>
-                          </div>
+                          <button onClick={()=>c2Cerrado&&setModalCaps({conteoId:c.id,ronda:"C2",nombre:c.nombre})} title={c2Cerrado?"Ver capturas C2":""}
+                            style={{display:"inline-flex",alignItems:"center",justifyContent:"center",minWidth:40,height:22,borderRadius:6,background:c2Cerrado?"#16a34a":"#94a3b8",border:"none",padding:"0 8px",cursor:c2Cerrado?"pointer":"default"}}>
+                            <span style={{color:"white",fontSize:10,fontWeight:800}}>{c2Cerrado?"OK 👁":"?"}</span>
+                          </button>
                         ):<span style={{color:"#d1d5db",fontSize:11}}>—</span>}
                       </td>
                       <td style={{padding:"10px 12px",fontWeight:600,color:"#7c3aed"}}>
@@ -1317,9 +1315,10 @@ function VConteos({G,rerender,showToast,usuario}){
                       </td>
                       <td style={{padding:"10px 12px"}}>
                         {c.usuarioC3?(
-                          <div style={{display:"inline-flex",alignItems:"center",justifyContent:"center",minWidth:36,height:22,borderRadius:6,background:c.estado==="completado"?"#16a34a":"#7c3aed",padding:"0 8px"}}>
-                            <span style={{color:"white",fontSize:10,fontWeight:800}}>{c.estado==="completado"?"OK":"…"}</span>
-                          </div>
+                          <button onClick={()=>getCapsRonda(c.id,"C3").length>0&&setModalCaps({conteoId:c.id,ronda:"C3",nombre:c.nombre})} title="Ver capturas C3"
+                            style={{display:"inline-flex",alignItems:"center",justifyContent:"center",minWidth:40,height:22,borderRadius:6,background:c.estado==="completado"?"#16a34a":"#7c3aed",border:"none",padding:"0 8px",cursor:getCapsRonda(c.id,"C3").length>0?"pointer":"default"}}>
+                            <span style={{color:"white",fontSize:10,fontWeight:800}}>{c.estado==="completado"?"OK 👁":"…"}</span>
+                          </button>
                         ):<span style={{color:"#d1d5db",fontSize:11}}>—</span>}
                       </td>
                       <td style={{padding:"10px 12px"}}><Badge color={stC[c.estado]||"#6b7280"} small>{stL[c.estado]||c.estado}</Badge></td>
@@ -1330,6 +1329,10 @@ function VConteos({G,rerender,showToast,usuario}){
                           {rondasReabribles(c).length>0&&(
                             <button onClick={()=>setModalReabrir(c)}
                               style={{background:"#fef9c3",border:"1px solid #fde047",color:"#92400e",borderRadius:6,padding:"4px 10px",cursor:"pointer",fontWeight:700,fontSize:11}}>Reabrir</button>
+                          )}
+                          {c.tipo==="2conteos"&&(
+                            <button onClick={()=>{setBusqComp("");setModalComp(c);}}
+                              style={{background:"#f3e8ff",color:"#7c3aed",border:"1px solid #d8b4fe",borderRadius:6,padding:"4px 10px",cursor:"pointer",fontWeight:700,fontSize:11}}>⚖ Comparar</button>
                           )}
                           {c.estado==="diferencia"&&!c.usuarioC3&&(
                             <select defaultValue="" onChange={e=>e.target.value&&asignarC3(c.id,e.target.value)}
@@ -1433,6 +1436,86 @@ function VConteos({G,rerender,showToast,usuario}){
           <div style={{marginTop:16}}><Btn c="#64748b" onClick={()=>setModalReabrir(null)} full outline>Cancelar</Btn></div>
         </Modal>
       )}
+      {modalCaps&&(()=>{
+        const {conteoId,ronda,nombre}=modalCaps;
+        const rCaps=getCapsRonda(conteoId,ronda);
+        const porProd={};rCaps.forEach(c=>{if(!porProd[c.productoId])porProd[c.productoId]={...c,total:0};porProd[c.productoId].total+=c.cantidad;});
+        const todo=Object.values(porProd);
+        const q=busqCaps.trim().toLowerCase();
+        const lista=q?todo.filter(c=>(c.codigo&&c.codigo.toLowerCase().includes(q))||(c.ean&&String(c.ean).toLowerCase().includes(q))||(c.nombre&&c.nombre.toLowerCase().includes(q))):todo;
+        const cerrar=()=>{setBusqCaps("");setModalCaps(null);};
+        return(
+          <Modal titulo={`${ronda} — ${nombre} (${lista.length}${q?" de "+todo.length:""} productos)`} onClose={cerrar} wide>
+            <div style={{marginBottom:12}}>
+              <input value={busqCaps} onChange={e=>setBusqCaps(e.target.value)} placeholder="🔍 Buscar por código de barras o nombre…" autoFocus style={{...inp,fontSize:14,border:"1.5px solid #2563eb"}}/>
+            </div>
+            <div style={{maxHeight:460,overflowY:"auto"}}>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                <thead><tr style={{background:"#0f172a",color:"white",position:"sticky",top:0}}>{["Código","Nombre","Referencia","Total","Estado","Usuario"].map(h=><th key={h} style={{padding:"7px 10px",textAlign:"left",fontWeight:600}}>{h}</th>)}</tr></thead>
+                <tbody>
+                  {lista.length===0?(<tr><td colSpan={6} style={{padding:20,textAlign:"center",color:"#64748b"}}>{q?`No se encontró "${busqCaps}"`:"Sin capturas"}</td></tr>):lista.map((c,i)=>(
+                    <tr key={i} style={{background:i%2?"#f8fafc":"white",borderBottom:"1px solid #f1f5f9"}}>
+                      <td style={{padding:"6px 10px",fontFamily:"monospace",color:"#2563eb",fontWeight:700}}>{c.codigo}</td>
+                      <td style={{padding:"6px 10px",fontWeight:500}}>{c.nombre}</td>
+                      <td style={{padding:"6px 10px",color:"#64748b",fontSize:11}}>{c.referencia}</td>
+                      <td style={{padding:"6px 10px",textAlign:"center",fontWeight:800,color:"#2563eb",fontSize:15}}>{c.total}</td>
+                      <td style={{padding:"6px 10px"}}><EstBadge e={c.estado}/></td>
+                      <td style={{padding:"6px 10px",color:"#64748b"}}>{c.usuario}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div style={{marginTop:14,display:"flex",justifyContent:"flex-end"}}><Btn c="#64748b" onClick={cerrar}>Cerrar</Btn></div>
+          </Modal>
+        );
+      })()}
+      {modalComp&&(()=>{
+        const c=modalComp;
+        const ids=new Set(caps.filter(x=>x.conteoId===c.id).map(x=>x.productoId));
+        const tot=(pid,r)=>caps.filter(x=>x.conteoId===c.id&&x.productoId===pid&&x.ronda===r).reduce((s,x)=>s+x.cantidad,0);
+        const filas=[...ids].map(pid=>{
+          const p=G.productos.find(x=>x.id===pid)||caps.find(x=>x.productoId===pid)||{};
+          const t1=tot(pid,"C1"),t2=tot(pid,"C2"),t3=tot(pid,"C3");
+          const difiere=t1!==t2;
+          return{codigo:p.codigo||"",nombre:p.nombre||"",ean:p.ean||"",t1,t2,t3,difiere};
+        }).sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||""));
+        const q=busqComp.trim().toLowerCase();
+        const lista=q?filas.filter(f=>(f.codigo&&f.codigo.toLowerCase().includes(q))||(f.ean&&String(f.ean).toLowerCase().includes(q))||(f.nombre&&f.nombre.toLowerCase().includes(q))):filas;
+        const nDif=filas.filter(f=>f.difiere).length;
+        const cerrar=()=>{setBusqComp("");setModalComp(null);};
+        return(
+          <Modal titulo={`⚖ Comparativo — ${c.nombre}`} onClose={cerrar} wide>
+            <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
+              <Badge color="#2563eb">C1: {c.usuarioC1||"—"}</Badge>
+              <Badge color="#16a34a">C2: {c.usuarioC2||"—"}</Badge>
+              {c.usuarioC3&&<Badge color="#7c3aed">C3: {c.usuarioC3}</Badge>}
+              <Badge color={nDif>0?"#dc2626":"#16a34a"}>{nDif} con diferencia</Badge>
+            </div>
+            <div style={{marginBottom:12}}>
+              <input value={busqComp} onChange={e=>setBusqComp(e.target.value)} placeholder="🔍 Buscar por código o nombre…" style={{...inp,fontSize:14,border:"1.5px solid #7c3aed"}}/>
+            </div>
+            <div style={{maxHeight:460,overflowY:"auto"}}>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                <thead><tr style={{background:"#0f172a",color:"white",position:"sticky",top:0}}>{["Código","Nombre","C1","C2","C3","Dif"].map(h=><th key={h} style={{padding:"7px 10px",textAlign:h==="Código"||h==="Nombre"?"left":"center",fontWeight:600}}>{h}</th>)}</tr></thead>
+                <tbody>
+                  {lista.length===0?(<tr><td colSpan={6} style={{padding:20,textAlign:"center",color:"#64748b"}}>{q?`No se encontró "${busqComp}"`:"Sin capturas"}</td></tr>):lista.map((f,i)=>(
+                    <tr key={i} style={{background:f.difiere?"#fef2f2":i%2?"#f8fafc":"white",borderBottom:"1px solid #f1f5f9"}}>
+                      <td style={{padding:"6px 10px",fontFamily:"monospace",color:"#2563eb",fontWeight:700}}>{f.codigo}</td>
+                      <td style={{padding:"6px 10px",fontWeight:500}}>{f.nombre}</td>
+                      <td style={{padding:"6px 10px",textAlign:"center",fontWeight:700,color:"#2563eb"}}>{f.t1||"—"}</td>
+                      <td style={{padding:"6px 10px",textAlign:"center",fontWeight:700,color:"#16a34a"}}>{f.t2||"—"}</td>
+                      <td style={{padding:"6px 10px",textAlign:"center",fontWeight:700,color:"#7c3aed"}}>{f.t3||"—"}</td>
+                      <td style={{padding:"6px 10px",textAlign:"center",fontWeight:800,color:f.difiere?"#dc2626":"#16a34a"}}>{f.difiere?(f.t1-f.t2>0?"+":"")+(f.t1-f.t2):"✓"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div style={{marginTop:14,display:"flex",justifyContent:"flex-end"}}><Btn c="#64748b" onClick={cerrar}>Cerrar</Btn></div>
+          </Modal>
+        );
+      })()}
     </Section>
   );
 }
@@ -1633,7 +1716,7 @@ function VProcesos({G,rerender,showToast,usuario}){
           {l:"Total conteos",v:totalConteos,c:"#475569"},
           {l:"Completados",v:conteosCompletos,c:"#16a34a"},
           {l:"% Avance",v:pct+"%",c:"#0891b2"},
-          {l:"Con diferencia",v:G.conteos.filter(c=>c.estado==="diferencia").length,c:"#dc2626"},
+          {l:"Con diferencia",v:G.conteos.filter(c=>c.tipo==="2conteos"&&getDifsConteo(c).length>0).length,c:"#dc2626"},
           {l:"Alertas",v:G.alertas.filter(a=>!a.leida).length,c:"#7c3aed"},
         ].map(s=>(
           <div key={s.l} style={{...card,borderTop:`3px solid ${s.c}`,padding:"10px 14px"}}>
@@ -1889,7 +1972,7 @@ function VProcesos({G,rerender,showToast,usuario}){
           {l:"Total conteos",v:totalConteos,c:"#475569"},
           {l:"Completados",v:conteosCompletos,c:"#16a34a"},
           {l:"% Avance",v:pct+"%",c:"#0891b2"},
-          {l:"Con diferencia",v:G.conteos.filter(c=>c.estado==="diferencia").length,c:"#dc2626"},
+          {l:"Con diferencia",v:G.conteos.filter(c=>c.tipo==="2conteos"&&getDifsConteo(c).length>0).length,c:"#dc2626"},
           {l:"Alertas",v:G.alertas.filter(a=>!a.leida).length,c:"#7c3aed"},
         ].map(s=>(
           <div key={s.l} style={{...card,borderTop:`3px solid ${s.c}`,padding:"10px 14px"}}>
@@ -2826,6 +2909,7 @@ function VHistorial({G,showToast,usuario}){
 // ─────────────────────────────────────────
 function ModCapturador({usuario,setUsuario,G,rerender,recargar,showToast}){
   const [conteoActivo,setConteoActivo]=useState(null);
+  const [rondaActiva,setRondaActiva]=useState(null); // ronda elegida cuando el usuario tiene varias
   const [scanInput,setScanInput]=useState("");
   const [productoActivo,setProductoActivo]=useState(null);
   const [form,setForm]=useState({unidades:"",embalaje:"",cajas:"",estado:"BUENO",obs:""});
@@ -2856,11 +2940,27 @@ function ModCapturador({usuario,setUsuario,G,rerender,recargar,showToast}){
   const getConteo=()=>G.conteos.find(c=>c.id===conteoActivo)||null;
   const miConteo=getConteo();
 
+  // TODAS las rondas de las que este usuario es responsable en el conteo
+  const misRondasEn=(c)=>{
+    if(!c)return [];
+    const r=[];
+    if(c.usuarioC1===usuario.nombre)r.push("C1");
+    if(c.usuarioC2===usuario.nombre)r.push("C2");
+    if(c.usuarioC3===usuario.nombre&&c.estado==="enC3")r.push("C3");
+    return r;
+  };
   const getMiRonda=(c)=>{
     if(!c)return null;
-    if(c.usuarioC3===usuario.nombre&&c.estado==="enC3")return "C3";
-    if(c.usuarioC2===usuario.nombre)return "C2";
-    return "C1";
+    const rondas=misRondasEn(c);
+    if(rondas.length===0)return null;
+    // Si hay una ronda elegida explícitamente y es válida, usarla
+    if(rondaActiva&&rondas.includes(rondaActiva))return rondaActiva;
+    // Si solo tiene una, esa
+    if(rondas.length===1)return rondas[0];
+    // Varias y ninguna elegida aún: priorizar C3 si está en curso, si no la primera no cerrada
+    if(rondas.includes("C3"))return "C3";
+    const noCerrada=rondas.find(r=>!(c.rondasCerradas||[]).includes(r));
+    return noCerrada||rondas[0];
   };
   const miRonda=getMiRonda(miConteo);
 
@@ -3011,7 +3111,7 @@ function ModCapturador({usuario,setUsuario,G,rerender,recargar,showToast}){
 
     G.conteos=G.conteos.map(c=>c.id===miConteo.id?{...c,estado:nuevoEstado,rondasCerradas}:c);
     G.alertas.push({usuario:usuario.nombre,conteoNombre:miConteo.nombre,conteoId:miConteo.id,ronda:miRonda,hora:HOUR(),leida:false});
-    setModalCerrar(false);setConteoActivo(null);
+    setModalCerrar(false);setConteoActivo(null);setRondaActiva(null);
     rerender();showToast("Conteo terminado ✓");
   };
 
@@ -3033,8 +3133,16 @@ function ModCapturador({usuario,setUsuario,G,rerender,recargar,showToast}){
 
   // ── VISTA LISTA COMPACTA ──
   if(!conteoActivo||!miConteo){
-    const activos=misConteos.filter(c=>getEstadoParaMi(c)==="activo");
-    const cerrados=misConteos.filter(c=>getEstadoParaMi(c)==="cerrado");
+    // Una entrada por cada (conteo, ronda) de la que el usuario es responsable
+    const entradas=[];
+    misConteos.forEach(c=>{
+      misRondasEn(c).forEach(r=>{
+        const cerrada=(c.rondasCerradas||[]).includes(r)||(r==="C3"&&c.estado==="completado");
+        entradas.push({c,r,cerrada});
+      });
+    });
+    const activos=entradas.filter(e=>!e.cerrada);
+    const cerrados=entradas.filter(e=>e.cerrada);
     return(
       <div style={{minHeight:"100vh",background:"#f1f5f9",fontFamily:"system-ui,sans-serif"}}>
         <div style={{background:"#0f172a",color:"white",padding:"0 16px",display:"flex",alignItems:"center",justifyContent:"space-between",height:52,position:"sticky",top:0,zIndex:100}}>
@@ -3063,12 +3171,18 @@ function ModCapturador({usuario,setUsuario,G,rerender,recargar,showToast}){
               </div>
             ):(
               <div style={{...card,padding:0,overflow:"hidden"}}>
-                {activos.map((c,i)=>{
-                  const r=getMiRonda(c);
+                {activos.map((e,i)=>{
+                  const c=e.c, r=e.r;
                   const caps=Object.values(G.capturas).filter(x=>x.conteoId===c.id&&x.ronda===r);
-                  const puedeIniciar=puedoCapturar(c);
+                  // Para C3 solo se puede si el conteo está en enC3
+                  const puedeIniciar=r==="C3"?c.estado==="enC3":true;
+                  const abrir=()=>{
+                    if(!puedeIniciar){showToast("No disponible aún","warn");return;}
+                    setRondaActiva(r);
+                    setConteoActivo(c.id);
+                  };
                   return(
-                    <div key={c.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 16px",borderBottom:i<activos.length-1?"1px solid #f1f5f9":"none",background:"white",gap:12}}>
+                    <div key={c.id+"_"+r} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 16px",borderBottom:i<activos.length-1?"1px solid #f1f5f9":"none",background:"white",gap:12}}>
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{fontWeight:700,fontSize:14,color:"#0f172a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nombre}</div>
                         <div style={{fontSize:11,color:"#64748b",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>📍 {c.locLabel}</div>
@@ -3078,7 +3192,7 @@ function ModCapturador({usuario,setUsuario,G,rerender,recargar,showToast}){
                           {!puedeIniciar&&<Badge color="#94a3b8" small>No disponible aún</Badge>}
                         </div>
                       </div>
-                      <button onClick={()=>{if(puedeIniciar)setConteoActivo(c.id);else showToast("No disponible aún","warn");}}
+                      <button onClick={abrir}
                         style={{padding:"8px 16px",background:puedeIniciar?rcol[r]:"#e2e8f0",color:puedeIniciar?"white":"#94a3b8",border:"none",borderRadius:8,cursor:puedeIniciar?"pointer":"not-allowed",fontWeight:700,fontSize:13,flexShrink:0}}>
                         {caps.length>0?"Continuar":"Iniciar"}
                       </button>
@@ -3094,11 +3208,11 @@ function ModCapturador({usuario,setUsuario,G,rerender,recargar,showToast}){
             <div>
               <div style={{fontSize:11,fontWeight:700,color:"#374151",textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>Completados</div>
               <div style={{...card,padding:0,overflow:"hidden"}}>
-                {cerrados.map((c,i)=>{
-                  const r=getMiRonda(c);
+                {cerrados.map((e,i)=>{
+                  const c=e.c, r=e.r;
                   const caps=Object.values(G.capturas).filter(x=>x.conteoId===c.id&&x.ronda===r);
                   return(
-                    <div key={c.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 16px",borderBottom:i<cerrados.length-1?"1px solid #f1f5f9":"none",opacity:0.7}}>
+                    <div key={c.id+"_"+r} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 16px",borderBottom:i<cerrados.length-1?"1px solid #f1f5f9":"none",opacity:0.7}}>
                       <div style={{flex:1}}>
                         <div style={{fontWeight:600,fontSize:13,color:"#64748b"}}>{c.nombre}</div>
                         <div style={{fontSize:11,color:"#94a3b8",marginTop:1}}>📍 {c.locLabel}</div>
@@ -3126,7 +3240,7 @@ function ModCapturador({usuario,setUsuario,G,rerender,recargar,showToast}){
     <div style={{minHeight:"100vh",background:"#f1f5f9",fontFamily:"system-ui,sans-serif"}}>
       <div style={{background:"#0f172a",color:"white",padding:"0 16px",display:"flex",alignItems:"center",justifyContent:"space-between",height:52,position:"sticky",top:0,zIndex:100}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <button onClick={()=>{setConteoActivo(null);setProductoActivo(null);setScanInput("");setBusqueda("");}}
+          <button onClick={()=>{setConteoActivo(null);setRondaActiva(null);setProductoActivo(null);setScanInput("");setBusqueda("");}}
             style={{background:"transparent",border:"1px solid #334155",color:"#94a3b8",padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer"}}>← Mis conteos</button>
           <span style={{fontWeight:800,fontSize:15,color:"white"}}>TOMFIC</span>
           <span style={{background:rcol[miRonda],fontSize:10,padding:"2px 10px",borderRadius:20,fontWeight:700}}>{rlbl[miRonda]}</span>
