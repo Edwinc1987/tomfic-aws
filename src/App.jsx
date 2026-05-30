@@ -214,6 +214,7 @@ const initSnap=()=>{
 };
 
 let _syncing=false,_pending=false,_syncTimer=null;
+let _busy=false; // true mientras se hace una operación crítica (importar base, eliminar, cerrar). Pausa el auto-refresco.
 const doSync=async()=>{
   if(_syncing){_pending=true;return;}
   _syncing=true;
@@ -279,7 +280,7 @@ export default function TomficApp(){
     scheduleSync();
     setLastSaved(new Date().toLocaleTimeString("es-CO"));
   };
-  const recargar=async()=>{try{await loadFromSupabase();}catch(e){}tick(n=>n+1);};
+  const recargar=async()=>{if(_busy||_syncing)return;try{await loadFromSupabase();}catch(e){}tick(n=>n+1);};
 
   const toastRef=useRef(null);
   const [toast,setToast]=useState(null);
@@ -555,6 +556,7 @@ function VInventario({G,rerender,showToast,usuario}){
   };
   const cerrar=()=>{
     if(!G.inventario)return;
+    _busy=true;
     const capsSnapshot=JSON.parse(JSON.stringify(G.capturas));
     const prodsSnapshot=JSON.parse(JSON.stringify(G.productos));
     const conteosSnapshot=JSON.parse(JSON.stringify(G.conteos));
@@ -572,11 +574,12 @@ function VInventario({G,rerender,showToast,usuario}){
       return final>0?{...p,saldo:final}:p;
     });
     G.inventario=null;G.conteos=[];G.capturas={};G.alertas=[];
+    _busy=false;
     rerender();showToast("Inventario cerrado. Saldos actualizados ✓");
   };
   const eliminarInventario=async()=>{
     if(!G.inventario)return;
-    setEliminando(true);
+    setEliminando(true);_busy=true;
     const invId=G.inventario.id;
     try{
       // Borrar de la nube: conteos del inventario + el inventario
@@ -587,7 +590,7 @@ function VInventario({G,rerender,showToast,usuario}){
     G.inventario=null;G.conteos=[];G.capturas={};G.alertas=[];
     G.conteos.forEach(()=>{});
     initSnap();
-    setEliminando(false);setModalEliminar(false);
+    setEliminando(false);setModalEliminar(false);_busy=false;
     rerender();showToast("Inventario eliminado por completo ✓","warn");
   };
   const st=G.conteos.reduce((a,c)=>{if(c.estado==="completado"||c.estado==="cerradoC2")a.comp++;if(c.estado==="diferencia")a.dif++;return a;},{comp:0,dif:0});
@@ -903,8 +906,9 @@ function VBaseDatos({G,rerender,showToast}){
     e.target.value="";
   };
 
-  const confirmarImport=()=>{
+  const confirmarImport=async()=>{
     if(!rawData)return;
+    _busy=true;
     const normKey=(k)=>String(k).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^A-Z0-9]/g,"");
     const toNum=(v)=>{if(v===undefined||v===null||v==="")return 0;if(typeof v==="number")return isNaN(v)?0:v;let s=String(v).replace(/[^\d.,-]/g,"").trim();if(s==="")return 0;if(s.includes(".")&&s.includes(","))s=s.replace(/\./g,"").replace(",",".");else if(s.includes(","))s=s.replace(",",".");const n=parseFloat(s);return isNaN(n)?0:n;};
     const mapped=rawData.map((rawRow,i)=>{
@@ -931,10 +935,18 @@ function VBaseDatos({G,rerender,showToast}){
       };
     }).filter(r=>r.nombre);
     G.productos=mapped;setPreview(null);setRawData(null);
+    // Subir directamente a la nube y ESPERAR a que termine, antes de permitir refrescos.
+    try{
+      await SB.deleteAllProductos();
+      if(mapped.length)await SB.upsertProductosBulk(mapped.map(prodCols));
+      _snap.prods=JSON.stringify(mapped.map(prodCols)); // marca como ya sincronizado
+    }catch(e){console.warn("Error subiendo productos:",e);showToast("Error subiendo a la nube, revisa tu conexión","err");}
+    saveLocalCache();
+    _busy=false;
     rerender();
     const conCosto=mapped.filter(p=>p.costo>0).length,conSaldo=mapped.filter(p=>p.saldo>0).length;
     if(conCosto===0||conSaldo===0)showToast(`Importados ${mapped.length}, pero ${conCosto===0?"COSTO":""}${conCosto===0&&conSaldo===0?" y ":""}${conSaldo===0?"SALDO":""} salieron en 0 — revisa el nombre de esas columnas`,"warn");
-    else showToast(`✓ ${mapped.length} productos importados`);
+    else showToast(`✓ ${mapped.length} productos importados y guardados en la nube`);
   };
 
   const [mostrarEstructura,setMostrarEstructura]=useState(false);
