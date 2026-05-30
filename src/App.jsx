@@ -274,6 +274,30 @@ export default function TomficApp(){
 
   useEffect(()=>{(async()=>{try{await loadFromSupabase();}catch(e){console.error(e);setLoadErr("Error de conexión con la nube");}setLoading(false);})();},[]);
 
+  // CSS responsive global para celular (se inyecta una sola vez)
+  useEffect(()=>{
+    if(document.getElementById("tomfic-responsive"))return;
+    const st=document.createElement("style");
+    st.id="tomfic-responsive";
+    st.textContent=`
+      * { box-sizing: border-box; }
+      html, body { max-width: 100%; overflow-x: hidden; }
+      /* Todas las tablas: scroll horizontal si no caben */
+      table { max-width: 100%; }
+      @media (max-width: 768px) {
+        /* Las tablas pueden desbordar -> su contenedor hace scroll */
+        table { display: block; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
+        /* Reducir tamaños generales en celular */
+        h1 { font-size: 26px !important; }
+        h2 { font-size: 17px !important; }
+        h3 { font-size: 15px !important; }
+        /* Evitar que cualquier bloque se salga del ancho */
+        div, section { max-width: 100%; }
+      }
+    `;
+    document.head.appendChild(st);
+  },[]);
+
   const rerender=()=>{
     tick(n=>n+1);
     saveLocalCache();saveLocalConfig();
@@ -468,6 +492,7 @@ function Login({lf,setLf,err,onLogin,lastSaved}){
 // ─────────────────────────────────────────
 function ModAdmin({usuario,setUsuario,G,rerender,recargar,showToast,lastSaved,limpiarDatos}){
   const [view,setView]=useState("inventario");
+  const [modalSalir,setModalSalir]=useState(false);
   const alertas=G.alertas.filter(a=>!a.leida).length;
   const nav=[
     {id:"inventario",icon:"📋",label:"Inventario"},
@@ -506,7 +531,7 @@ function ModAdmin({usuario,setUsuario,G,rerender,recargar,showToast,lastSaved,li
           {alertas>0&&<button onClick={()=>{G.alertas=G.alertas.map(a=>({...a,leida:true}));rerender();setView("procesos");}} style={{background:"#dc2626",color:"white",border:"none",padding:"5px 12px",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:700}}>🔔 {alertas} alerta{alertas>1?"s":""}</button>}
           {lastSaved&&<span style={{fontSize:10,color:"#475569"}}>☁️ {lastSaved}</span>}
           <span style={{fontSize:12,color:"#94a3b8"}}>👤 {usuario.nombre}</span>
-          <button onClick={()=>setUsuario(null)} style={{background:"transparent",border:"1px solid #334155",color:"#94a3b8",padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer"}}>Salir</button>
+          <button onClick={()=>setModalSalir(true)} style={{background:"#dc2626",border:"none",color:"white",padding:"6px 16px",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer"}}>⎋ Salir</button>
         </div>
       </div>
       <div style={{display:"flex",minHeight:"calc(100vh - 54px)"}}>
@@ -529,6 +554,18 @@ function ModAdmin({usuario,setUsuario,G,rerender,recargar,showToast,lastSaved,li
           {view==="historial"&&<VHistorial {...props}/>}
         </div>
       </div>
+      {modalSalir&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+          <div style={{background:"white",borderRadius:16,padding:28,width:380,maxWidth:"96vw",boxShadow:"0 25px 60px rgba(0,0,0,0.3)"}}>
+            <h3 style={{margin:"0 0 12px",fontSize:18,fontWeight:700,color:"#0f172a"}}>¿Cerrar sesión?</h3>
+            <p style={{fontSize:14,color:"#374151",marginBottom:22,lineHeight:1.5}}>Vas a salir de TOMFIC. Tus datos ya están guardados en la nube.</p>
+            <div style={{display:"flex",gap:10}}>
+              <Btn c="#dc2626" onClick={()=>setUsuario(null)} full>Sí, salir</Btn>
+              <Btn c="#64748b" onClick={()=>setModalSalir(false)} full outline>Cancelar</Btn>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -538,9 +575,25 @@ function VInventario({G,rerender,showToast,usuario}){
   const [modal,setModal]=useState(false);
   const [modalEdit,setModalEdit]=useState(false);
   const [modalEliminar,setModalEliminar]=useState(false);
+  const [modalCerrar,setModalCerrar]=useState(false);
   const [eliminando,setEliminando]=useState(false);
   const [form,setForm]=useState({nombre:"",tipo:"2conteos",obs:"",fecha:TODAY()});
   const [editForm,setEditForm]=useState({nombre:"",obs:""});
+
+  // Determina qué conteos NO están completados (para bloquear el cierre)
+  const estadoConteo=(c)=>{
+    // ¿completo? un conteo está completo solo si su estado final es "completado"
+    if(c.estado==="completado")return null; // ok, completo
+    // Razón por la que no está completo:
+    if(c.estado==="pendiente")return "sin iniciar";
+    if(c.estado==="enCurso")return "C1 en curso";
+    if(c.estado==="cerradoC1")return c.tipo==="2conteos"?"falta C2":null; // si es 1 conteo, cerradoC1 = completo
+    if(c.estado==="cerradoC2")return null; // 2 conteos sin diferencia = completo
+    if(c.estado==="diferencia")return "tiene diferencias, falta C3";
+    if(c.estado==="enC3")return "C3 en curso";
+    return "incompleto";
+  };
+  const conteosIncompletos=()=>G.conteos.map(c=>({c,razon:estadoConteo(c)})).filter(x=>x.razon!==null);
   const crear=()=>{
     if(!form.nombre.trim())return showToast("Ingresa un nombre","err");
     if(G.inventario)return showToast("Ya hay un inventario activo","err");
@@ -554,8 +607,22 @@ function VInventario({G,rerender,showToast,usuario}){
     G.inventario={...G.inventario,nombre:editForm.nombre,obs:editForm.obs};
     setModalEdit(false);rerender();showToast("Inventario actualizado ✓");
   };
+  const intentarCerrar=()=>{
+    if(!G.inventario)return;
+    if(G.conteos.length===0)return showToast("No hay conteos en este inventario","err");
+    const incompletos=conteosIncompletos();
+    if(incompletos.length>0){
+      const nombres=incompletos.map(x=>`• ${x.c.nombre} (${x.razon})`).join("\n");
+      showToast(`⚠️ Faltan ${incompletos.length} conteo(s) por completar. No se puede cerrar.`,"err");
+      G.alertas=[{id:ID(),tipo:"cierre",msg:`No se cerró el inventario: faltan conteos por completar:\n${nombres}`,fecha:HOUR(),leida:false},...G.alertas];
+      rerender();
+      return;
+    }
+    setModalCerrar(true);
+  };
   const cerrar=()=>{
     if(!G.inventario)return;
+    setModalCerrar(false);
     _busy=true;
     const capsSnapshot=JSON.parse(JSON.stringify(G.capturas));
     const prodsSnapshot=JSON.parse(JSON.stringify(G.productos));
@@ -598,7 +665,7 @@ function VInventario({G,rerender,showToast,usuario}){
     <Section titulo="Inventario">
       <div style={{display:"flex",gap:10,marginBottom:16}}>
         {!G.inventario&&<Btn c="#16a34a" onClick={()=>setModal(true)}>+ Nuevo Inventario</Btn>}
-        {G.inventario&&<Btn c="#dc2626" onClick={cerrar}>⬛ Cerrar Inventario</Btn>}
+        {G.inventario&&<Btn c="#dc2626" onClick={intentarCerrar}>⬛ Cerrar Inventario</Btn>}
         {G.inventario&&<Btn c="#2563eb" outline onClick={()=>{setEditForm({nombre:G.inventario.nombre,obs:G.inventario.obs||""});setModalEdit(true);}}>✏️ Editar</Btn>}
         {G.inventario&&<Btn c="#dc2626" outline onClick={()=>setModalEliminar(true)}>🗑 Eliminar</Btn>}
       </div>
@@ -657,6 +724,18 @@ function VInventario({G,rerender,showToast,usuario}){
           <Lbl>Observaciones</Lbl>
           <Inp value={editForm.obs} onChange={e=>setEditForm(p=>({...p,obs:e.target.value}))} placeholder="Opcional..." style={{marginBottom:20}}/>
           <Btn c="#2563eb" onClick={guardarEdit} full>✓ Guardar cambios</Btn>
+        </Modal>
+      )}
+      {modalCerrar&&(
+        <Modal titulo="⬛ Cerrar Inventario" onClose={()=>setModalCerrar(false)}>
+          <div style={{background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:10,padding:16,marginBottom:18,fontSize:14,color:"#166534",lineHeight:1.5}}>
+            Todos los conteos están completos. ✅<br/><br/>
+            Al cerrar, se guardará el inventario en el <b>historial</b>, se actualizarán los <b>saldos</b> con las cantidades contadas, y este inventario dejará de estar activo.
+          </div>
+          <div style={{display:"flex",gap:10}}>
+            <Btn c="#dc2626" onClick={cerrar} full>Sí, cerrar inventario</Btn>
+            <Btn c="#64748b" onClick={()=>setModalCerrar(false)} full outline>Cancelar</Btn>
+          </div>
         </Modal>
       )}
       {modalEliminar&&(
@@ -1154,9 +1233,23 @@ function VConteos({G,rerender,showToast,usuario}){
     rerender();showToast("C3 asignado ✓");
   };
 
-  const reabrir=(id)=>{
-    G.conteos=G.conteos.map(c=>c.id===id?{...c,estado:"enCurso",rondasCerradas:[]}:c);
-    rerender();showToast("Conteo reabierto ✓","warn");
+  const [modalReabrir,setModalReabrir]=useState(null);
+  const reabrirRonda=(c,ronda)=>{
+    const rc=(c.rondasCerradas||[]).filter(r=>r!==ronda);
+    let nuevoEstado;
+    if(ronda==="C1")nuevoEstado="enCurso";
+    else if(ronda==="C2")nuevoEstado=rc.includes("C1")?"cerradoC1":"enCurso";
+    else if(ronda==="C3")nuevoEstado="diferencia";
+    G.conteos=G.conteos.map(x=>x.id===c.id?{...x,estado:nuevoEstado,rondasCerradas:rc,...(ronda==="C3"?{}:{})}:x);
+    setModalReabrir(null);rerender();showToast(`${ronda} reabierto ✓`,"warn");
+  };
+  // Qué rondas se pueden reabrir según lo ya cerrado
+  const rondasReabribles=(c)=>{
+    const r=[];const rc=c.rondasCerradas||[];
+    if(rc.includes("C1")||["cerradoC1","cerradoC2","completado","diferencia","enC3"].includes(c.estado))r.push("C1");
+    if(c.tipo==="2conteos"&&(rc.includes("C2")||["cerradoC2","completado","diferencia"].includes(c.estado)))r.push("C2");
+    if(c.usuarioC3&&c.estado==="completado")r.push("C3");
+    return r;
   };
 
   const stC={pendiente:"#94a3b8",enCurso:"#2563eb",cerradoC1:"#d97706",cerradoC2:"#16a34a",diferencia:"#dc2626",enC3:"#7c3aed",completado:"#16a34a"};
@@ -1234,8 +1327,8 @@ function VConteos({G,rerender,showToast,usuario}){
                         <div style={{display:"flex",gap:6}}>
                           <button onClick={()=>{setModalMod(c);setModForm({obs:c.obs||"",usuarioC1:c.usuarioC1,usuarioC2:c.usuarioC2||""});}}
                             style={{background:"#eff6ff",color:"#2563eb",border:"1px solid #bfdbfe",borderRadius:6,padding:"4px 10px",cursor:"pointer",fontWeight:700,fontSize:11}}>Modificar</button>
-                          {["cerradoC1","cerradoC2","completado","diferencia","enC3"].includes(c.estado)&&(
-                            <button onClick={()=>reabrir(c.id)}
+                          {rondasReabribles(c).length>0&&(
+                            <button onClick={()=>setModalReabrir(c)}
                               style={{background:"#fef9c3",border:"1px solid #fde047",color:"#92400e",borderRadius:6,padding:"4px 10px",cursor:"pointer",fontWeight:700,fontSize:11}}>Reabrir</button>
                           )}
                           {c.estado==="diferencia"&&!c.usuarioC3&&(
@@ -1315,6 +1408,31 @@ function VConteos({G,rerender,showToast,usuario}){
           <Btn c="#2563eb" onClick={guardarMod} full>✓ Guardar cambios</Btn>
         </Modal>
       )}
+      {modalReabrir&&(
+        <Modal titulo="¿Qué conteo deseas reabrir?" onClose={()=>setModalReabrir(null)}>
+          <div style={{fontSize:13,color:"#64748b",marginBottom:16}}>
+            Conteo: <b style={{color:"#0f172a"}}>{modalReabrir.nombre}</b> · {modalReabrir.locLabel}
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {rondasReabribles(modalReabrir).map(r=>{
+              const col={C1:"#2563eb",C2:"#16a34a",C3:"#7c3aed"}[r];
+              const quien=r==="C1"?modalReabrir.usuarioC1:r==="C2"?modalReabrir.usuarioC2:modalReabrir.usuarioC3;
+              const txt={C1:"Conteo 1",C2:"Conteo 2",C3:"Conteo 3"}[r];
+              return(
+                <button key={r} onClick={()=>reabrirRonda(modalReabrir,r)}
+                  style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 16px",border:`2px solid ${col}`,borderRadius:10,background:"white",cursor:"pointer",textAlign:"left"}}>
+                  <div>
+                    <div style={{fontWeight:700,color:col,fontSize:15}}>🔓 Reabrir {txt}</div>
+                    <div style={{fontSize:12,color:"#64748b",marginTop:2}}>Usuario: {quien||"—"}</div>
+                  </div>
+                  <span style={{color:col,fontSize:18}}>→</span>
+                </button>
+              );
+            })}
+          </div>
+          <div style={{marginTop:16}}><Btn c="#64748b" onClick={()=>setModalReabrir(null)} full outline>Cancelar</Btn></div>
+        </Modal>
+      )}
     </Section>
   );
 }
@@ -1323,6 +1441,7 @@ function VConteos({G,rerender,showToast,usuario}){
 function VProcesos({G,rerender,showToast,usuario}){
   const [modalAsignar,setModalAsignar]=useState(null);
   const [modalCaps,setModalCaps]=useState(null); // {conteoId, ronda, nombre}
+  const [busqCaps,setBusqCaps]=useState("");
   const [modalReabrir,setModalReabrir]=useState(null); // {conteo}
   const [usuariosExtra,setUsuariosExtra]=useState({});
   const caps=Object.values(G.capturas);
@@ -1421,9 +1540,20 @@ function VProcesos({G,rerender,showToast,usuario}){
       if(!porProd[c.productoId])porProd[c.productoId]={...c,total:0};
       porProd[c.productoId].total+=c.cantidad;
     });
-    const lista=Object.values(porProd);
+    const listaTotal=Object.values(porProd);
+    const q=busqCaps.trim().toLowerCase();
+    const lista=q?listaTotal.filter(c=>
+      (c.codigo&&c.codigo.toLowerCase().includes(q))||
+      (c.ean&&String(c.ean).toLowerCase().includes(q))||
+      (c.nombre&&c.nombre.toLowerCase().includes(q))
+    ):listaTotal;
+    const cerrar=()=>{setBusqCaps("");setModalCaps(null);};
     return(
-      <Modal titulo={`${ronda} — ${nombre} (${lista.length} productos)`} onClose={()=>setModalCaps(null)} wide>
+      <Modal titulo={`${ronda} — ${nombre} (${lista.length}${q?" de "+listaTotal.length:""} productos)`} onClose={cerrar} wide>
+        <div style={{marginBottom:12}}>
+          <input value={busqCaps} onChange={e=>setBusqCaps(e.target.value)} placeholder="🔍 Buscar por código de barras o nombre…" autoFocus
+            style={{...inp,fontSize:14,border:"1.5px solid #2563eb"}}/>
+        </div>
         <div style={{maxHeight:480,overflowY:"auto"}}>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
             <thead><tr style={{background:"#0f172a",color:"white",position:"sticky",top:0}}>
@@ -1433,7 +1563,7 @@ function VProcesos({G,rerender,showToast,usuario}){
             </tr></thead>
             <tbody>
               {lista.length===0?(
-                <tr><td colSpan={7} style={{padding:20,textAlign:"center",color:"#64748b"}}>Sin capturas registradas aún</td></tr>
+                <tr><td colSpan={7} style={{padding:20,textAlign:"center",color:"#64748b"}}>{q?`No se encontró "${busqCaps}"`:"Sin capturas registradas aún"}</td></tr>
               ):lista.map((c,i)=>(
                 <tr key={i} style={{background:i%2?"#f8fafc":"white",borderBottom:"1px solid #f1f5f9"}}>
                   <td style={{padding:"6px 10px",fontFamily:"monospace",color:"#2563eb",fontWeight:700}}>{c.codigo}</td>
@@ -1449,7 +1579,7 @@ function VProcesos({G,rerender,showToast,usuario}){
           </table>
         </div>
         <div style={{marginTop:14,display:"flex",justifyContent:"flex-end"}}>
-          <Btn c="#64748b" onClick={()=>setModalCaps(null)}>Cerrar</Btn>
+          <Btn c="#64748b" onClick={cerrar}>Cerrar</Btn>
         </div>
       </Modal>
     );
@@ -1568,14 +1698,20 @@ function VProcesos({G,rerender,showToast,usuario}){
                   const c2Cerrado=["cerradoC2","completado","diferencia","enC3"].includes(c.estado);
                   // Hay diferencia real
                   const hayDifs=difs.length>0&&c1Cerrado&&c2Cerrado;
+                  // ¿El C3 ya se realizó? (hay capturas C3 registradas para este conteo)
+                  const c3Terminado=c.usuarioC3&&c.estado==="completado"&&caps.some(x=>x.conteoId===c.id&&x.ronda==="C3");
+                  // ¿Se puede hacer clic para asignar C3? Solo si hay diferencias y el C3 aún NO terminó
+                  const puedeAsignarC3=(hayDifs||c.estado==="diferencia")&&!c3Terminado;
 
                   // Validador
                   const validColor=
+                    c3Terminado?"#94a3b8":
                     c.estado==="completado"&&!hayDifs?"#16a34a":
-                    hayDifs||c.estado==="diferencia"?"#dc2626":"#94a3b8";
+                    puedeAsignarC3?"#dc2626":"#94a3b8";
                   const validContent=
+                    c3Terminado?<span style={{color:"white",fontWeight:800,fontSize:13}}>🔒</span>:
                     c.estado==="completado"&&!hayDifs?<span style={{color:"white",fontWeight:800,fontSize:13}}>OK</span>:
-                    hayDifs||c.estado==="diferencia"?<span style={{color:"white",fontWeight:800,fontSize:11}}>CLIC</span>:
+                    puedeAsignarC3?<span style={{color:"white",fontWeight:800,fontSize:11}}>CLIC</span>:
                     <span style={{color:"white",fontWeight:800,fontSize:16}}>?</span>;
 
                   return(
@@ -1680,12 +1816,12 @@ function VProcesos({G,rerender,showToast,usuario}){
 
                       {/* Validador */}
                       <td style={{padding:"10px 10px",textAlign:"center",minWidth:80}}>
-                        <div onClick={()=>(hayDifs||c.estado==="diferencia")&&setModalAsignar({conteoId:c.id,tipo:"C3"})}
-                          style={{width:44,height:44,borderRadius:"50%",background:validColor,display:"flex",alignItems:"center",justifyContent:"center",cursor:(hayDifs||c.estado==="diferencia")?"pointer":"default",boxShadow:"0 2px 8px rgba(0,0,0,0.18)",margin:"0 auto"}}>
+                        <div onClick={()=>puedeAsignarC3&&setModalAsignar({conteoId:c.id,tipo:"C3"})}
+                          style={{width:44,height:44,borderRadius:"50%",background:validColor,display:"flex",alignItems:"center",justifyContent:"center",cursor:puedeAsignarC3?"pointer":"default",boxShadow:"0 2px 8px rgba(0,0,0,0.18)",margin:"0 auto",opacity:c3Terminado?0.7:1}}>
                           {validContent}
                         </div>
                         <div style={{fontSize:9,color:"#64748b",marginTop:3,textAlign:"center"}}>
-                          {(hayDifs||c.estado==="diferencia")?"→ C3":c.estado==="completado"?"Sin dif":"En proceso"}
+                          {c3Terminado?"C3 validado":puedeAsignarC3?"→ C3":c.estado==="completado"?"Sin dif":"En proceso"}
                         </div>
                       </td>
 
@@ -2698,6 +2834,7 @@ function ModCapturador({usuario,setUsuario,G,rerender,recargar,showToast}){
   const [modalCerrar,setModalCerrar]=useState(false);
   const [busqueda,setBusqueda]=useState("");
   const [showCam,setShowCam]=useState(false);
+  const [modalSalir,setModalSalir]=useState(false);
   const scanRef=useRef(null);
   const unidadesRef=useRef(null);
 
@@ -2881,6 +3018,19 @@ function ModCapturador({usuario,setUsuario,G,rerender,recargar,showToast}){
   const rcol={C1:"#2563eb",C2:"#16a34a",C3:"#7c3aed"};
   const rlbl={C1:"CONTEO 1",C2:"CONTEO 2",C3:"CONTEO 3"};
 
+  const modalSalirJSX=modalSalir?(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+      <div style={{background:"white",borderRadius:16,padding:28,width:360,maxWidth:"96vw",boxShadow:"0 25px 60px rgba(0,0,0,0.3)"}}>
+        <h3 style={{margin:"0 0 12px",fontSize:18,fontWeight:700,color:"#0f172a"}}>¿Cerrar sesión?</h3>
+        <p style={{fontSize:14,color:"#374151",marginBottom:22,lineHeight:1.5}}>Vas a salir de TOMFIC. Tus capturas ya están guardadas en la nube.</p>
+        <div style={{display:"flex",gap:10}}>
+          <Btn c="#dc2626" onClick={()=>setUsuario(null)} full>Sí, salir</Btn>
+          <Btn c="#64748b" onClick={()=>setModalSalir(false)} full outline>Cancelar</Btn>
+        </div>
+      </div>
+    </div>
+  ):null;
+
   // ── VISTA LISTA COMPACTA ──
   if(!conteoActivo||!miConteo){
     const activos=misConteos.filter(c=>getEstadoParaMi(c)==="activo");
@@ -2896,7 +3046,7 @@ function ModCapturador({usuario,setUsuario,G,rerender,recargar,showToast}){
           <div style={{display:"flex",gap:10,alignItems:"center"}}>
             <button onClick={async()=>{await recargar();showToast("Actualizado ✓");}} style={{background:"transparent",border:"1px solid #334155",color:"#94a3b8",padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer"}}>🔄</button>
             <span style={{fontSize:11,color:"#94a3b8"}}>👤 {usuario.nombre}</span>
-            <button onClick={()=>setUsuario(null)} style={{background:"transparent",border:"1px solid #334155",color:"#94a3b8",padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer"}}>Salir</button>
+            <button onClick={()=>setModalSalir(true)} style={{background:"#dc2626",border:"none",color:"white",padding:"6px 16px",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer"}}>⎋ Salir</button>
           </div>
         </div>
         <div style={{maxWidth:700,margin:"0 auto",padding:"20px 14px"}}>
@@ -2965,6 +3115,7 @@ function ModCapturador({usuario,setUsuario,G,rerender,recargar,showToast}){
             </div>
           )}
         </div>
+        {modalSalirJSX}
       </div>
     );
   }
@@ -2984,7 +3135,7 @@ function ModCapturador({usuario,setUsuario,G,rerender,recargar,showToast}){
           <button onClick={async()=>{await recargar();showToast("Actualizado ✓");}} title="Traer lo último de la nube" style={{background:"transparent",border:"1px solid #334155",color:"#94a3b8",padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer"}}>🔄</button>
           <span style={{fontSize:11,color:"#94a3b8"}}>👤 {usuario.nombre}</span>
           {soyPrincipal(miConteo)&&<button onClick={()=>setModalCerrar(true)} style={{background:"#dc2626",color:"white",border:"none",padding:"6px 14px",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:700}}>Terminar conteo</button>}
-          <button onClick={()=>setUsuario(null)} style={{background:"transparent",border:"1px solid #334155",color:"#94a3b8",padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer"}}>Salir</button>
+          <button onClick={()=>setModalSalir(true)} style={{background:"#dc2626",border:"none",color:"white",padding:"6px 16px",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer"}}>⎋ Salir</button>
         </div>
       </div>
 
@@ -3282,6 +3433,7 @@ function ModCapturador({usuario,setUsuario,G,rerender,recargar,showToast}){
         </div>
       )}
       {showCam&&<CamScanner color={rcol[miRonda]} onClose={()=>setShowCam(false)} onDetect={onCamDetect}/>}
+      {modalSalirJSX}
     </div>
   );
 }
