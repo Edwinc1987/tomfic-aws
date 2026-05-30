@@ -397,15 +397,13 @@ function Login({lf,setLf,err,onLogin,lastSaved}){
 
           {/* Form */}
           <div style={{background:"white",borderRadius:16,padding:"28px 28px",boxShadow:"0 4px 24px rgba(0,0,0,0.08)",border:"1px solid #e2e8f0"}}>
-            {lastSaved&&(
-              <div style={{marginBottom:16,background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:10,padding:"10px 14px",fontSize:12,color:"#166534",display:"flex",alignItems:"center",gap:8}}>
-                <span style={{fontSize:16}}>💾</span>
-                <div>
-                  <b>Datos guardados disponibles</b><br/>
-                  <span style={{fontSize:11,color:"#64748b"}}>Último guardado: {typeof lastSaved==="string"?lastSaved:new Date(lastSaved).toLocaleString("es-CO")}</span>
-                </div>
+            <div style={{marginBottom:16,background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:10,padding:"10px 14px",fontSize:12,color:"#1e40af",display:"flex",alignItems:"center",gap:8}}>
+              <span style={{fontSize:16}}>☁️</span>
+              <div>
+                <b>Conectado a la nube</b><br/>
+                <span style={{fontSize:11,color:"#64748b"}}>Datos sincronizados en tiempo real</span>
               </div>
-            )}
+            </div>
             <div style={{marginBottom:20}}>
               <Lbl>Usuario</Lbl>
               <Inp value={lf.user} onChange={e=>setLf(p=>({...p,user:e.target.value}))}
@@ -481,6 +479,18 @@ function ModAdmin({usuario,setUsuario,G,rerender,recargar,showToast,lastSaved,li
     {id:"historial",icon:"🗄️",label:"Historial"},
   ];
   const props={usuario,setUsuario,G,rerender,recargar,showToast};
+
+  // Auto-refresco desde la nube cada 10s. Se pausa si el admin está
+  // escribiendo en un campo (input/select/textarea) para no interrumpirlo.
+  useEffect(()=>{
+    const t=setInterval(()=>{
+      const el=document.activeElement;
+      const tag=el&&el.tagName?el.tagName.toUpperCase():"";
+      if(tag==="INPUT"||tag==="SELECT"||tag==="TEXTAREA")return;
+      recargar();
+    },10000);
+    return ()=>clearInterval(t);
+  },[]);
   return(
     <div style={{minHeight:"100vh",background:"#f1f5f9",fontFamily:"system-ui,sans-serif"}}>
       <div style={{background:"#0f172a",color:"white",padding:"0 20px",display:"flex",alignItems:"center",justifyContent:"space-between",height:54,position:"sticky",top:0,zIndex:100}}>
@@ -526,6 +536,8 @@ function ModAdmin({usuario,setUsuario,G,rerender,recargar,showToast,lastSaved,li
 function VInventario({G,rerender,showToast,usuario}){
   const [modal,setModal]=useState(false);
   const [modalEdit,setModalEdit]=useState(false);
+  const [modalEliminar,setModalEliminar]=useState(false);
+  const [eliminando,setEliminando]=useState(false);
   const [form,setForm]=useState({nombre:"",tipo:"2conteos",obs:"",fecha:TODAY()});
   const [editForm,setEditForm]=useState({nombre:"",obs:""});
   const crear=()=>{
@@ -562,6 +574,22 @@ function VInventario({G,rerender,showToast,usuario}){
     G.inventario=null;G.conteos=[];G.capturas={};G.alertas=[];
     rerender();showToast("Inventario cerrado. Saldos actualizados ✓");
   };
+  const eliminarInventario=async()=>{
+    if(!G.inventario)return;
+    setEliminando(true);
+    const invId=G.inventario.id;
+    try{
+      // Borrar de la nube: conteos del inventario + el inventario
+      for(const c of G.conteos){try{await SB.deleteConteo(c.id);}catch(e){}}
+      try{await supabase.from("inventarios").delete().eq("id",invId);}catch(e){}
+    }catch(e){console.warn("Error al eliminar de la nube:",e);}
+    // Limpiar localmente y resetear el snapshot de sincronización
+    G.inventario=null;G.conteos=[];G.capturas={};G.alertas=[];
+    G.conteos.forEach(()=>{});
+    initSnap();
+    setEliminando(false);setModalEliminar(false);
+    rerender();showToast("Inventario eliminado por completo ✓","warn");
+  };
   const st=G.conteos.reduce((a,c)=>{if(c.estado==="completado"||c.estado==="cerradoC2")a.comp++;if(c.estado==="diferencia")a.dif++;return a;},{comp:0,dif:0});
   return(
     <Section titulo="Inventario">
@@ -569,6 +597,7 @@ function VInventario({G,rerender,showToast,usuario}){
         {!G.inventario&&<Btn c="#16a34a" onClick={()=>setModal(true)}>+ Nuevo Inventario</Btn>}
         {G.inventario&&<Btn c="#dc2626" onClick={cerrar}>⬛ Cerrar Inventario</Btn>}
         {G.inventario&&<Btn c="#2563eb" outline onClick={()=>{setEditForm({nombre:G.inventario.nombre,obs:G.inventario.obs||""});setModalEdit(true);}}>✏️ Editar</Btn>}
+        {G.inventario&&<Btn c="#dc2626" outline onClick={()=>setModalEliminar(true)}>🗑 Eliminar</Btn>}
       </div>
       {!G.inventario?(
         <div style={{...card,textAlign:"center",padding:48,color:"#64748b"}}>
@@ -625,6 +654,18 @@ function VInventario({G,rerender,showToast,usuario}){
           <Lbl>Observaciones</Lbl>
           <Inp value={editForm.obs} onChange={e=>setEditForm(p=>({...p,obs:e.target.value}))} placeholder="Opcional..." style={{marginBottom:20}}/>
           <Btn c="#2563eb" onClick={guardarEdit} full>✓ Guardar cambios</Btn>
+        </Modal>
+      )}
+      {modalEliminar&&(
+        <Modal titulo="🗑 Eliminar Inventario" onClose={()=>!eliminando&&setModalEliminar(false)}>
+          <div style={{background:"#fef2f2",border:"1px solid #fecaca",borderRadius:10,padding:16,marginBottom:18,fontSize:14,color:"#991b1b",lineHeight:1.5}}>
+            Esto borrará <b>por completo</b> el inventario <b>{G.inventario?.nombre}</b> junto con <b>todos sus conteos y capturas</b>, en este dispositivo y en la nube.<br/><br/>
+            Esta acción <b>no se puede deshacer</b>. Úsala solo si el inventario quedó mal creado.
+          </div>
+          <div style={{display:"flex",gap:10}}>
+            <Btn c="#dc2626" onClick={eliminarInventario} full disabled={eliminando}>{eliminando?"Eliminando...":"Sí, eliminar todo"}</Btn>
+            <Btn c="#64748b" onClick={()=>setModalEliminar(false)} full disabled={eliminando}>Cancelar</Btn>
+          </div>
         </Modal>
       )}
     </Section>
@@ -1125,7 +1166,7 @@ function VConteos({G,rerender,showToast,usuario}){
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:13,minWidth:800}}>
               <thead>
                 <tr style={{background:"#0f172a",color:"white"}}>
-                  {["Nombre","Ubicación","Tipo","C1","Estado C1","C2","Estado C2","Estado","Acciones"].map(h=>(
+                  {["Nombre","Ubicación","Tipo","C1","Estado C1","C2","Estado C2","C3","Estado C3","Estado","Acciones"].map(h=>(
                     <th key={h} style={{padding:"10px 12px",textAlign:"left",fontWeight:600,whiteSpace:"nowrap",fontSize:11}}>{h}</th>
                   ))}
                 </tr>
@@ -1161,6 +1202,18 @@ function VConteos({G,rerender,showToast,usuario}){
                         {c.tipo==="2conteos"&&c.usuarioC2?(
                           <div style={{display:"inline-flex",alignItems:"center",justifyContent:"center",minWidth:36,height:22,borderRadius:6,background:c2Cerrado?"#16a34a":"#94a3b8",padding:"0 8px"}}>
                             <span style={{color:"white",fontSize:10,fontWeight:800}}>{c2Cerrado?"OK":"?"}</span>
+                          </div>
+                        ):<span style={{color:"#d1d5db",fontSize:11}}>—</span>}
+                      </td>
+                      <td style={{padding:"10px 12px",fontWeight:600,color:"#7c3aed"}}>
+                        {c.usuarioC3?c.usuarioC3:(
+                          c.estado==="diferencia"?<span style={{color:"#dc2626",fontSize:11,fontWeight:700}}>Por asignar</span>:<span style={{color:"#d1d5db",fontSize:11}}>—</span>
+                        )}
+                      </td>
+                      <td style={{padding:"10px 12px"}}>
+                        {c.usuarioC3?(
+                          <div style={{display:"inline-flex",alignItems:"center",justifyContent:"center",minWidth:36,height:22,borderRadius:6,background:c.estado==="completado"?"#16a34a":"#7c3aed",padding:"0 8px"}}>
+                            <span style={{color:"white",fontSize:10,fontWeight:800}}>{c.estado==="completado"?"OK":"…"}</span>
                           </div>
                         ):<span style={{color:"#d1d5db",fontSize:11}}>—</span>}
                       </td>
@@ -1998,7 +2051,40 @@ function VReportes({G,showToast,usuario}){
     };
   }).filter(Boolean);
 
-  const difInv=capFinal.filter(c=>c.diferencia!==0);
+  // BASE COMPLETA: recorre TODOS los productos de la base de datos.
+  // Los no contados cuentan como físico = 0 (faltante total).
+  const capByProd={};
+  caps.forEach(c=>{
+    if(!capByProd[c.productoId])capByProd[c.productoId]={c1:0,c2:0,c3:0,last:null};
+    const r=capByProd[c.productoId];
+    if(c.ronda==="C1")r.c1+=c.cantidad;else if(c.ronda==="C2")r.c2+=c.cantidad;else if(c.ronda==="C3")r.c3+=c.cantidad;
+    r.last=c;
+  });
+  const baseCompleta=G.productos.map(p=>{
+    const r=capByProd[p.id];
+    const sumC1=r?r.c1:0,sumC2=r?r.c2:0,sumC3=r?r.c3:0;
+    const contado=!!r;
+    const final=contado?(sumC3||sumC2||sumC1):0;
+    const last=r?r.last:null;
+    const conteo=last?G.conteos.find(c=>c.id===last.conteoId):null;
+    return{
+      ...p,
+      ubicacion:conteo?.ubicacion||p.ubicacion||"",
+      localizacion:conteo?.localizacion||p.localizacion||"",
+      nro:conteo?.nro||"",
+      c1:sumC1||"",c2:sumC2||"",c3:sumC3||"",
+      cantFinal:final,
+      contado,
+      diferencia:final-(p.saldo||0),
+      valDif:(final-(p.saldo||0))*(p.costo||0),
+      estado:contado?(last.estado||""):"SIN CONTAR",
+      obs:last?.obs||"",
+      usuario:last?.usuario||"",
+    };
+  });
+  // Diferencia sobre toda la base: cualquier producto cuyo físico != saldo sistema
+  const difBase=baseCompleta.filter(c=>c.diferencia!==0);
+  const valorAjusteTotal=baseCompleta.reduce((s,c)=>s+c.valDif,0);
 
   return(
     <Section titulo="Reportes">
@@ -2067,18 +2153,18 @@ function VReportes({G,showToast,usuario}){
         <div style={card}>
           <div style={{fontSize:26,marginBottom:6}}>⚖️</div>
           <h3 style={{margin:"0 0 4px",fontSize:14,fontWeight:700}}>Diferencia Inventario</h3>
-          <p style={{fontSize:12,color:"#64748b",margin:"0 0 12px"}}>Físico vs Sistema</p>
-          <div style={{background:"#2563eb22",borderRadius:8,padding:8,fontSize:24,fontWeight:800,color:"#2563eb",textAlign:"center",marginBottom:12}}>{difInv.length}</div>
-          <Btn c="#2563eb" onClick={()=>expXLSX(difInv.map(c=>[c.codigo,c.nombre,c.referencia,c.costo||0,c.saldo,c.cantFinal,c.diferencia,Math.round(c.valDif),c.estado||"",c.categoria||"",c.subcategoria||"",c.nit||"",c.proveedor||""]),["CODIGO","NOMBRE","REFERENCIA","COSTO","SALDO","CANTIDAD","DIFERENCIA","VALOR_DIF","ESTADO","CATEGORIA","SUBCATEGORIA","NIT","PROVEEDOR"],"diferencia_inventario.xlsx","DIFERENCIA INVENTARIOS")} disabled={difInv.length===0} full>⬇ Exportar Excel</Btn>
+          <p style={{fontSize:12,color:"#64748b",margin:"0 0 12px"}}>Físico vs Sistema · base completa</p>
+          <div style={{background:"#2563eb22",borderRadius:8,padding:8,fontSize:24,fontWeight:800,color:"#2563eb",textAlign:"center",marginBottom:12}}>{difBase.length}</div>
+          <Btn c="#2563eb" onClick={()=>expXLSX(difBase.map(c=>[c.codigo,c.nombre,c.referencia,c.costo||0,c.saldo,c.cantFinal,c.diferencia,Math.round(c.valDif),c.estado||"",c.categoria||"",c.subcategoria||"",c.subgrupo||"",c.nit||"",c.proveedor||""]),["CODIGO","NOMBRE","REFERENCIA","COSTO","SALDO","CANTIDAD","DIFERENCIA","VALOR_DIF","ESTADO","CATEGORIA","SUBCATEGORIA","SUBGRUPO","NIT","PROVEEDOR"],"diferencia_inventario.xlsx","DIFERENCIA INVENTARIOS")} disabled={difBase.length===0} full>⬇ Exportar Excel</Btn>
         </div>
 
         {/* Ajuste */}
         <div style={card}>
           <div style={{fontSize:26,marginBottom:6}}>🔧</div>
           <h3 style={{margin:"0 0 4px",fontSize:14,fontWeight:700}}>Ajuste de Inventario</h3>
-          <p style={{fontSize:12,color:"#64748b",margin:"0 0 12px"}}>Código · Cantidad · Fecha</p>
-          <div style={{background:"#16a34a22",borderRadius:8,padding:8,fontSize:24,fontWeight:800,color:"#16a34a",textAlign:"center",marginBottom:12}}>{capFinal.length}</div>
-          <Btn c="#16a34a" onClick={()=>expXLSX(capFinal.map(c=>[c.codigo,c.cantFinal,c.saldo,TODAY(),c.ubicacion||"BODEGA"]),["CODIGO","CANTIDAD","SALDO","FECH_CORTE","BODEGA"],"ajuste_inventario.xlsx","AJUSTE INVENTARIO")} disabled={capFinal.length===0} full>⬇ Exportar Excel</Btn>
+          <p style={{fontSize:12,color:"#64748b",margin:"0 0 12px"}}>Código · Cantidad · Fecha · base completa</p>
+          <div style={{background:"#16a34a22",borderRadius:8,padding:8,fontSize:24,fontWeight:800,color:"#16a34a",textAlign:"center",marginBottom:12}}>{baseCompleta.length}</div>
+          <Btn c="#16a34a" onClick={()=>expXLSX(baseCompleta.map(c=>[c.codigo,c.cantFinal,c.saldo,c.diferencia,TODAY(),c.ubicacion||"BODEGA"]),["CODIGO","CANTIDAD","SALDO","DIFERENCIA","FECH_CORTE","BODEGA"],"ajuste_inventario.xlsx","AJUSTE INVENTARIO")} disabled={baseCompleta.length===0} full>⬇ Exportar Excel</Btn>
         </div>
 
         {/* Reporte de Captura — C1/C2/C3 en columnas, sin SALDO, con ubicación */}
@@ -2603,6 +2689,16 @@ function ModCapturador({usuario,setUsuario,G,rerender,recargar,showToast}){
   const scanRef=useRef(null);
   const unidadesRef=useRef(null);
 
+  // Auto-refresco desde la nube cada 10s. Se pausa si el capturador está
+  // escribiendo una captura o tiene la cámara abierta, para no interrumpir.
+  useEffect(()=>{
+    const t=setInterval(()=>{
+      if(productoActivo||showCam)return;
+      recargar();
+    },10000);
+    return ()=>clearInterval(t);
+  },[productoActivo,showCam]);
+
   // Todos los conteos asignados a este usuario
   const misConteos=G.conteos.filter(c=>
     c.usuarioC1===usuario.nombre||c.usuarioC2===usuario.nombre||c.usuarioC3===usuario.nombre
@@ -2873,6 +2969,7 @@ function ModCapturador({usuario,setUsuario,G,rerender,recargar,showToast}){
           <span style={{background:rcol[miRonda],fontSize:10,padding:"2px 10px",borderRadius:20,fontWeight:700}}>{rlbl[miRonda]}</span>
         </div>
         <div style={{display:"flex",gap:10,alignItems:"center"}}>
+          <button onClick={async()=>{await recargar();showToast("Actualizado ✓");}} title="Traer lo último de la nube" style={{background:"transparent",border:"1px solid #334155",color:"#94a3b8",padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer"}}>🔄</button>
           <span style={{fontSize:11,color:"#94a3b8"}}>👤 {usuario.nombre}</span>
           {soyPrincipal(miConteo)&&<button onClick={()=>setModalCerrar(true)} style={{background:"#dc2626",color:"white",border:"none",padding:"6px 14px",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:700}}>Terminar conteo</button>}
           <button onClick={()=>setUsuario(null)} style={{background:"transparent",border:"1px solid #334155",color:"#94a3b8",padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer"}}>Salir</button>
