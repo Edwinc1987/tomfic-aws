@@ -1528,7 +1528,27 @@ function VProcesos({G,rerender,showToast,usuario}){
   const [modalReabrir,setModalReabrir]=useState(null); // {conteo}
   const [usuariosExtra,setUsuariosExtra]=useState({});
   const [verPendientes,setVerPendientes]=useState(false);
+  const [pendForm,setPendForm]=useState(null); // {tipo:'crear'|'c2'|'c3', id/locId, nombre, c1, c2}
   const caps=Object.values(G.capturas);
+  const usuariosActivos=()=>G.usuarios.filter(u=>u.activo);
+  // Crear conteo rápido desde el panel de pendientes
+  const crearConteoRapido=(loc,nombre,c1,c2)=>{
+    if(!nombre.trim()||!c1)return showToast("Completa nombre y usuario C1","err");
+    G.conteos.push({
+      id:ID(),nombre:nombre.trim(),locId:loc.id,
+      locLabel:`${loc.ubicacion} › ${loc.localizacion} › ${loc.nro}`,
+      ubicacion:loc.ubicacion,localizacion:loc.localizacion,nro:loc.nro,
+      obs:"",tipo:G.inventario.tipo,
+      usuarioC1:c1,usuarioC2:c2||"",usuarioC3:"",
+      estado:"pendiente",rondasCerradas:[],fechaCreacion:TODAY(),
+    });
+    setPendForm(null);rerender();showToast("Conteo programado ✓");
+  };
+  const asignarC2Rapido=(id,u)=>{
+    if(!u)return showToast("Selecciona un usuario","err");
+    G.conteos=G.conteos.map(c=>c.id===id?{...c,usuarioC2:u}:c);
+    setPendForm(null);rerender();showToast("Usuario C2 asignado ✓");
+  };
   const total=G.productos.length;
 
   const totalConteos=G.conteos.length;
@@ -1766,13 +1786,34 @@ function VProcesos({G,rerender,showToast,usuario}){
                   <div style={{fontSize:12,fontWeight:700,color:"#374151",marginBottom:8,textTransform:"uppercase",letterSpacing:0.5}}>Conteos sin terminar ({conteosPend.length})</div>
                   {conteosPend.length===0?<div style={{fontSize:12,color:"#16a34a",padding:"6px 0"}}>Todos los conteos creados estan completos</div>:(
                     <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                      {conteosPend.map(({c,razon})=>(
+                      {conteosPend.map(({c,razon})=>{
+                        const abierto=pendForm&&pendForm.id===c.id;
+                        const faltaC2=c.tipo==="2conteos"&&!c.usuarioC2;
+                        const faltaC3=c.estado==="diferencia"&&!c.usuarioC3;
+                        const accionable=faltaC2||faltaC3;
+                        return(
                         <div key={c.id} style={{background:"#fffbeb",border:"1px solid #fde047",borderRadius:8,padding:"8px 12px",fontSize:12}}>
-                          <div style={{fontWeight:700,color:"#0f172a"}}>{c.nombre}</div>
-                          <div style={{color:"#64748b",fontSize:11,marginTop:1}}>📍 {c.locLabel}</div>
-                          <div style={{color:"#92400e",fontSize:11,fontWeight:700,marginTop:3}}>{razon}</div>
+                          <div onClick={()=>accionable&&setPendForm(abierto?null:{id:c.id,tipo:faltaC2?"c2":"c3",val:""})} style={{cursor:accionable?"pointer":"default"}}>
+                            <div style={{fontWeight:700,color:"#0f172a",display:"flex",justifyContent:"space-between"}}>
+                              <span>{c.nombre}</span>
+                              {accionable&&<span style={{color:"#2563eb",fontSize:11}}>{abierto?"▲":faltaC2?"+ Asignar C2":"+ Asignar C3"}</span>}
+                            </div>
+                            <div style={{color:"#64748b",fontSize:11,marginTop:1}}>📍 {c.locLabel}</div>
+                            <div style={{color:"#92400e",fontSize:11,fontWeight:700,marginTop:3}}>{razon}</div>
+                          </div>
+                          {abierto&&(
+                            <div style={{marginTop:8,display:"flex",gap:6,alignItems:"center"}}>
+                              <select value={pendForm.val} onChange={e=>setPendForm({...pendForm,val:e.target.value})} style={{...inp,fontSize:12,padding:"5px 8px",flex:1}}>
+                                <option value="">Selecciona usuario…</option>
+                                {usuariosActivos().map(u=><option key={u.id}>{u.nombre}</option>)}
+                              </select>
+                              <Btn c="#16a34a" small onClick={()=>pendForm.tipo==="c2"?asignarC2Rapido(c.id,pendForm.val):(pendForm.val&&asignarC3(c.id,pendForm.val),setPendForm(null))}>OK</Btn>
+                              <Btn c="#64748b" small onClick={()=>setPendForm(null)}>✕</Btn>
+                            </div>
+                          )}
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -1780,13 +1821,40 @@ function VProcesos({G,rerender,showToast,usuario}){
                   <div style={{fontSize:12,fontWeight:700,color:"#374151",marginBottom:8,textTransform:"uppercase",letterSpacing:0.5}}>Ubicaciones sin conteo ({locSinConteo.length})</div>
                   {locSinConteo.length===0?<div style={{fontSize:12,color:"#16a34a",padding:"6px 0"}}>Todas las ubicaciones tienen conteo</div>:(
                     <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                      {locSinConteo.map(l=>(
+                      {locSinConteo.map(l=>{
+                        const abierto=pendForm&&pendForm.locId===l.id;
+                        return(
                         <div key={l.id} style={{background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:8,padding:"8px 12px",fontSize:12}}>
-                          <div style={{fontWeight:700,color:"#1e40af"}}>{l.ubicacion} › {l.localizacion} › {l.nro}</div>
-                          {l.observacion&&<div style={{color:"#64748b",fontSize:11,marginTop:1}}>{l.observacion}</div>}
-                          <div style={{color:"#2563eb",fontSize:11,fontWeight:700,marginTop:3}}>Sin conteo programado</div>
+                          <div onClick={()=>setPendForm(abierto?null:{locId:l.id,tipo:"crear",nombre:`${l.localizacion} ${l.nro}`,c1:"",c2:""})} style={{cursor:"pointer"}}>
+                            <div style={{fontWeight:700,color:"#1e40af",display:"flex",justifyContent:"space-between"}}>
+                              <span>{l.ubicacion} › {l.localizacion} › {l.nro}</span>
+                              <span style={{color:"#2563eb",fontSize:11}}>{abierto?"▲":"+ Crear conteo"}</span>
+                            </div>
+                            {l.observacion&&<div style={{color:"#64748b",fontSize:11,marginTop:1}}>{l.observacion}</div>}
+                            {!abierto&&<div style={{color:"#2563eb",fontSize:11,fontWeight:700,marginTop:3}}>Sin conteo programado</div>}
+                          </div>
+                          {abierto&&(
+                            <div style={{marginTop:8,display:"flex",flexDirection:"column",gap:6}}>
+                              <input value={pendForm.nombre} onChange={e=>setPendForm({...pendForm,nombre:e.target.value})} placeholder="Nombre del conteo" style={{...inp,fontSize:12,padding:"5px 8px"}}/>
+                              <select value={pendForm.c1} onChange={e=>setPendForm({...pendForm,c1:e.target.value})} style={{...inp,fontSize:12,padding:"5px 8px"}}>
+                                <option value="">Usuario Conteo 1…</option>
+                                {usuariosActivos().map(u=><option key={u.id}>{u.nombre}</option>)}
+                              </select>
+                              {G.inventario.tipo==="2conteos"&&(
+                                <select value={pendForm.c2} onChange={e=>setPendForm({...pendForm,c2:e.target.value})} style={{...inp,fontSize:12,padding:"5px 8px"}}>
+                                  <option value="">Usuario Conteo 2 (opcional)…</option>
+                                  {usuariosActivos().map(u=><option key={u.id}>{u.nombre}</option>)}
+                                </select>
+                              )}
+                              <div style={{display:"flex",gap:6}}>
+                                <Btn c="#16a34a" small onClick={()=>crearConteoRapido(l,pendForm.nombre,pendForm.c1,pendForm.c2)} full>✓ Crear</Btn>
+                                <Btn c="#64748b" small onClick={()=>setPendForm(null)} full>Cancelar</Btn>
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
