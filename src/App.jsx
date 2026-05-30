@@ -1527,6 +1527,7 @@ function VProcesos({G,rerender,showToast,usuario}){
   const [busqCaps,setBusqCaps]=useState("");
   const [modalReabrir,setModalReabrir]=useState(null); // {conteo}
   const [usuariosExtra,setUsuariosExtra]=useState({});
+  const [verPendientes,setVerPendientes]=useState(false);
   const caps=Object.values(G.capturas);
   const total=G.productos.length;
 
@@ -1736,6 +1737,64 @@ function VProcesos({G,rerender,showToast,usuario}){
           <div style={{width:pct+"%",background:"linear-gradient(90deg,#2563eb,#16a34a)",borderRadius:99,height:"100%",transition:"width 0.5s"}}/>
         </div>
       </div>
+
+      {/* Panel: Pendientes por hacer */}
+      {(()=>{
+        const conteosPend=G.conteos.filter(c=>c.estado!=="completado").map(c=>{
+          let razon="";
+          if(c.estado==="pendiente")razon="Sin iniciar";
+          else if(c.estado==="enCurso")razon="C1 en curso";
+          else if(c.estado==="cerradoC1")razon=c.tipo==="2conteos"?"Falta C2":"";
+          else if(c.estado==="diferencia")razon="Tiene diferencias, falta C3";
+          else if(c.estado==="enC3")razon="C3 en curso";
+          return {c,razon};
+        }).filter(x=>x.razon!=="");
+        const locConConteo=new Set(G.conteos.map(c=>c.locId));
+        const locSinConteo=G.localizaciones.filter(l=>!locConConteo.has(l.id));
+        const totalPend=conteosPend.length+locSinConteo.length;
+        return(
+          <div style={{...card,marginBottom:16,border:totalPend>0?"2px solid #f59e0b":"2px solid #bbf7d0"}}>
+            <div onClick={()=>setVerPendientes(v=>!v)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}}>
+              <div style={{fontWeight:700,fontSize:14,color:totalPend>0?"#92400e":"#166534"}}>
+                {totalPend>0?`⏳ Faltan ${totalPend} pendiente(s) por hacer`:"✅ Todo al día — no hay pendientes"}
+              </div>
+              <span style={{fontSize:12,color:"#64748b"}}>{verPendientes?"▲ ocultar":"▼ ver detalle"}</span>
+            </div>
+            {verPendientes&&totalPend>0&&(
+              <div style={{marginTop:14,display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:14}}>
+                <div>
+                  <div style={{fontSize:12,fontWeight:700,color:"#374151",marginBottom:8,textTransform:"uppercase",letterSpacing:0.5}}>Conteos sin terminar ({conteosPend.length})</div>
+                  {conteosPend.length===0?<div style={{fontSize:12,color:"#16a34a",padding:"6px 0"}}>Todos los conteos creados estan completos</div>:(
+                    <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                      {conteosPend.map(({c,razon})=>(
+                        <div key={c.id} style={{background:"#fffbeb",border:"1px solid #fde047",borderRadius:8,padding:"8px 12px",fontSize:12}}>
+                          <div style={{fontWeight:700,color:"#0f172a"}}>{c.nombre}</div>
+                          <div style={{color:"#64748b",fontSize:11,marginTop:1}}>📍 {c.locLabel}</div>
+                          <div style={{color:"#92400e",fontSize:11,fontWeight:700,marginTop:3}}>{razon}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <div style={{fontSize:12,fontWeight:700,color:"#374151",marginBottom:8,textTransform:"uppercase",letterSpacing:0.5}}>Ubicaciones sin conteo ({locSinConteo.length})</div>
+                  {locSinConteo.length===0?<div style={{fontSize:12,color:"#16a34a",padding:"6px 0"}}>Todas las ubicaciones tienen conteo</div>:(
+                    <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                      {locSinConteo.map(l=>(
+                        <div key={l.id} style={{background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:8,padding:"8px 12px",fontSize:12}}>
+                          <div style={{fontWeight:700,color:"#1e40af"}}>{l.ubicacion} › {l.localizacion} › {l.nro}</div>
+                          {l.observacion&&<div style={{color:"#64748b",fontSize:11,marginTop:1}}>{l.observacion}</div>}
+                          <div style={{color:"#2563eb",fontSize:11,fontWeight:700,marginTop:3}}>Sin conteo programado</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Alertas */}
       {G.alertas.filter(a=>!a.leida).length>0&&(
