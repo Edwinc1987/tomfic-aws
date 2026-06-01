@@ -749,6 +749,8 @@ function VUbicaciones({G,rerender,showToast}){
   const [form,setForm]=useState({ubicacion:"",localizacion:"",nro:"",observacion:""});
   const [newUbicTipo,setNewUbicTipo]=useState("");
   const [newLocTipo,setNewLocTipo]=useState("");
+  const [editLoc,setEditLoc]=useState(null); // localización en edición
+  const [editForm,setEditFormLoc]=useState({nro:"",observacion:""});
 
   const siguienteNro=()=>{
     if(!form.ubicacion||!form.localizacion)return "";
@@ -938,6 +940,10 @@ function VUbicaciones({G,rerender,showToast}){
                           style={{background:"#eff6ff",color:"#2563eb",border:"1px solid #bfdbfe",borderRadius:6,padding:"4px 10px",cursor:"pointer",fontWeight:700,fontSize:11}}>
                           🖨️ Etiqueta
                         </button>
+                        <button onClick={()=>{setEditLoc(l);setEditFormLoc({nro:l.nro,observacion:l.observacion||"",ubicacion:l.ubicacion,localizacion:l.localizacion});}}
+                          style={{background:"#fef9c3",color:"#92400e",border:"1px solid #fde047",borderRadius:6,padding:"4px 10px",cursor:"pointer",fontWeight:700,fontSize:11}}>
+                          ✏️ Editar
+                        </button>
                         <button onClick={()=>eliminar(l.id)}
                           style={{background:"transparent",border:"none",color:"#dc2626",cursor:"pointer",fontWeight:700,fontSize:15}}>✕</button>
                       </div>
@@ -949,6 +955,47 @@ function VUbicaciones({G,rerender,showToast}){
           </div>
         )}
       </div>
+
+      {/* Modal editar localización */}
+      {editLoc&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <div style={{background:"white",borderRadius:14,padding:28,width:400,maxWidth:"95vw",boxShadow:"0 20px 60px rgba(0,0,0,0.25)"}}>
+            <h3 style={{margin:"0 0 16px",fontSize:16,fontWeight:700}}>Editar localización</h3>
+            <div style={{marginBottom:12}}>
+              <div style={{fontSize:11,color:"#94a3b8",fontWeight:700,marginBottom:4}}>UBICACIÓN</div>
+              <div style={{padding:"8px 12px",background:"#f8fafc",borderRadius:7,fontSize:13,color:"#374151"}}>{editForm.ubicacion}</div>
+            </div>
+            <div style={{marginBottom:12}}>
+              <div style={{fontSize:11,color:"#94a3b8",fontWeight:700,marginBottom:4}}>LOCALIZACIÓN</div>
+              <div style={{padding:"8px 12px",background:"#f8fafc",borderRadius:7,fontSize:13,color:"#374151"}}>{editForm.localizacion}</div>
+            </div>
+            <div style={{marginBottom:12}}>
+              <div style={{fontSize:11,color:"#94a3b8",fontWeight:700,marginBottom:4}}>N° LOCALIZACIÓN</div>
+              <input value={editForm.nro} onChange={e=>setEditFormLoc(f=>({...f,nro:e.target.value.toUpperCase()}))}
+                style={{width:"100%",padding:"8px 12px",borderRadius:7,border:"1.5px solid #e2e8f0",fontSize:13,boxSizing:"border-box"}}/>
+            </div>
+            <div style={{marginBottom:20}}>
+              <div style={{fontSize:11,color:"#94a3b8",fontWeight:700,marginBottom:4}}>OBSERVACIÓN</div>
+              <input value={editForm.observacion} onChange={e=>setEditFormLoc(f=>({...f,observacion:e.target.value}))}
+                placeholder="Ej: Tienda Gourmet"
+                style={{width:"100%",padding:"8px 12px",borderRadius:7,border:"1.5px solid #e2e8f0",fontSize:13,boxSizing:"border-box"}}/>
+            </div>
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={()=>{
+                if(!editForm.nro.trim())return showToast("El N° no puede estar vacío","err");
+                G.localizaciones=G.localizaciones.map(l=>l.id===editLoc.id?{...l,nro:editForm.nro.trim(),observacion:editForm.observacion.trim()}:l);
+                rerender();showToast("Localización actualizada");setEditLoc(null);
+              }} style={{flex:1,padding:"9px 0",background:"#2563eb",color:"white",border:"none",borderRadius:8,fontWeight:700,cursor:"pointer"}}>
+                Guardar
+              </button>
+              <button onClick={()=>setEditLoc(null)}
+                style={{flex:1,padding:"9px 0",background:"#f1f5f9",color:"#374151",border:"none",borderRadius:8,fontWeight:700,cursor:"pointer"}}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Section>
   );
 }
@@ -986,7 +1033,7 @@ function VBaseDatos({G,rerender,showToast}){
       const getNum=(...keys)=>{for(const k of keys){const nk=normKey(k);if(row[nk]!==undefined&&row[nk]!==null&&String(row[nk]).trim()!=="")return toNum(row[nk]);}return 0;};
       return{
         id:"p"+i,
-        ean:get("EAN13","EAN","CODIGOBARRAS","CODIGO DE BARRAS","BARRAS"),
+        ean:get("EAN13OCODIGOBARRAS","EAN13","EAN","CODIGOBARRAS","CODIGO DE BARRAS","BARRAS"),
         codigo:get("CODIGO","CODIGO INTERNO","CODIGOINTERNO","COD","CODIGO PRODUCTO","SKU","PLU"),
         nombre:get("NOMBRE PRODUCTO","NOMBRE DEL PRODUCTO","NOMBRE","DESCRIPCION","PRODUCTO"),
         referencia:get("NOMBRE REFERENCIA","REFERENCIA","REF","PRESENTACION"),
@@ -1026,7 +1073,7 @@ function VBaseDatos({G,rerender,showToast}){
   });
 
   const ESTRUCTURA=[
-    {col:"EAN13 o CODIGOBARRAS",desc:"Código de barras del producto",ej:"7701101300176",req:"Recomendado"},
+    {col:"EAN13",desc:"Código de barras del producto",ej:"7701101300176",req:"Recomendado"},
     {col:"CODIGOINTERNO",desc:"Código interno del sistema",ej:"00009",req:"Recomendado"},
     {col:"NOMBRE PRODUCTO",desc:"Nombre del producto",ej:"HAMBURGUESA ZENU",req:"Obligatorio"},
     {col:"NOMBRE REFERENCIA",desc:"Presentación o referencia",ej:"30 und",req:"Opcional"},
@@ -1034,11 +1081,21 @@ function VBaseDatos({G,rerender,showToast}){
     {col:"NOMBRE SUBCATEGORIA",desc:"Subcategoría",ej:"HAMBURGUESA",req:"Opcional"},
     {col:"NOMBRE SUBGRUPO",desc:"Subgrupo",ej:"RES",req:"Opcional"},
     {col:"NOMBRE DETERMINADA",desc:"Ubicación física",ej:"CAVA 1",req:"Recomendado"},
-    {col:"SALDO o CANTIDAD",desc:"Cantidad en sistema",ej:"12",req:"Recomendado"},
+    {col:"CANTIDAD",desc:"Cantidad en sistema",ej:"12",req:"Recomendado"},
     {col:"COSTO",desc:"Costo unitario",ej:"18500",req:"Recomendado"},
     {col:"NIT",desc:"NIT del proveedor",ej:"860001697",req:"Opcional"},
     {col:"NOMBRE PROVEEDOR",desc:"Nombre del proveedor",ej:"ZENU",req:"Opcional"},
+    {col:"LOCALIZACION",desc:"Tipo de localización",ej:"NEVERA",req:"Opcional"},
+    {col:"UBICACION",desc:"Tipo de ubicación",ej:"SALA DE VENTAS",req:"Opcional"},
+    {col:"OBSERVACION",desc:"Observación del producto",ej:"IMPORTADO",req:"Opcional"},
   ];
+
+  const descargarPlantilla=()=>{
+    const cols=["EAN13","CODIGOINTERNO","NOMBRE PRODUCTO","NOMBRE REFERENCIA","NOMBRE CATEGORIA","NOMBRE SUBCATEGORIA","NOMBRE SUBGRUPO","NOMBRE DETERMINADA","CANTIDAD","COSTO","NIT","NOMBRE PROVEEDOR","LOCALIZACION","UBICACION","OBSERVACION"];
+    const ej=["7701101300176","00009","HAMBURGUESA ZENU X 30 UND","30 und","CARNES FRIAS","HAMBURGUESA","RES","CAVA 1",12,18500,"860001697","ZENU","NEVERA","SALA DE VENTAS","IMPORTADO"];
+    expXLSX([ej],cols,"plantilla_productos_TOMFIC.xlsx","PRODUCTOS");
+    showToast("Plantilla descargada");
+  };
 
   return(
     <Section titulo="Base de Productos">
@@ -1049,6 +1106,10 @@ function VBaseDatos({G,rerender,showToast}){
         <button onClick={()=>setMostrarEstructura(v=>!v)}
           style={{padding:"9px 16px",background:"#f8fafc",border:"1.5px solid #e2e8f0",color:"#374151",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:13}}>
           📋 {mostrarEstructura?"Ocultar":"Ver"} estructura del Excel
+        </button>
+        <button onClick={descargarPlantilla}
+          style={{padding:"9px 16px",background:"#f0fdf4",border:"1.5px solid #bbf7d0",color:"#166534",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:13}}>
+          ⬇ Descargar plantilla
         </button>
         {G.productos.length>0&&(
           <>
@@ -1956,7 +2017,16 @@ function VProcesos({G,rerender,showToast,usuario}){
                           <span style={{color:"white",fontSize:10,fontWeight:800}}>{c1Cerrado?"OK ✓":"?"}</span>
                         </button>
                       </td>
-                      <td style={{padding:"10px 10px",color:"#64748b",fontSize:11}}>{c1s.length>0?c1s.length+" reg":"—"}</td>
+                      <td style={{padding:"10px 10px",fontSize:11}}>
+                        {(()=>{
+                          const usuarios=[c.usuarioC1,...(usuariosExtra[c.id]||[])].filter(Boolean);
+                          const rows=usuarios.map(u=>{
+                            const und=c1s.filter(x=>x.usuario===u).reduce((a,x)=>a+(Number(x.total)||0),0);
+                            return und>0?<div key={u} style={{whiteSpace:"nowrap"}}><span style={{color:"#2563eb",fontWeight:700}}>{u}:</span> <span style={{color:"#374151"}}>{und} und</span></div>:null;
+                          }).filter(Boolean);
+                          return rows.length>0?rows:<span style={{color:"#d1d5db"}}>—</span>;
+                        })()}
+                      </td>
 
                       {/* Conteo 2 — clickeable */}
                       <td style={{padding:"10px 10px",minWidth:120}}>
@@ -1979,7 +2049,14 @@ function VProcesos({G,rerender,showToast,usuario}){
                           )
                         ):<span style={{color:"#d1d5db",fontSize:11}}>N/A</span>}
                       </td>
-                      <td style={{padding:"10px 10px",color:"#64748b",fontSize:11}}>{c2s.length>0?c2s.length+" reg":"—"}</td>
+                      <td style={{padding:"10px 10px",fontSize:11}}>
+                        {(()=>{
+                          const u2=c.usuarioC2;
+                          if(!u2)return <span style={{color:"#d1d5db"}}>—</span>;
+                          const und=c2s.filter(x=>x.usuario===u2).reduce((a,x)=>a+(Number(x.total)||0),0);
+                          return und>0?<div><span style={{color:"#16a34a",fontWeight:700}}>{u2}:</span> <span style={{color:"#374151"}}>{und} und</span></div>:<span style={{color:"#d1d5db"}}>—</span>;
+                        })()}
+                      </td>
 
                       {/* Diferencia — solo si ambos cerrados */}
                       <td style={{padding:"10px 10px",minWidth:70,textAlign:"center"}}>
@@ -2227,7 +2304,16 @@ function VProcesos({G,rerender,showToast,usuario}){
                           <span style={{color:"white",fontSize:10,fontWeight:800}}>{c1Cerrado?"OK":"?"}</span>
                         </div>
                       </td>
-                      <td style={{padding:"10px 10px",color:"#64748b",fontSize:11}}>{c1s.length>0?c1s.length+" caps":"—"}</td>
+                      <td style={{padding:"10px 10px",fontSize:11}}>
+                        {(()=>{
+                          const usuarios=[c.usuarioC1,...(usuariosExtra[c.id]||[])].filter(Boolean);
+                          const rows=usuarios.map(u=>{
+                            const und=c1s.filter(x=>x.usuario===u).reduce((a,x)=>a+(Number(x.total)||0),0);
+                            return und>0?<div key={u} style={{whiteSpace:"nowrap"}}><span style={{color:"#2563eb",fontWeight:700}}>{u}:</span> <span style={{color:"#374151"}}>{und} und</span></div>:null;
+                          }).filter(Boolean);
+                          return rows.length>0?rows:<span style={{color:"#d1d5db"}}>—</span>;
+                        })()}
+                      </td>
 
                       {/* Conteo 2 */}
                       <td style={{padding:"10px 10px",minWidth:110}}>
@@ -2248,7 +2334,14 @@ function VProcesos({G,rerender,showToast,usuario}){
                           )
                         ):<span style={{color:"#d1d5db",fontSize:11}}>N/A</span>}
                       </td>
-                      <td style={{padding:"10px 10px",color:"#64748b",fontSize:11}}>{c2s.length>0?c2s.length+" caps":"—"}</td>
+                      <td style={{padding:"10px 10px",fontSize:11}}>
+                        {(()=>{
+                          const u2=c.usuarioC2;
+                          if(!u2)return <span style={{color:"#d1d5db"}}>—</span>;
+                          const und=c2s.filter(x=>x.usuario===u2).reduce((a,x)=>a+(Number(x.total)||0),0);
+                          return und>0?<div><span style={{color:"#16a34a",fontWeight:700}}>{u2}:</span> <span style={{color:"#374151"}}>{und} und</span></div>:<span style={{color:"#d1d5db"}}>—</span>;
+                        })()}
+                      </td>
 
                       {/* Diferencia — solo por este conteo */}
                       <td style={{padding:"10px 10px",minWidth:70,textAlign:"center"}}>
@@ -3046,6 +3139,8 @@ function ModCapturador({usuario,setUsuario,G,rerender,recargar,showToast}){
   const [busqueda,setBusqueda]=useState("");
   const [showCam,setShowCam]=useState(false);
   const [modalSalir,setModalSalir]=useState(false);
+  const [busqCap,setBusqCap]=useState("");
+  const [editCap,setEditCap]=useState(null); // {p, cap} cuando se edita una captura
   const scanRef=useRef(null);
   const unidadesRef=useRef(null);
 
@@ -3163,9 +3258,28 @@ function ModCapturador({usuario,setUsuario,G,rerender,recargar,showToast}){
   const guardar=()=>{
     if(!productoActivo||!miConteo||!miRonda)return;
     const total=calcTotal(form);
-    // En C3 se permite guardar 0
     if(miRonda!=="C3"&&total<=0)return showToast("Ingresa al menos las unidades","err");
     if(miConteo.estado==="pendiente"){G.conteos=G.conteos.map(c=>c.id===miConteo.id?{...c,estado:"enCurso"}:c);}
+    // Si hay editCap, actualizar la captura existente
+    if(editCap){
+      const key=Object.keys(G.capturas).find(k=>{
+        const c=G.capturas[k];
+        return c.conteoId===miConteo.id&&c.productoId===productoActivo.id&&c.ronda===miRonda&&c===editCap.cap;
+      });
+      if(key){
+        G.capturas[key]={...G.capturas[key],
+          cantidad:total,unidades:parseFloat(form.unidades)||0,
+          cajas:parseFloat(form.cajas)||0,embalaje:parseFloat(form.embalaje)||0,
+          estado:form.estado,obs:form.obs,
+          fecha:TODAY(),hora:HOUR(),
+        };
+        rerender();showToast(`✓ Editado: ${productoActivo.nombre} — ${total} und`);
+        setProductoActivo(null);setForm({unidades:"",embalaje:"",cajas:"",estado:"BUENO",obs:""});
+        setEditCap(null);
+        setTimeout(()=>scanRef.current?.focus(),80);
+        return;
+      }
+    }
     const key=`${miConteo.id}_${productoActivo.id}_${miRonda}_${ID()}`;
     G.capturas[key]={
       conteoId:miConteo.id,productoId:productoActivo.id,ronda:miRonda,
@@ -3181,6 +3295,7 @@ function ModCapturador({usuario,setUsuario,G,rerender,recargar,showToast}){
     };
     rerender();showToast(`✓ ${productoActivo.nombre} — ${total} und`);
     setProductoActivo(null);setForm({unidades:"",embalaje:"",cajas:"",estado:"BUENO",obs:""});
+    setEditCap(null);
     setTimeout(()=>scanRef.current?.focus(),80);
   };
 
@@ -3549,6 +3664,11 @@ function ModCapturador({usuario,setUsuario,G,rerender,recargar,showToast}){
                     <div><div style={{fontSize:10,color:"#94a3b8"}}>LOCALIZACIÓN</div><div style={{fontSize:12,fontWeight:600}}>{miConteo.localizacion}</div></div>
                     <div><div style={{fontSize:10,color:"#94a3b8"}}>N° LOCALIZACIÓN</div><div style={{fontSize:12,fontWeight:600}}>{miConteo.nro}</div></div>
                     <div><div style={{fontSize:10,color:"#94a3b8"}}>CONTEO N°</div><div style={{fontSize:12,fontWeight:600}}>{miRonda==="C1"?1:miRonda==="C2"?2:3}</div></div>
+                    <div style={{background:"#f0fdf4",borderRadius:8,padding:"6px 10px",border:"1px solid #bbf7d0"}}>
+                      <div style={{fontSize:9,color:"#94a3b8",fontWeight:700,marginBottom:2}}>ESTE PRODUCTO</div>
+                      <div style={{fontSize:12,fontWeight:700,color:"#16a34a"}}>{totalAnt} und</div>
+                      <div style={{fontSize:10,color:"#64748b"}}>{caps.length} {caps.length===1?"entrada":"entradas"}</div>
+                    </div>
                   </div>
                   <div style={{marginTop:8}}>
                     <div style={{fontSize:10,color:"#94a3b8"}}>LÍNEA / SUBLÍNEA / SUBGRUPO</div>
@@ -3603,7 +3723,7 @@ function ModCapturador({usuario,setUsuario,G,rerender,recargar,showToast}){
                   style={{padding:"10px 28px",background:miRonda==="C3"||total>0?"#16a34a":"#e2e8f0",color:miRonda==="C3"||total>0?"white":"#94a3b8",border:"none",borderRadius:8,cursor:miRonda==="C3"||total>0?"pointer":"not-allowed",fontWeight:700,fontSize:14}}>
                   GUARDAR
                 </button>
-                <button onClick={()=>{setProductoActivo(null);setForm({unidades:"",embalaje:"",cajas:"",estado:"BUENO",obs:""});setTimeout(()=>scanRef.current?.focus(),80);}}
+                <button onClick={()=>{setProductoActivo(null);setForm({unidades:"",embalaje:"",cajas:"",estado:"BUENO",obs:""});setEditCap(null);setTimeout(()=>scanRef.current?.focus(),80);}}
                   style={{padding:"10px 20px",background:"#64748b",color:"white",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:13}}>CANCELAR</button>
                 <div style={{flex:1}}/>
                 {soyPrincipal(miConteo)&&<button onClick={()=>setModalCerrar(true)} style={{padding:"10px 20px",background:"#dc2626",color:"white",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:13}}>TERMINAR CONTEO</button>}
@@ -3615,8 +3735,10 @@ function ModCapturador({usuario,setUsuario,G,rerender,recargar,showToast}){
         {/* Capturas realizadas */}
         {miRonda!=="C3"&&capturasRealizadas.length>0&&(
           <div style={{background:"white",borderRadius:10,overflow:"hidden",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",marginBottom:10}}>
-            <div style={{padding:"10px 16px",background:"#f8fafc",borderBottom:"1px solid #e2e8f0",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div style={{padding:"10px 16px",background:"#f8fafc",borderBottom:"1px solid #e2e8f0",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
               <span style={{fontWeight:700,fontSize:13,color:"#0f172a"}}>Capturas realizadas — {capturasRealizadas.length} productos</span>
+              <input value={busqCap} onChange={e=>setBusqCap(e.target.value)} placeholder="Buscar por código o nombre…"
+                style={{padding:"5px 10px",borderRadius:7,border:"1.5px solid #2563eb",fontSize:12,outline:"none",minWidth:200}}/>
             </div>
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
               <thead><tr style={{background:"#f1f5f9"}}>
@@ -3625,7 +3747,7 @@ function ModCapturador({usuario,setUsuario,G,rerender,recargar,showToast}){
                 ))}
               </tr></thead>
               <tbody>
-                {capturasRealizadas.map(({p,caps,total:tot},i)=>(
+                {capturasRealizadas.filter(({p})=>!busqCap||p.nombre.toLowerCase().includes(busqCap.toLowerCase())||p.codigo.toLowerCase().includes(busqCap.toLowerCase())).map(({p,caps,total:tot},i)=>(
                   <tr key={p.id} style={{background:i%2?"#f8fafc":"white",borderBottom:"1px solid #f1f5f9"}}>
                     <td style={{padding:"7px 10px",fontFamily:"monospace",color:"#2563eb",fontWeight:700,fontSize:11}}>{p.codigo}</td>
                     <td style={{padding:"7px 10px",fontWeight:600}}>{p.nombre}</td>
@@ -3637,8 +3759,22 @@ function ModCapturador({usuario,setUsuario,G,rerender,recargar,showToast}){
                     <td style={{padding:"7px 10px"}}><EstBadge e={caps[0]?.estado}/></td>
                     <td style={{padding:"7px 10px",color:"#64748b",fontSize:11,maxWidth:100,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{caps[0]?.obs||"—"}</td>
                     <td style={{padding:"7px 10px"}}>
-                      <button onClick={()=>{setProductoActivo(p);setForm({unidades:"",embalaje:"",cajas:"",estado:"BUENO",obs:""});setTimeout(()=>unidadesRef.current?.focus(),80);}}
-                        style={{background:"#eff6ff",color:"#2563eb",border:"none",borderRadius:6,padding:"3px 10px",cursor:"pointer",fontWeight:700,fontSize:11,marginRight:4}}>+ Agregar</button>
+                      <button onClick={()=>{
+                        setProductoActivo(p);
+                        const lastCap=caps[caps.length-1];
+                        if(lastCap){
+                          const emb=lastCap.embalaje||"";
+                          const caj=lastCap.cajas||"";
+                          const und=emb&&caj?"":(lastCap.cantidad||"");
+                          setForm({unidades:String(und),embalaje:String(emb),cajas:String(caj),estado:lastCap.estado||"BUENO",obs:lastCap.obs||""});
+                          setEditCap({p,cap:lastCap});
+                        }else{
+                          setForm({unidades:"",embalaje:"",cajas:"",estado:"BUENO",obs:""});
+                          setEditCap(null);
+                        }
+                        setTimeout(()=>unidadesRef.current?.focus(),80);
+                      }}
+                        style={{background:"#fef9c3",color:"#92400e",border:"1px solid #fde047",borderRadius:6,padding:"3px 10px",cursor:"pointer",fontWeight:700,fontSize:11,marginRight:4}}>✏ Editar</button>
                       <button onClick={()=>{caps.forEach(c=>{const k=Object.keys(G.capturas).find(k=>G.capturas[k]===c);if(k)delete G.capturas[k];});rerender();showToast("Eliminado","warn");}}
                         style={{background:"#fef2f2",color:"#dc2626",border:"1px solid #fecaca",borderRadius:6,padding:"3px 10px",cursor:"pointer",fontWeight:700,fontSize:11}}>Borrar</button>
                     </td>
