@@ -1786,36 +1786,53 @@ function VProcesos({G,rerender,showToast,usuario}){
         </Modal>
       )}
 
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-        <h2 style={{margin:0,fontSize:20,fontWeight:700,color:"#0f172a"}}>Vista de Procesos</h2>
-        <div style={{fontSize:12,color:"#64748b"}}>{TODAY()}</div>
+      {/* Header moderno */}
+      <div style={{background:"linear-gradient(135deg,#1e40af 0%,#0891b2 100%)",borderRadius:16,padding:"20px 24px",marginBottom:20,color:"white",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div>
+          <div style={{fontSize:11,fontWeight:600,opacity:0.75,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>Panel de Control</div>
+          <h2 style={{margin:0,fontSize:22,fontWeight:800,letterSpacing:-0.5}}>Vista de Procesos</h2>
+          <div style={{fontSize:12,opacity:0.8,marginTop:4}}>{G.inventario?.nombre||"Inventario activo"}</div>
+        </div>
+        <div style={{textAlign:"right"}}>
+          <div style={{fontSize:28,fontWeight:900,letterSpacing:-1}}>{pct}%</div>
+          <div style={{fontSize:11,opacity:0.8}}>completado</div>
+        </div>
       </div>
 
-      {/* Métricas */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:12,marginBottom:16}}>
+      {/* Tarjetas KPI modernas */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:12,marginBottom:16}}>
         {[
-          {l:"Total productos",v:total,c:"#2563eb"},
-          {l:"Total conteos",v:totalConteos,c:"#475569"},
-          {l:"Completados",v:conteosCompletos,c:"#16a34a"},
-          {l:"% Avance",v:pct+"%",c:"#0891b2"},
-          {l:"Con diferencia",v:G.conteos.filter(c=>c.tipo==="2conteos"&&getDifsConteo(c).length>0).length,c:"#dc2626"},
-          {l:"Alertas",v:G.alertas.filter(a=>!a.leida).length,c:"#7c3aed"},
+          {l:"Productos",v:total,c:"#2563eb",bg:"#eff6ff",icon:"📦"},
+          {l:"Total conteos",v:totalConteos,c:"#475569",bg:"#f8fafc",icon:"📋"},
+          {l:"Completados",v:conteosCompletos,c:"#16a34a",bg:"#f0fdf4",icon:"✅"},
+          {l:"En progreso",v:totalConteos-conteosCompletos,c:"#0891b2",bg:"#ecfeff",icon:"⚙️"},
+          {l:"Con diferencia",v:G.conteos.filter(c=>c.tipo==="2conteos"&&getDifsConteo(c).length>0).length,c:"#dc2626",bg:"#fef2f2",icon:"⚠️"},
+          {l:"Alertas",v:G.alertas.filter(a=>!a.leida).length,c:"#7c3aed",bg:"#faf5ff",icon:"🔔"},
         ].map(s=>(
-          <div key={s.l} style={{...card,borderTop:`3px solid ${s.c}`,padding:"10px 14px"}}>
-            <div style={{fontSize:20,fontWeight:800,color:s.c}}>{s.v}</div>
-            <div style={{fontSize:11,color:"#64748b",marginTop:2}}>{s.l}</div>
+          <div key={s.l} style={{background:s.bg,borderRadius:14,padding:"14px 16px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",border:`1px solid ${s.c}22`}}>
+            <div style={{fontSize:20,marginBottom:6}}>{s.icon}</div>
+            <div style={{fontSize:26,fontWeight:900,color:s.c,lineHeight:1}}>{s.v}</div>
+            <div style={{fontSize:11,color:"#64748b",marginTop:4,fontWeight:600}}>{s.l}</div>
           </div>
         ))}
       </div>
 
-      {/* Barra avance */}
-      <div style={{...card,marginBottom:16,padding:"12px 18px"}}>
-        <div style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:6}}>
-          <b>Avance del inventario (por ubicaciones)</b>
-          <span style={{color:"#2563eb",fontWeight:700}}>{pct}% — {conteosCompletos}/{totalConteos} ubicaciones completadas</span>
+      {/* Barra avance moderna */}
+      <div style={{background:"white",borderRadius:14,padding:"18px 20px",marginBottom:16,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",border:"1px solid #e2e8f0"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+          <div>
+            <div style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>Avance del inventario</div>
+            <div style={{fontSize:11,color:"#64748b",marginTop:1}}>{conteosCompletos} de {totalConteos} ubicaciones completadas</div>
+          </div>
+          <div style={{background:"linear-gradient(135deg,#1e40af,#0891b2)",borderRadius:10,padding:"6px 14px"}}>
+            <span style={{fontSize:18,fontWeight:900,color:"white"}}>{pct}%</span>
+          </div>
         </div>
-        <div style={{background:"#e2e8f0",borderRadius:99,height:12}}>
-          <div style={{width:pct+"%",background:"linear-gradient(90deg,#2563eb,#16a34a)",borderRadius:99,height:"100%",transition:"width 0.5s"}}/>
+        <div style={{background:"#e2e8f0",borderRadius:99,height:14,overflow:"hidden"}}>
+          <div style={{width:pct+"%",background:"linear-gradient(90deg,#2563eb,#0891b2,#16a34a)",borderRadius:99,height:"100%",transition:"width 0.6s ease",boxShadow:"0 2px 8px rgba(37,99,235,0.4)"}}/>
+        </div>
+        <div style={{display:"flex",justifyContent:"space-between",marginTop:6,fontSize:10,color:"#94a3b8"}}>
+          <span>0%</span><span>50%</span><span>100%</span>
         </div>
       </div>
 
@@ -2020,11 +2037,8 @@ function VProcesos({G,rerender,showToast,usuario}){
                       <td style={{padding:"10px 10px",fontSize:11}}>
                         {(()=>{
                           const usuarios=[c.usuarioC1,...(usuariosExtra[c.id]||[])].filter(Boolean);
-                          const rows=usuarios.map(u=>{
-                            const und=c1s.filter(x=>x.usuario===u).reduce((a,x)=>a+(Number(x.total)||0),0);
-                            return und>0?<div key={u} style={{whiteSpace:"nowrap"}}><span style={{color:"#2563eb",fontWeight:700}}>{u}:</span> <span style={{color:"#374151"}}>{und} und</span></div>:null;
-                          }).filter(Boolean);
-                          return rows.length>0?rows:<span style={{color:"#d1d5db"}}>—</span>;
+                          const undTotal=c1s.reduce((a,x)=>a+(Number(x.cantidad)||0),0);
+                          return undTotal>0?<div style={{whiteSpace:"nowrap",fontWeight:700,color:"#2563eb"}}>{undTotal} und</div>:<span style={{color:"#d1d5db"}}>—</span>;
                         })()}
                       </td>
 
@@ -2051,10 +2065,8 @@ function VProcesos({G,rerender,showToast,usuario}){
                       </td>
                       <td style={{padding:"10px 10px",fontSize:11}}>
                         {(()=>{
-                          const u2=c.usuarioC2;
-                          if(!u2)return <span style={{color:"#d1d5db"}}>—</span>;
-                          const und=c2s.filter(x=>x.usuario===u2).reduce((a,x)=>a+(Number(x.total)||0),0);
-                          return und>0?<div><span style={{color:"#16a34a",fontWeight:700}}>{u2}:</span> <span style={{color:"#374151"}}>{und} und</span></div>:<span style={{color:"#d1d5db"}}>—</span>;
+                          const undTotal=c2s.reduce((a,x)=>a+(Number(x.cantidad)||0),0);
+                          return undTotal>0?<div style={{whiteSpace:"nowrap",fontWeight:700,color:"#16a34a"}}>{undTotal} und</div>:<span style={{color:"#d1d5db"}}>—</span>;
                         })()}
                       </td>
 
@@ -2164,36 +2176,53 @@ function VProcesos({G,rerender,showToast,usuario}){
   );
   return(
     <div>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-        <h2 style={{margin:0,fontSize:20,fontWeight:700,color:"#0f172a"}}>Vista de Procesos</h2>
-        <div style={{fontSize:12,color:"#64748b"}}>{TODAY()} · {HOUR()}</div>
+      {/* Header moderno */}
+      <div style={{background:"linear-gradient(135deg,#1e40af 0%,#0891b2 100%)",borderRadius:16,padding:"20px 24px",marginBottom:20,color:"white",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div>
+          <div style={{fontSize:11,fontWeight:600,opacity:0.75,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>Panel de Control</div>
+          <h2 style={{margin:0,fontSize:22,fontWeight:800,letterSpacing:-0.5}}>Vista de Procesos</h2>
+          <div style={{fontSize:12,opacity:0.8,marginTop:4}}>{G.inventario?.nombre||"Inventario activo"}</div>
+        </div>
+        <div style={{textAlign:"right"}}>
+          <div style={{fontSize:28,fontWeight:900,letterSpacing:-1}}>{pct}%</div>
+          <div style={{fontSize:11,opacity:0.8}}>completado</div>
+        </div>
       </div>
 
-      {/* Métricas */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:12,marginBottom:16}}>
+      {/* Tarjetas KPI modernas */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:12,marginBottom:16}}>
         {[
-          {l:"Total productos",v:total,c:"#2563eb"},
-          {l:"Total conteos",v:totalConteos,c:"#475569"},
-          {l:"Completados",v:conteosCompletos,c:"#16a34a"},
-          {l:"% Avance",v:pct+"%",c:"#0891b2"},
-          {l:"Con diferencia",v:G.conteos.filter(c=>c.tipo==="2conteos"&&getDifsConteo(c).length>0).length,c:"#dc2626"},
-          {l:"Alertas",v:G.alertas.filter(a=>!a.leida).length,c:"#7c3aed"},
+          {l:"Productos",v:total,c:"#2563eb",bg:"#eff6ff",icon:"📦"},
+          {l:"Total conteos",v:totalConteos,c:"#475569",bg:"#f8fafc",icon:"📋"},
+          {l:"Completados",v:conteosCompletos,c:"#16a34a",bg:"#f0fdf4",icon:"✅"},
+          {l:"En progreso",v:totalConteos-conteosCompletos,c:"#0891b2",bg:"#ecfeff",icon:"⚙️"},
+          {l:"Con diferencia",v:G.conteos.filter(c=>c.tipo==="2conteos"&&getDifsConteo(c).length>0).length,c:"#dc2626",bg:"#fef2f2",icon:"⚠️"},
+          {l:"Alertas",v:G.alertas.filter(a=>!a.leida).length,c:"#7c3aed",bg:"#faf5ff",icon:"🔔"},
         ].map(s=>(
-          <div key={s.l} style={{...card,borderTop:`3px solid ${s.c}`,padding:"10px 14px"}}>
-            <div style={{fontSize:20,fontWeight:800,color:s.c}}>{s.v}</div>
-            <div style={{fontSize:11,color:"#64748b",marginTop:2}}>{s.l}</div>
+          <div key={s.l} style={{background:s.bg,borderRadius:14,padding:"14px 16px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",border:`1px solid ${s.c}22`}}>
+            <div style={{fontSize:20,marginBottom:6}}>{s.icon}</div>
+            <div style={{fontSize:26,fontWeight:900,color:s.c,lineHeight:1}}>{s.v}</div>
+            <div style={{fontSize:11,color:"#64748b",marginTop:4,fontWeight:600}}>{s.l}</div>
           </div>
         ))}
       </div>
 
-      {/* Barra avance */}
-      <div style={{...card,marginBottom:16,padding:"12px 18px"}}>
-        <div style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:6}}>
-          <b>Avance del inventario (por ubicaciones)</b>
-          <span style={{color:"#2563eb",fontWeight:700}}>{pct}% — {conteosCompletos}/{totalConteos} ubicaciones completadas</span>
+      {/* Barra avance moderna */}
+      <div style={{background:"white",borderRadius:14,padding:"18px 20px",marginBottom:16,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",border:"1px solid #e2e8f0"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+          <div>
+            <div style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>Avance del inventario</div>
+            <div style={{fontSize:11,color:"#64748b",marginTop:1}}>{conteosCompletos} de {totalConteos} ubicaciones completadas</div>
+          </div>
+          <div style={{background:"linear-gradient(135deg,#1e40af,#0891b2)",borderRadius:10,padding:"6px 14px"}}>
+            <span style={{fontSize:18,fontWeight:900,color:"white"}}>{pct}%</span>
+          </div>
         </div>
-        <div style={{background:"#e2e8f0",borderRadius:99,height:12}}>
-          <div style={{width:pct+"%",background:"linear-gradient(90deg,#2563eb,#16a34a)",borderRadius:99,height:"100%",transition:"width 0.5s"}}/>
+        <div style={{background:"#e2e8f0",borderRadius:99,height:14,overflow:"hidden"}}>
+          <div style={{width:pct+"%",background:"linear-gradient(90deg,#2563eb,#0891b2,#16a34a)",borderRadius:99,height:"100%",transition:"width 0.6s ease",boxShadow:"0 2px 8px rgba(37,99,235,0.4)"}}/>
+        </div>
+        <div style={{display:"flex",justifyContent:"space-between",marginTop:6,fontSize:10,color:"#94a3b8"}}>
+          <span>0%</span><span>50%</span><span>100%</span>
         </div>
       </div>
 
@@ -2306,12 +2335,8 @@ function VProcesos({G,rerender,showToast,usuario}){
                       </td>
                       <td style={{padding:"10px 10px",fontSize:11}}>
                         {(()=>{
-                          const usuarios=[c.usuarioC1,...(usuariosExtra[c.id]||[])].filter(Boolean);
-                          const rows=usuarios.map(u=>{
-                            const und=c1s.filter(x=>x.usuario===u).reduce((a,x)=>a+(Number(x.total)||0),0);
-                            return und>0?<div key={u} style={{whiteSpace:"nowrap"}}><span style={{color:"#2563eb",fontWeight:700}}>{u}:</span> <span style={{color:"#374151"}}>{und} und</span></div>:null;
-                          }).filter(Boolean);
-                          return rows.length>0?rows:<span style={{color:"#d1d5db"}}>—</span>;
+                          const undTotal=c1s.reduce((a,x)=>a+(Number(x.cantidad)||0),0);
+                          return undTotal>0?<div style={{whiteSpace:"nowrap",fontWeight:700,color:"#2563eb"}}>{undTotal} und</div>:<span style={{color:"#d1d5db"}}>—</span>;
                         })()}
                       </td>
 
@@ -2336,10 +2361,8 @@ function VProcesos({G,rerender,showToast,usuario}){
                       </td>
                       <td style={{padding:"10px 10px",fontSize:11}}>
                         {(()=>{
-                          const u2=c.usuarioC2;
-                          if(!u2)return <span style={{color:"#d1d5db"}}>—</span>;
-                          const und=c2s.filter(x=>x.usuario===u2).reduce((a,x)=>a+(Number(x.total)||0),0);
-                          return und>0?<div><span style={{color:"#16a34a",fontWeight:700}}>{u2}:</span> <span style={{color:"#374151"}}>{und} und</span></div>:<span style={{color:"#d1d5db"}}>—</span>;
+                          const undTotal=c2s.reduce((a,x)=>a+(Number(x.cantidad)||0),0);
+                          return undTotal>0?<div style={{whiteSpace:"nowrap",fontWeight:700,color:"#16a34a"}}>{undTotal} und</div>:<span style={{color:"#d1d5db"}}>—</span>;
                         })()}
                       </td>
 
@@ -2910,7 +2933,8 @@ function VUsuarios({G,rerender,showToast}){
 
 function VHistorial({G,showToast,usuario}){
   const [invSel,setInvSel]=useState(null);
-  const [cardDetalle,setCardDetalle]=useState(null); // {tipo, lista, titulo}
+  const [cardDetalle,setCardDetalle]=useState(null);
+  const [confirmElim,setConfirmElim]=useState(null); // índice del historial a eliminar
 
   const getSt=(inv)=>{
     // Usar solo las capturas del snapshot de ese inventario
@@ -3089,12 +3113,11 @@ function VHistorial({G,showToast,usuario}){
             {G.historial.map((h,i)=>{
               const st=getSt(h);
               return(
-                <div key={i} style={{...card,cursor:"pointer",borderLeft:"4px solid #2563eb",transition:"box-shadow 0.15s"}}
-                  onClick={()=>setInvSel(h)}
+                <div key={i} style={{...card,borderLeft:"4px solid #2563eb",transition:"box-shadow 0.15s",position:"relative"}}
                   onMouseEnter={e=>e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.12)"}
                   onMouseLeave={e=>e.currentTarget.style.boxShadow="0 1px 4px rgba(0,0,0,0.07)"}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-                    <div>
+                    <div style={{flex:1,cursor:"pointer"}} onClick={()=>setInvSel(h)}>
                       <div style={{fontWeight:700,fontSize:15,color:"#0f172a"}}>{h.nombre}</div>
                       <div style={{fontSize:12,color:"#64748b",marginTop:3}}>
                         <Badge color={h.tipo==="2conteos"?"#2563eb":"#16a34a"} small>{h.tipo==="2conteos"?"2 CONTEOS":"1 CONTEO"}</Badge>
@@ -3107,13 +3130,45 @@ function VHistorial({G,showToast,usuario}){
                         {st.conDif.length>0&&<span style={{fontSize:12,color:"#dc2626",fontWeight:700}}>⚠️ {st.conDif.length} difs</span>}
                       </div>
                     </div>
-                    <div style={{fontSize:12,color:"#2563eb",fontWeight:600,flexShrink:0,marginLeft:12}}>Ver detalle →</div>
+                    <div style={{display:"flex",alignItems:"center",gap:10,flexShrink:0,marginLeft:12}}>
+                      <div style={{fontSize:12,color:"#2563eb",fontWeight:600,cursor:"pointer"}} onClick={()=>setInvSel(h)}>Ver detalle →</div>
+                      <button onClick={e=>{e.stopPropagation();setConfirmElim(i);}}
+                        style={{background:"#fef2f2",color:"#dc2626",border:"1px solid #fecaca",borderRadius:7,padding:"4px 10px",cursor:"pointer",fontWeight:700,fontSize:12}}>
+                        🗑
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
             })}
           </div>
         </>
+      )}
+
+      {/* Modal confirmar eliminación historial */}
+      {confirmElim!==null&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <div style={{background:"white",borderRadius:16,padding:28,width:400,maxWidth:"95vw",boxShadow:"0 25px 60px rgba(0,0,0,0.3)"}}>
+            <div style={{fontSize:32,textAlign:"center",marginBottom:12}}>🗑️</div>
+            <h3 style={{margin:"0 0 8px",fontSize:17,fontWeight:700,textAlign:"center"}}>Eliminar inventario</h3>
+            <p style={{fontSize:14,color:"#374151",textAlign:"center",marginBottom:24}}>
+              ¿Estás seguro de eliminar <strong>{G.historial[confirmElim]?.nombre}</strong> del historial? Esta acción no se puede deshacer.
+            </p>
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={()=>{
+                G.historial=G.historial.filter((_,idx)=>idx!==confirmElim);
+                setConfirmElim(null);
+                showToast("Inventario eliminado del historial","warn");
+              }} style={{flex:1,padding:"10px 0",background:"#dc2626",color:"white",border:"none",borderRadius:8,fontWeight:700,cursor:"pointer",fontSize:14}}>
+                Sí, eliminar
+              </button>
+              <button onClick={()=>setConfirmElim(null)}
+                style={{flex:1,padding:"10px 0",background:"#f1f5f9",color:"#374151",border:"none",borderRadius:8,fontWeight:700,cursor:"pointer",fontSize:14}}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -3651,7 +3706,11 @@ function ModCapturador({usuario,setUsuario,G,rerender,recargar,showToast}){
                     <div><div style={{fontSize:10,color:"#94a3b8"}}>REFERENCIA</div><div style={{fontSize:13,fontWeight:600}}>{productoActivo.referencia||"—"}</div></div>
                     <div><div style={{fontSize:10,color:"#94a3b8"}}>PROVEEDOR</div><div style={{fontSize:13,fontWeight:600}}>{productoActivo.proveedor||"—"}</div></div>
                   </div>
-                  {totalAnt>0&&<div style={{marginTop:8,background:"#eff6ff",borderRadius:8,padding:"6px 10px",fontSize:12,color:"#2563eb",fontWeight:600}}>Ya capturado: {totalAnt} und ({caps.length} entradas)</div>}
+                  {totalAnt>0&&<div style={{marginTop:8,background:"#f0fdf4",borderRadius:8,padding:"8px 12px",border:"1px solid #bbf7d0",display:"flex",alignItems:"center",gap:16}}>
+                    <div><div style={{fontSize:9,color:"#94a3b8",fontWeight:700}}>YA CAPTURADO</div><div style={{fontSize:15,fontWeight:800,color:"#16a34a"}}>{totalAnt} und</div></div>
+                    <div style={{color:"#d1d5db"}}>|</div>
+                    <div><div style={{fontSize:9,color:"#94a3b8",fontWeight:700}}>ENTRADAS</div><div style={{fontSize:15,fontWeight:800,color:"#374151"}}>{caps.length}</div></div>
+                  </div>}
                   {miRonda==="C3"&&(()=>{
                     const t1=Object.values(G.capturas).filter(c=>c.conteoId===miConteo.id&&c.productoId===productoActivo.id&&c.ronda==="C1").reduce((s,c)=>s+c.cantidad,0);
                     const t2=Object.values(G.capturas).filter(c=>c.conteoId===miConteo.id&&c.productoId===productoActivo.id&&c.ronda==="C2").reduce((s,c)=>s+c.cantidad,0);
@@ -3664,11 +3723,6 @@ function ModCapturador({usuario,setUsuario,G,rerender,recargar,showToast}){
                     <div><div style={{fontSize:10,color:"#94a3b8"}}>LOCALIZACIÓN</div><div style={{fontSize:12,fontWeight:600}}>{miConteo.localizacion}</div></div>
                     <div><div style={{fontSize:10,color:"#94a3b8"}}>N° LOCALIZACIÓN</div><div style={{fontSize:12,fontWeight:600}}>{miConteo.nro}</div></div>
                     <div><div style={{fontSize:10,color:"#94a3b8"}}>CONTEO N°</div><div style={{fontSize:12,fontWeight:600}}>{miRonda==="C1"?1:miRonda==="C2"?2:3}</div></div>
-                    <div style={{background:"#f0fdf4",borderRadius:8,padding:"6px 10px",border:"1px solid #bbf7d0"}}>
-                      <div style={{fontSize:9,color:"#94a3b8",fontWeight:700,marginBottom:2}}>ESTE PRODUCTO</div>
-                      <div style={{fontSize:12,fontWeight:700,color:"#16a34a"}}>{totalAnt} und</div>
-                      <div style={{fontSize:10,color:"#64748b"}}>{caps.length} {caps.length===1?"entrada":"entradas"}</div>
-                    </div>
                   </div>
                   <div style={{marginTop:8}}>
                     <div style={{fontSize:10,color:"#94a3b8"}}>LÍNEA / SUBLÍNEA / SUBGRUPO</div>
