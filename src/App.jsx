@@ -735,40 +735,61 @@ function VInventario({G,rerender,showToast,usuario}){
   };
   const st=G.conteos.reduce((a,c)=>{if(c.estado==="completado"||c.estado==="cerradoC2")a.comp++;if(c.estado==="diferencia")a.dif++;return a;},{comp:0,dif:0});
   return(
-    <Section titulo="Inventario">
-      <div style={{display:"flex",gap:10,marginBottom:16}}>
-        {!G.inventario&&<Btn c="#16a34a" onClick={()=>setModal(true)}>+ Nuevo Inventario</Btn>}
-        {G.inventario&&<Btn c="#dc2626" onClick={intentarCerrar}>⬛ Cerrar Inventario</Btn>}
-        {G.inventario&&<Btn c="#2563eb" outline onClick={()=>{setEditForm({nombre:G.inventario.nombre,obs:G.inventario.obs||""});setModalEdit(true);}}>✏️ Editar</Btn>}
-        {G.inventario&&<Btn c="#dc2626" outline onClick={()=>setModalEliminar(true)}>🗑 Eliminar</Btn>}
-      </div>
+    <Section>
       {!G.inventario?(
-        <div style={{...card,textAlign:"center",padding:48,color:"#64748b"}}>
-          <div style={{fontSize:52,marginBottom:12}}>📋</div>
-          <div style={{fontSize:15,fontWeight:600,marginBottom:6}}>No hay inventario activo</div>
-          <div style={{fontSize:13}}>Crea uno nuevo para comenzar.</div>
+        <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"60px 20px",background:"white",borderRadius:20,boxShadow:"0 2px 8px rgba(0,0,0,0.06)",border:"2px dashed #e2e8f0",textAlign:"center"}}>
+          <div style={{fontSize:64,marginBottom:16}}>📋</div>
+          <div style={{fontSize:20,fontWeight:800,color:"#0f172a",marginBottom:8}}>Sin inventario activo</div>
+          <div style={{fontSize:14,color:"#64748b",marginBottom:24,maxWidth:360}}>Crea un nuevo inventario para comenzar a registrar conteos de productos.</div>
+          <Btn c="#16a34a" onClick={()=>setModal(true)}>+ Crear Inventario</Btn>
         </div>
       ):(
-        <div style={card}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
-            <div>
-              <div style={{fontSize:20,fontWeight:800,color:"#0f172a"}}>{G.inventario.nombre}</div>
-              <div style={{fontSize:13,color:"#64748b",marginTop:4}}>Abierto: {G.inventario.apertura} {G.inventario.horaApertura} · por {G.inventario.usuarioApertura}</div>
-            </div>
-            <Badge color="#16a34a">● ACTIVO</Badge>
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:12}}>
-            {[{l:"Tipo",v:G.inventario.tipo==="2conteos"?"2 Conteos":"1 Conteo"},{l:"Fecha",v:G.inventario.fecha},{l:"Productos",v:G.productos.length},{l:"Conteos",v:G.conteos.length},{l:"Completados",v:st.comp},{l:"Con diferencia",v:st.dif}].map(s=>(
-              <div key={s.l} style={{background:"#f8fafc",borderRadius:8,padding:"10px 14px"}}>
-                <div style={{fontSize:11,color:"#64748b",marginBottom:3}}>{s.l}</div>
-                <div style={{fontSize:17,fontWeight:700,color:"#0f172a"}}>{s.v}</div>
+        <>
+          {/* Banner principal del inventario */}
+          <div style={{background:"linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%)",borderRadius:18,padding:"24px 28px",marginBottom:16,color:"white",position:"relative",overflow:"hidden"}}>
+            <div style={{position:"absolute",right:-20,top:-20,width:120,height:120,background:"rgba(255,255,255,0.04)",borderRadius:99}}/>
+            <div style={{position:"absolute",right:40,bottom:-30,width:80,height:80,background:"rgba(255,255,255,0.03)",borderRadius:99}}/>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12}}>
+              <div>
+                <div style={{fontSize:11,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>Inventario Activo</div>
+                <div style={{fontSize:26,fontWeight:900,letterSpacing:-0.5,marginBottom:6}}>{G.inventario.nombre}</div>
+                <div style={{fontSize:12,color:"#94a3b8"}}>Abierto el {G.inventario.apertura} {G.inventario.horaApertura&&`a las ${G.inventario.horaApertura}`} · por <span style={{color:"#60a5fa",fontWeight:700}}>{G.inventario.usuarioApertura}</span></div>
               </div>
-            ))}
+              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                <div style={{background:"rgba(22,163,74,0.2)",border:"1px solid rgba(22,163,74,0.4)",borderRadius:20,padding:"4px 14px",fontSize:12,fontWeight:700,color:"#4ade80",display:"flex",alignItems:"center",gap:5}}>
+                  <span style={{width:7,height:7,background:"#4ade80",borderRadius:99,display:"inline-block"}}/>
+                  ACTIVO
+                </div>
+                <div style={{background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.15)",borderRadius:20,padding:"4px 14px",fontSize:12,fontWeight:700,color:"white"}}>
+                  {G.inventario.tipo==="2conteos"?"2 Conteos":"1 Conteo"}
+                </div>
+              </div>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(110px,1fr))",gap:10,marginTop:20}}>
+              {[
+                {l:"Productos",v:G.productos.length,icon:"📦"},
+                {l:"Conteos",v:G.conteos.length,icon:"📋"},
+                {l:"Completados",v:st.comp,icon:"✅"},
+                {l:"Diferencias",v:st.dif,icon:"⚠️"},
+              ].map(s=>(
+                <div key={s.l} style={{background:"rgba(255,255,255,0.07)",borderRadius:12,padding:"12px 14px",border:"1px solid rgba(255,255,255,0.08)"}}>
+                  <div style={{fontSize:16,marginBottom:4}}>{s.icon}</div>
+                  <div style={{fontSize:22,fontWeight:900,color:"white"}}>{s.v}</div>
+                  <div style={{fontSize:10,color:"#94a3b8",marginTop:2,textTransform:"uppercase",letterSpacing:0.5}}>{s.l}</div>
+                </div>
+              ))}
+            </div>
           </div>
-          {G.inventario.obs&&<div style={{marginTop:14,fontSize:13,color:"#64748b",background:"#f1f5f9",borderRadius:8,padding:"8px 12px"}}>📝 {G.inventario.obs}</div>}
-          {G.productos.length===0&&<div style={{marginTop:14,background:"#fef9c3",border:"1px solid #fde047",borderRadius:8,padding:"10px 14px",fontSize:13,color:"#92400e",fontWeight:600}}>⚠️ La base de productos está vacía. Ve a "Base de datos" y carga el Excel del cliente antes de programar conteos.</div>}
-          {G.productos.length>0&&<div style={{marginTop:14,background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:8,padding:"10px 14px",fontSize:13,color:"#166534",fontWeight:600}}>✅ Base de datos lista: {G.productos.length} productos disponibles. Puedes programar los conteos.</div>}
-        </div>
+          {/* Acciones */}
+          <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap"}}>
+            <Btn c="#dc2626" onClick={intentarCerrar}>⬛ Cerrar Inventario</Btn>
+            <Btn c="#2563eb" outline onClick={()=>{setEditForm({nombre:G.inventario.nombre,obs:G.inventario.obs||""});setModalEdit(true);}}>✏️ Editar</Btn>
+            <Btn c="#dc2626" outline onClick={()=>setModalEliminar(true)}>🗑 Eliminar</Btn>
+          </div>
+          {G.inventario.obs&&<div style={{marginBottom:12,background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:10,padding:"10px 14px",fontSize:13,color:"#64748b"}}>📝 {G.inventario.obs}</div>}
+          {G.productos.length===0&&<div style={{background:"#fef9c3",border:"1px solid #fde047",borderRadius:10,padding:"12px 16px",fontSize:13,color:"#92400e",fontWeight:600}}>⚠️ La base de productos está vacía. Ve a "Base de datos" y carga el Excel del cliente antes de programar conteos.</div>}
+          {G.productos.length>0&&<div style={{background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:10,padding:"12px 16px",fontSize:13,color:"#166534",fontWeight:600}}>✅ Base lista: {G.productos.length} productos disponibles. Puedes programar los conteos.</div>}
+        </>
       )}
       {modal&&(
         <Modal titulo="Nuevo Inventario" onClose={()=>setModal(false)}>
@@ -937,7 +958,7 @@ function VUbicaciones({G,rerender,showToast}){
   };
 
   return(
-    <Section titulo="Ubicaciones y Localizaciones">
+    <Section>
       {/* Tipos */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:18}}>
         <div style={card}>
@@ -1181,7 +1202,7 @@ function VBaseDatos({G,rerender,showToast}){
   };
 
   return(
-    <Section titulo="Base de Productos">
+    <Section>
       <div style={{display:"flex",gap:10,marginBottom:16,alignItems:"center",flexWrap:"wrap"}}>
         <label style={{padding:"9px 20px",background:"#2563eb",color:"white",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:13}}>
           ⬆ Cargar / Actualizar Excel<input type="file" accept=".xlsx,.xls" onChange={cargarPreview} style={{display:"none"}}/>
@@ -1396,7 +1417,7 @@ function VConteos({G,rerender,showToast,usuario}){
   const stL={pendiente:"Pendiente",enCurso:"En curso",cerradoC1:"C1 cerrado",cerradoC2:"Completado",diferencia:"⚠️ Diferencia",enC3:"En C3",completado:"Completado"};
 
   return(
-    <Section titulo="Programación de Conteos">
+    <Section>
       <div style={{marginBottom:16}}>
         <Btn c="#16a34a" onClick={()=>setModal(true)} disabled={!G.inventario||G.productos.length===0}>+ Programar Conteo</Btn>
         {!G.inventario&&<span style={{marginLeft:12,fontSize:12,color:"#dc2626"}}>Primero crea un inventario.</span>}
@@ -2663,16 +2684,38 @@ function VReportes({G,showToast,usuario}){
   const difBase=baseCompleta.filter(c=>c.diferencia!==0);
   const valorAjusteTotal=baseCompleta.reduce((s,c)=>s+c.valDif,0);
 
+  const rCards=[
+    {icon:"🔄",titulo:"Diferencias de Conteos",desc:"C1 ≠ C2 por conteo",val:totalDifs,c:"#dc2626",bg:"#fef2f2"},
+    {icon:"⚪",titulo:"Sin Conteo",desc:"Productos no inventariados",val:sinConteo.length,c:"#d97706",bg:"#fffbeb"},
+    {icon:"⚖️",titulo:"Diferencia Inventario",desc:"Físico vs Sistema",val:baseCompleta.length,c:"#2563eb",bg:"#eff6ff"},
+    {icon:"🔧",titulo:"Ajuste de Inventario",desc:"Base completa",val:baseCompleta.length,c:"#16a34a",bg:"#f0fdf4"},
+    {icon:"📄",titulo:"Reporte de Captura",desc:"C1·C2·C3 con ubicación",val:capFinal.length,c:"#7c3aed",bg:"#faf5ff"},
+  ];
   return(
-    <Section titulo="Reportes">
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(230px,1fr))",gap:16}}>
+    <Section>
+      {/* Resumen rápido */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginBottom:20}}>
+        {rCards.map(r=>(
+          <div key={r.titulo} style={{background:r.bg,borderRadius:12,padding:"14px 16px",border:`1px solid ${r.c}22`}}>
+            <div style={{fontSize:22,marginBottom:6}}>{r.icon}</div>
+            <div style={{fontSize:24,fontWeight:900,color:r.c}}>{r.val}</div>
+            <div style={{fontSize:11,color:"#64748b",fontWeight:600,marginTop:3}}>{r.titulo}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:16}}>
 
         {/* Diferencias de Conteos — expandible */}
-        <div style={card}>
-          <div style={{fontSize:26,marginBottom:6}}>🔄</div>
-          <h3 style={{margin:"0 0 4px",fontSize:14,fontWeight:700}}>Diferencias de Conteos</h3>
-          <p style={{fontSize:12,color:"#64748b",margin:"0 0 12px"}}>C1 ≠ C2 — por conteo</p>
-          <div style={{background:"#fee2e233",borderRadius:8,padding:8,fontSize:24,fontWeight:800,color:"#dc2626",textAlign:"center",marginBottom:12}}>{totalDifs}</div>
+        <div style={{...card,border:"1px solid #fecaca"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+            <div style={{width:40,height:40,background:"#fef2f2",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>🔄</div>
+            <div>
+              <div style={{fontWeight:700,fontSize:14,color:"#0f172a"}}>Diferencias de Conteos</div>
+              <div style={{fontSize:11,color:"#64748b"}}>C1 ≠ C2 — por conteo</div>
+            </div>
+          </div>
+          <div style={{background:"#fef2f2",borderRadius:10,padding:"10px",fontSize:28,fontWeight:900,color:"#dc2626",textAlign:"center",marginBottom:12}}>{totalDifs}</div>
           <Btn c="#dc2626" onClick={()=>setVerDifs(v=>!v)} full>{verDifs?"Ocultar diferencias":"Ver diferencias"}</Btn>
           {verDifs&&(
             <div style={{marginTop:12}}>
@@ -2718,38 +2761,42 @@ function VReportes({G,showToast,usuario}){
         </div>
 
         {/* Sin Conteo */}
-        <div style={card}>
-          <div style={{fontSize:26,marginBottom:6}}>⚪</div>
-          <h3 style={{margin:"0 0 4px",fontSize:14,fontWeight:700}}>Sin Conteo</h3>
-          <p style={{fontSize:12,color:"#64748b",margin:"0 0 12px"}}>Productos no inventariados</p>
-          <div style={{background:"#d9770622",borderRadius:8,padding:8,fontSize:24,fontWeight:800,color:"#d97706",textAlign:"center",marginBottom:12}}>{sinConteo.length}</div>
+        <div style={{...card,border:"1px solid #fed7aa"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+            <div style={{width:40,height:40,background:"#fffbeb",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>⚪</div>
+            <div><div style={{fontWeight:700,fontSize:14,color:"#0f172a"}}>Sin Conteo</div><div style={{fontSize:11,color:"#64748b"}}>Productos no inventariados</div></div>
+          </div>
+          <div style={{background:"#fffbeb",borderRadius:10,padding:"10px",fontSize:28,fontWeight:900,color:"#d97706",textAlign:"center",marginBottom:12}}>{sinConteo.length}</div>
           <Btn c="#d97706" onClick={()=>expXLSX(sinConteo.map(p=>[p.codigo,p.nombre,p.referencia,p.categoria,p.subcategoria,p.subgrupo,p.saldo,p.costo,p.nit,p.proveedor]),["CODIGO","NOMBRE","REFERENCIA","CATEGORIA","SUBCATEGORIA","SUBGRUPO","SALDO","COSTO","NIT","PROVEEDOR"],"sin_conteo.xlsx","REPORTE SIN CONTEOS")} full>⬇ Exportar Excel</Btn>
         </div>
 
         {/* Diferencia Inventario */}
-        <div style={card}>
-          <div style={{fontSize:26,marginBottom:6}}>⚖️</div>
-          <h3 style={{margin:"0 0 4px",fontSize:14,fontWeight:700}}>Diferencia Inventario</h3>
-          <p style={{fontSize:12,color:"#64748b",margin:"0 0 12px"}}>Físico vs Sistema · base completa</p>
-          <div style={{background:"#2563eb22",borderRadius:8,padding:8,fontSize:24,fontWeight:800,color:"#2563eb",textAlign:"center",marginBottom:12}}>{difBase.length}</div>
-          <Btn c="#2563eb" onClick={()=>expXLSX(difBase.map(c=>[c.codigo,c.nombre,c.referencia,c.costo||0,c.saldo,c.cantFinal,c.diferencia,Math.round(c.valDif),c.estado||"",c.categoria||"",c.subcategoria||"",c.subgrupo||"",c.nit||"",c.proveedor||""]),["CODIGO","NOMBRE","REFERENCIA","COSTO","SALDO","CANTIDAD","DIFERENCIA","VALOR_DIF","ESTADO","CATEGORIA","SUBCATEGORIA","SUBGRUPO","NIT","PROVEEDOR"],"diferencia_inventario.xlsx","DIFERENCIA INVENTARIOS")} disabled={difBase.length===0} full>⬇ Exportar Excel</Btn>
+        <div style={{...card,border:"1px solid #bfdbfe"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+            <div style={{width:40,height:40,background:"#eff6ff",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>⚖️</div>
+            <div><div style={{fontWeight:700,fontSize:14,color:"#0f172a"}}>Diferencia Inventario</div><div style={{fontSize:11,color:"#64748b"}}>Físico vs Sistema · base completa</div></div>
+          </div>
+          <div style={{background:"#eff6ff",borderRadius:10,padding:"10px",fontSize:28,fontWeight:900,color:"#2563eb",textAlign:"center",marginBottom:12}}>{baseCompleta.length}</div>
+          <Btn c="#2563eb" onClick={()=>expXLSX(baseCompleta.map(c=>[c.codigo,c.nombre,c.referencia,c.costo||0,c.saldo,c.cantFinal,c.diferencia,Math.round(c.valDif),c.estado||"",c.categoria||"",c.subcategoria||"",c.subgrupo||"",c.nit||"",c.proveedor||""]),["CODIGO","NOMBRE","REFERENCIA","COSTO","SALDO","CANTIDAD","DIFERENCIA","VALOR_DIF","ESTADO","CATEGORIA","SUBCATEGORIA","SUBGRUPO","NIT","PROVEEDOR"],"diferencia_inventario.xlsx","DIFERENCIA INVENTARIOS")} disabled={baseCompleta.length===0} full>⬇ Exportar Excel</Btn>
         </div>
 
         {/* Ajuste */}
-        <div style={card}>
-          <div style={{fontSize:26,marginBottom:6}}>🔧</div>
-          <h3 style={{margin:"0 0 4px",fontSize:14,fontWeight:700}}>Ajuste de Inventario</h3>
-          <p style={{fontSize:12,color:"#64748b",margin:"0 0 12px"}}>Código · Cantidad · Fecha · base completa</p>
-          <div style={{background:"#16a34a22",borderRadius:8,padding:8,fontSize:24,fontWeight:800,color:"#16a34a",textAlign:"center",marginBottom:12}}>{baseCompleta.length}</div>
+        <div style={{...card,border:"1px solid #bbf7d0"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+            <div style={{width:40,height:40,background:"#f0fdf4",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>🔧</div>
+            <div><div style={{fontWeight:700,fontSize:14,color:"#0f172a"}}>Ajuste de Inventario</div><div style={{fontSize:11,color:"#64748b"}}>Código · Cantidad · Fecha · base completa</div></div>
+          </div>
+          <div style={{background:"#f0fdf4",borderRadius:10,padding:"10px",fontSize:28,fontWeight:900,color:"#16a34a",textAlign:"center",marginBottom:12}}>{baseCompleta.length}</div>
           <Btn c="#16a34a" onClick={()=>expXLSX(baseCompleta.map(c=>[c.codigo,c.cantFinal,c.saldo,c.diferencia,TODAY(),c.ubicacion||"BODEGA"]),["CODIGO","CANTIDAD","SALDO","DIFERENCIA","FECH_CORTE","BODEGA"],"ajuste_inventario.xlsx","AJUSTE INVENTARIO")} disabled={baseCompleta.length===0} full>⬇ Exportar Excel</Btn>
         </div>
 
-        {/* Reporte de Captura — C1/C2/C3 en columnas, sin SALDO, con ubicación */}
-        <div style={card}>
-          <div style={{fontSize:26,marginBottom:6}}>📄</div>
-          <h3 style={{margin:"0 0 4px",fontSize:14,fontWeight:700}}>Reporte de Captura</h3>
-          <p style={{fontSize:12,color:"#64748b",margin:"0 0 12px"}}>C1·C2·C3 en columnas · con ubicación</p>
-          <div style={{background:"#7c3aed22",borderRadius:8,padding:8,fontSize:24,fontWeight:800,color:"#7c3aed",textAlign:"center",marginBottom:12}}>{capFinal.length}</div>
+        {/* Reporte de Captura */}
+        <div style={{...card,border:"1px solid #ddd6fe"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+            <div style={{width:40,height:40,background:"#faf5ff",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>📄</div>
+            <div><div style={{fontWeight:700,fontSize:14,color:"#0f172a"}}>Reporte de Captura</div><div style={{fontSize:11,color:"#64748b"}}>C1·C2·C3 en columnas · con ubicación</div></div>
+          </div>
+          <div style={{background:"#faf5ff",borderRadius:10,padding:"10px",fontSize:28,fontWeight:900,color:"#7c3aed",textAlign:"center",marginBottom:12}}>{capFinal.length}</div>
           <Btn c="#7c3aed" onClick={()=>expXLSX(
             capFinal.map(c=>[c.ean,c.codigo,c.nombre,c.referencia,c.categoria,c.subcategoria,c.subgrupo,c.ubicacion,c.localizacion,c.nro,c.c1||"",c.c2||"",c.c3||"",c.cantFinal,c.costo,c.fecha||TODAY(),c.estado,c.obs||"",c.usuario,c.nit,c.proveedor]),
             ["EAN","CODIGO","NOMBRE","REFERENCIA","CATEGORIA","SUBCATEGORIA","SUBGRUPO","UBICACION","LOCALIZACION","N_LOCAL","CONTEO_1","CONTEO_2","CONTEO_3","CANTIDAD_FINAL","COSTO","FECHA","ESTADO","OBS","USUARIO","NIT","PROVEEDOR"],
@@ -2860,7 +2907,7 @@ function VUsuarios({G,rerender,showToast}){
   };
 
   return(
-    <Section titulo="Gestión de Usuarios">
+    <Section>
       <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap"}}>
         <Btn c="#16a34a" onClick={()=>{setForm({nombre:"",pass:"",rol:"capturador",correo:"",telefono:"",editId:null});setModal(true);}}>+ Crear Usuario</Btn>
         <Btn c="#2563eb" onClick={()=>setModalImport(true)}>⬆ Importar desde Excel</Btn>
@@ -3168,7 +3215,6 @@ function VHistorial({G,showToast,usuario}){
   // Vista global
   return(
     <div>
-      <h2 style={{margin:"0 0 20px",fontSize:20,fontWeight:700}}>Historial de Inventarios</h2>
       {G.historial.length===0?(
         <div style={{...card,textAlign:"center",padding:40,color:"#64748b"}}>No hay inventarios cerrados aún.</div>
       ):G.historial.length===1?(
@@ -3204,11 +3250,16 @@ function VHistorial({G,showToast,usuario}){
       ):(
         // Múltiples inventarios — dashboard global + lista
         <>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:14,marginBottom:20}}>
-            {[{l:"Total inventarios",v:G.historial.length,c:"#2563eb"},{l:"Último inventario",v:G.historial[0]?.nombre?.substring(0,20)||"—",c:"#16a34a"},{l:"Fecha último",v:G.historial[0]?.cierre||"—",c:"#0891b2"}].map(s=>(
-              <div key={s.l} style={{...card,borderTop:`3px solid ${s.c}`,padding:"12px 16px"}}>
-                <div style={{fontSize:s.v.toString().length>12?13:18,fontWeight:800,color:s.c}}>{s.v}</div>
-                <div style={{fontSize:11,color:"#64748b",marginTop:3}}>{s.l}</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:14,marginBottom:20}}>
+            {[
+              {l:"Total inventarios",v:G.historial.length,c:"#2563eb",bg:"#eff6ff",icon:"🏛️"},
+              {l:"Último inventario",v:G.historial[0]?.nombre?.substring(0,18)||"—",c:"#16a34a",bg:"#f0fdf4",icon:"📋"},
+              {l:"Fecha de cierre",v:G.historial[0]?.cierre||"—",c:"#0891b2",bg:"#ecfeff",icon:"📅"},
+            ].map(s=>(
+              <div key={s.l} style={{background:s.bg,borderRadius:14,padding:"16px 18px",border:`1px solid ${s.c}22`,boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
+                <div style={{fontSize:22,marginBottom:8}}>{s.icon}</div>
+                <div style={{fontSize:s.v.toString().length>12?13:22,fontWeight:900,color:s.c}}>{s.v}</div>
+                <div style={{fontSize:11,color:"#64748b",marginTop:4,fontWeight:600}}>{s.l}</div>
               </div>
             ))}
           </div>
@@ -3258,10 +3309,17 @@ function VHistorial({G,showToast,usuario}){
               ¿Estás seguro de eliminar <strong>{G.historial[confirmElim]?.nombre}</strong> del historial? Esta acción no se puede deshacer.
             </p>
             <div style={{display:"flex",gap:10}}>
-              <button onClick={()=>{
+              <button onClick={async()=>{
+                const inv=G.historial[confirmElim];
+                if(inv){
+                  // Eliminar en Supabase primero
+                  try{await SB.deleteInventario(inv.id);}catch(e){console.warn("Error al eliminar en Supabase:",e);}
+                  // Eliminar del snap para que doSync no lo restaure
+                  delete _snap.hist[inv.id];
+                }
                 G.historial=G.historial.filter((_,idx)=>idx!==confirmElim);
                 setConfirmElim(null);
-                showToast("Inventario eliminado del historial","warn");
+                showToast("Inventario eliminado ✓","warn");
               }} style={{flex:1,padding:"10px 0",background:"#dc2626",color:"white",border:"none",borderRadius:8,fontWeight:700,cursor:"pointer",fontSize:14}}>
                 Sí, eliminar
               </button>
