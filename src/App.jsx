@@ -45,7 +45,7 @@ const catC = c => CAT_C[c?.trim()] || "#6b7280";
 // ─────────────────────────────────────────
 const inp = {width:"100%",padding:"9px 12px",border:"1.5px solid #e2e8f0",borderRadius:8,fontSize:14,boxSizing:"border-box",outline:"none",background:"white",color:"#0f172a"};
 const lbl = {fontSize:11,fontWeight:700,color:"#374151",textTransform:"uppercase",letterSpacing:"0.8px",display:"block",marginBottom:5};
-const card = {background:"white",borderRadius:12,padding:18,boxShadow:"0 1px 4px rgba(0,0,0,0.07)"};
+const card = {background:"white",borderRadius:14,padding:20,boxShadow:"0 2px 8px rgba(0,0,0,0.06)",border:"1px solid #f1f5f9"};
 
 function Lbl({children,color}){return <label style={{...lbl,...(color?{color}:{})}}>{children}</label>;}
 function Inp({value,onChange,placeholder,type="text",disabled,onKeyDown,style={},min}){
@@ -81,10 +81,15 @@ function Modal({titulo,onClose,children,wide}){
     </div>
   );
 }
-function Section({titulo,children}){
+function Section({titulo,children,subtitle}){
   return(
-    <div style={{marginBottom:22}}>
-      <h2 style={{margin:"0 0 16px",fontSize:20,fontWeight:700,color:"#0f172a"}}>{titulo}</h2>
+    <div style={{marginBottom:24}}>
+      {titulo&&(
+        <div style={{marginBottom:18,paddingBottom:14,borderBottom:"2px solid #f1f5f9"}}>
+          <h2 style={{margin:0,fontSize:21,fontWeight:800,color:"#0f172a",letterSpacing:-0.5}}>{titulo}</h2>
+          {subtitle&&<div style={{fontSize:12,color:"#94a3b8",marginTop:4}}>{subtitle}</div>}
+        </div>
+      )}
       {children}
     </div>
   );
@@ -189,6 +194,7 @@ const SB={
   upsertInventario:(inv)=>supabase.from("inventarios").upsert(inv,{onConflict:"id"}),
   upsertConteo:(c)=>supabase.from("conteos").upsert(c,{onConflict:"id"}),
   deleteConteo:(id)=>supabase.from("conteos").delete().eq("id",id),
+  deleteInventario:(id)=>supabase.from("inventarios").delete().eq("id",id),
 };
 
 // --- Config local (localizaciones, tipos, alertas) ---
@@ -223,6 +229,7 @@ const doSync=async()=>{
     if(invS!==_snap.inv){if(invObj)await SB.upsertInventario(invObj);_snap.inv=invS;}
     const curH={};G.historial.forEach(h=>{curH[h.id]=serInv(h,"cerrado");});
     for(const id in curH){const s=JSON.stringify(curH[id]);if(_snap.hist[id]!==s){await SB.upsertInventario(curH[id]);_snap.hist[id]=s;}}
+    for(const id in _snap.hist){if(!curH[id]){await SB.deleteInventario(id);delete _snap.hist[id];}}
     const curC={};G.conteos.forEach(c=>{curC[c.id]=serConteo(c);});
     for(const id in curC){const s=JSON.stringify(curC[id]);if(_snap.c[id]!==s){await SB.upsertConteo(curC[id]);_snap.c[id]=s;}}
     for(const id in _snap.c){if(!curC[id]){await SB.deleteConteo(id);delete _snap.c[id];}}
@@ -483,21 +490,20 @@ function Login({lf,setLf,err,onLogin,lastSaved}){
 function ModAdmin({usuario,setUsuario,G,rerender,recargar,showToast,lastSaved,limpiarDatos}){
   const [view,setView]=useState("inventario");
   const [modalSalir,setModalSalir]=useState(false);
+  const [sideCollapsed,setSideCollapsed]=useState(false);
   const alertas=G.alertas.filter(a=>!a.leida).length;
   const nav=[
-    {id:"inventario",icon:"📋",label:"Inventario"},
-    {id:"basedatos",icon:"🗄️",label:"Base de datos"},
-    {id:"ubicaciones",icon:"📍",label:"Ubicaciones"},
-    {id:"conteos",icon:"🗂️",label:"Conteos"},
-    {id:"procesos",icon:"📡",label:"Procesos"},
-    {id:"reportes",icon:"📊",label:"Reportes"},
-    {id:"usuarios",icon:"👥",label:"Usuarios"},
-    {id:"historial",icon:"🗄️",label:"Historial"},
+    {id:"inventario",icon:"📋",label:"Inventario",desc:"Gestión activa"},
+    {id:"basedatos",icon:"🗄️",label:"Base de datos",desc:"Productos"},
+    {id:"ubicaciones",icon:"📍",label:"Ubicaciones",desc:"Localizaciones"},
+    {id:"conteos",icon:"🗂️",label:"Conteos",desc:"Rondas"},
+    {id:"procesos",icon:"📡",label:"Procesos",desc:"Avance"},
+    {id:"reportes",icon:"📊",label:"Reportes",desc:"Análisis"},
+    {id:"usuarios",icon:"👥",label:"Usuarios",desc:"Accesos"},
+    {id:"historial",icon:"🏛️",label:"Historial",desc:"Inventarios"},
   ];
   const props={usuario,setUsuario,G,rerender,recargar,showToast};
 
-  // Auto-refresco desde la nube cada 10s. Se pausa si el admin está
-  // escribiendo en un campo (input/select/textarea) para no interrumpirlo.
   useEffect(()=>{
     const t=setInterval(()=>{
       const el=document.activeElement;
@@ -507,33 +513,106 @@ function ModAdmin({usuario,setUsuario,G,rerender,recargar,showToast,lastSaved,li
     },10000);
     return ()=>clearInterval(t);
   },[]);
+
+  const navActual=nav.find(n=>n.id===view);
+
   return(
-    <div style={{minHeight:"100vh",background:"#f1f5f9",fontFamily:"system-ui,sans-serif"}}>
-      <div style={{background:"#0f172a",color:"white",padding:"0 20px",display:"flex",alignItems:"center",justifyContent:"space-between",height:54,position:"sticky",top:0,zIndex:100}}>
+    <div style={{minHeight:"100vh",background:"#f0f4f8",fontFamily:"system-ui,sans-serif"}}>
+
+      {/* TOPBAR */}
+      <div style={{background:"linear-gradient(135deg,#0f172a 0%,#1e293b 100%)",color:"white",padding:"0 20px",display:"flex",alignItems:"center",justifyContent:"space-between",height:58,position:"sticky",top:0,zIndex:100,boxShadow:"0 2px 12px rgba(0,0,0,0.25)"}}>
         <div style={{display:"flex",alignItems:"center",gap:12}}>
-          <span style={{fontSize:20}}>📦</span>
-          <span style={{fontWeight:800,fontSize:16}}>TOMFIC</span>
-          <span style={{color:"#475569",fontSize:12}}>Admin</span>
-          {G.inventario&&<span style={{background:"#16a34a",fontSize:10,padding:"2px 10px",borderRadius:20,fontWeight:700}}>● {G.inventario.nombre}</span>}
+          <button onClick={()=>setSideCollapsed(v=>!v)} style={{background:"rgba(255,255,255,0.08)",border:"none",color:"white",width:34,height:34,borderRadius:8,cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>
+            {sideCollapsed?"→":"☰"}
+          </button>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <div style={{width:32,height:32,background:"linear-gradient(135deg,#2563eb,#0891b2)",borderRadius:9,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>📦</div>
+            <div>
+              <div style={{fontWeight:800,fontSize:15,letterSpacing:-0.5}}>TOMFIC</div>
+              <div style={{fontSize:9,color:"#64748b",marginTop:-2,letterSpacing:1,textTransform:"uppercase"}}>Inventarios</div>
+            </div>
+          </div>
+          {G.inventario&&(
+            <div style={{background:"rgba(22,163,74,0.2)",border:"1px solid rgba(22,163,74,0.4)",fontSize:11,padding:"3px 12px",borderRadius:20,fontWeight:700,color:"#4ade80",display:"flex",alignItems:"center",gap:5}}>
+              <span style={{width:6,height:6,background:"#4ade80",borderRadius:99,display:"inline-block"}}/>
+              {G.inventario.nombre}
+            </div>
+          )}
+          {navActual&&(
+            <div style={{display:"flex",alignItems:"center",gap:6,color:"#64748b",fontSize:12}}>
+              <span style={{color:"#334155"}}>›</span>
+              <span style={{color:"#94a3b8"}}>{navActual.icon}</span>
+              <span style={{color:"#cbd5e1",fontWeight:600}}>{navActual.label}</span>
+            </div>
+          )}
         </div>
-        <div style={{display:"flex",gap:10,alignItems:"center"}}>
-          <button onClick={async()=>{await recargar();showToast("Datos actualizados ✓");}} style={{background:"transparent",border:"1px solid #334155",color:"#94a3b8",padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer"}}>🔄 Actualizar</button>
-          {alertas>0&&<button onClick={()=>{G.alertas=G.alertas.map(a=>({...a,leida:true}));rerender();setView("procesos");}} style={{background:"#dc2626",color:"white",border:"none",padding:"5px 12px",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:700}}>🔔 {alertas} alerta{alertas>1?"s":""}</button>}
-          {lastSaved&&<span style={{fontSize:10,color:"#475569"}}>☁️ {lastSaved}</span>}
-          <span style={{fontSize:12,color:"#94a3b8"}}>👤 {usuario.nombre}</span>
-          <button onClick={()=>setModalSalir(true)} style={{background:"#dc2626",border:"none",color:"white",padding:"6px 16px",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer"}}>⎋ Salir</button>
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          <button onClick={async()=>{await recargar();showToast("Datos actualizados ✓");}}
+            style={{background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.1)",color:"#94a3b8",padding:"5px 12px",borderRadius:8,fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}>
+            🔄 <span>Sync</span>
+          </button>
+          {alertas>0&&(
+            <button onClick={()=>{G.alertas=G.alertas.map(a=>({...a,leida:true}));rerender();setView("procesos");}}
+              style={{background:"#dc2626",color:"white",border:"none",padding:"5px 14px",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:700,display:"flex",alignItems:"center",gap:5,animation:"pulse 2s infinite"}}>
+              🔔 {alertas}
+            </button>
+          )}
+          {lastSaved&&<span style={{fontSize:10,color:"#475569",display:"flex",alignItems:"center",gap:4}}>☁️ {lastSaved}</span>}
+          <div style={{display:"flex",alignItems:"center",gap:7,background:"rgba(255,255,255,0.07)",borderRadius:9,padding:"5px 10px",border:"1px solid rgba(255,255,255,0.08)"}}>
+            <div style={{width:24,height:24,background:"linear-gradient(135deg,#2563eb,#7c3aed)",borderRadius:99,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700}}>{usuario.nombre.charAt(0)}</div>
+            <span style={{fontSize:12,color:"#cbd5e1",fontWeight:600}}>{usuario.nombre}</span>
+          </div>
+          <button onClick={()=>setModalSalir(true)}
+            style={{background:"rgba(220,38,38,0.15)",border:"1px solid rgba(220,38,38,0.3)",color:"#fca5a5",padding:"6px 14px",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer"}}>
+            Salir
+          </button>
         </div>
       </div>
-      <div style={{display:"flex",minHeight:"calc(100vh - 54px)"}}>
-        <div style={{width:190,background:"#1e293b",padding:"14px 0",flexShrink:0,position:"sticky",top:54,height:"calc(100vh - 54px)",overflowY:"auto"}}>
-          {nav.map(n=>(
-            <button key={n.id} onClick={()=>setView(n.id)}
-              style={{width:"100%",display:"flex",alignItems:"center",gap:9,padding:"10px 16px",background:view===n.id?"#2563eb":"transparent",color:view===n.id?"white":"#94a3b8",border:"none",cursor:"pointer",fontSize:13,textAlign:"left",transition:"all 0.1s"}}>
-              <span>{n.icon}</span><span>{n.label}</span>
-            </button>
-          ))}
+
+      <div style={{display:"flex",minHeight:"calc(100vh - 58px)"}}>
+
+        {/* SIDEBAR */}
+        <div style={{width:sideCollapsed?64:210,background:"linear-gradient(180deg,#1e293b 0%,#0f172a 100%)",flexShrink:0,position:"sticky",top:58,height:"calc(100vh - 58px)",overflowY:"auto",overflowX:"hidden",transition:"width 0.25s ease",boxShadow:"2px 0 12px rgba(0,0,0,0.2)"}}>
+          <div style={{padding:sideCollapsed?"12px 8px":"16px 10px",display:"flex",flexDirection:"column",gap:3}}>
+            {nav.map(n=>{
+              const active=view===n.id;
+              return(
+                <button key={n.id} onClick={()=>setView(n.id)}
+                  title={sideCollapsed?n.label:""}
+                  style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:sideCollapsed?"10px":"10px 12px",background:active?"linear-gradient(135deg,#2563eb,#1d4ed8)":"transparent",color:active?"white":"#64748b",border:"none",cursor:"pointer",fontSize:13,textAlign:"left",borderRadius:10,transition:"all 0.15s",position:"relative",overflow:"hidden"}}>
+                  {active&&<div style={{position:"absolute",left:0,top:"20%",bottom:"20%",width:3,background:"#60a5fa",borderRadius:"0 3px 3px 0"}}/>}
+                  <span style={{fontSize:18,flexShrink:0,filter:active?"none":"grayscale(0.3)"}}>{n.icon}</span>
+                  {!sideCollapsed&&(
+                    <div style={{overflow:"hidden"}}>
+                      <div style={{fontWeight:active?700:500,fontSize:13,whiteSpace:"nowrap",color:active?"white":"#94a3b8"}}>{n.label}</div>
+                      <div style={{fontSize:10,color:active?"#bfdbfe":"#475569",marginTop:1,whiteSpace:"nowrap"}}>{n.desc}</div>
+                    </div>
+                  )}
+                  {active&&!sideCollapsed&&<div style={{marginLeft:"auto",width:6,height:6,background:"#60a5fa",borderRadius:99,flexShrink:0}}/>}
+                </button>
+              );
+            })}
+          </div>
+          {!sideCollapsed&&(
+            <div style={{margin:"12px 10px 0",padding:"10px 12px",background:"rgba(255,255,255,0.04)",borderRadius:10,border:"1px solid rgba(255,255,255,0.06)"}}>
+              <div style={{fontSize:9,color:"#334155",textTransform:"uppercase",letterSpacing:1,fontWeight:700,marginBottom:4}}>Sistema</div>
+              <div style={{fontSize:11,color:"#475569"}}>v2.1 · {G.productos.length} productos</div>
+            </div>
+          )}
         </div>
-        <div style={{flex:1,padding:22,overflowY:"auto"}}>
+
+        {/* CONTENIDO */}
+        <div style={{flex:1,padding:24,overflowY:"auto",minWidth:0}}>
+          {/* Breadcrumb */}
+          {navActual&&(
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:20,padding:"8px 14px",background:"white",borderRadius:10,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",border:"1px solid #e2e8f0",width:"fit-content"}}>
+              <span style={{fontSize:13}}>📦</span>
+              <span style={{fontSize:12,color:"#94a3b8"}}>TOMFIC</span>
+              <span style={{color:"#d1d5db",fontSize:12}}>›</span>
+              <span style={{fontSize:13}}>{navActual.icon}</span>
+              <span style={{fontSize:12,fontWeight:700,color:"#0f172a"}}>{navActual.label}</span>
+            </div>
+          )}
           {view==="inventario"&&<VInventario {...props}/>}
           {view==="ubicaciones"&&<VUbicaciones {...props}/>}
           {view==="basedatos"&&<VBaseDatos {...props}/>}
@@ -544,12 +623,16 @@ function ModAdmin({usuario,setUsuario,G,rerender,recargar,showToast,lastSaved,li
           {view==="historial"&&<VHistorial {...props}/>}
         </div>
       </div>
+
       {modalSalir&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
-          <div style={{background:"white",borderRadius:16,padding:28,width:380,maxWidth:"96vw",boxShadow:"0 25px 60px rgba(0,0,0,0.3)"}}>
-            <h3 style={{margin:"0 0 12px",fontSize:18,fontWeight:700,color:"#0f172a"}}>¿Cerrar sesión?</h3>
-            <p style={{fontSize:14,color:"#374151",marginBottom:22,lineHeight:1.5}}>Vas a salir de TOMFIC. Tus datos ya están guardados en la nube.</p>
-            <div style={{display:"flex",gap:10}}>
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center",padding:16,backdropFilter:"blur(4px)"}}>
+          <div style={{background:"white",borderRadius:20,padding:32,width:380,maxWidth:"96vw",boxShadow:"0 30px 80px rgba(0,0,0,0.35)"}}>
+            <div style={{textAlign:"center",marginBottom:16}}>
+              <div style={{fontSize:40,marginBottom:8}}>👋</div>
+              <h3 style={{margin:"0 0 8px",fontSize:18,fontWeight:800,color:"#0f172a"}}>¿Cerrar sesión?</h3>
+              <p style={{fontSize:14,color:"#64748b",lineHeight:1.6,margin:0}}>Vas a salir de TOMFIC. Tus datos ya están guardados en la nube.</p>
+            </div>
+            <div style={{display:"flex",gap:10,marginTop:24}}>
               <Btn c="#dc2626" onClick={()=>setUsuario(null)} full>Sí, salir</Btn>
               <Btn c="#64748b" onClick={()=>setModalSalir(false)} full outline>Cancelar</Btn>
             </div>
@@ -1851,41 +1934,57 @@ function VProcesos({G,rerender,showToast,usuario}){
         const locSinConteo=G.localizaciones.filter(l=>!locConConteo.has(l.id));
         const totalPend=conteosPend.length+locSinConteo.length;
         return(
-          <div style={{...card,marginBottom:16,border:totalPend>0?"2px solid #f59e0b":"2px solid #bbf7d0"}}>
-            <div onClick={()=>setVerPendientes(v=>!v)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}}>
-              <div style={{fontWeight:700,fontSize:14,color:totalPend>0?"#92400e":"#166534"}}>
-                {totalPend>0?`⏳ Faltan ${totalPend} pendiente(s) por hacer`:"✅ Todo al día — no hay pendientes"}
-              </div>
-              <span style={{fontSize:12,color:"#64748b"}}>{verPendientes?"▲ ocultar":"▼ ver detalle"}</span>
-            </div>
-            {verPendientes&&totalPend>0&&(
-              <div style={{marginTop:14,display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:14}}>
+          <div style={{marginBottom:16,borderRadius:16,overflow:"hidden",boxShadow:"0 2px 12px rgba(0,0,0,0.08)",border:totalPend>0?"1.5px solid #fbbf24":"1.5px solid #86efac"}}>
+            {/* Header del panel */}
+            <div onClick={()=>setVerPendientes(v=>!v)} style={{cursor:"pointer",padding:"14px 20px",background:totalPend>0?"linear-gradient(135deg,#fffbeb,#fef3c7)":"linear-gradient(135deg,#f0fdf4,#dcfce7)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                <div style={{width:36,height:36,borderRadius:10,background:totalPend>0?"#f59e0b":"#16a34a",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>
+                  {totalPend>0?"⏳":"✅"}
+                </div>
                 <div>
-                  <div style={{fontSize:12,fontWeight:700,color:"#374151",marginBottom:8,textTransform:"uppercase",letterSpacing:0.5}}>Conteos sin terminar ({conteosPend.length})</div>
-                  {conteosPend.length===0?<div style={{fontSize:12,color:"#16a34a",padding:"6px 0"}}>Todos los conteos creados estan completos</div>:(
-                    <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                  <div style={{fontWeight:800,fontSize:14,color:totalPend>0?"#92400e":"#166534"}}>
+                    {totalPend>0?`Faltan ${totalPend} pendiente${totalPend>1?"s":""} por completar`:"Todo al día — sin pendientes"}
+                  </div>
+                  {totalPend>0&&<div style={{fontSize:11,color:"#a16207",marginTop:1}}>{conteosPend.length} conteo{conteosPend.length!==1?"s":""} · {locSinConteo.length} ubicación{locSinConteo.length!==1?"es":""}</div>}
+                </div>
+              </div>
+              <div style={{background:"white",borderRadius:8,padding:"4px 12px",fontSize:12,fontWeight:600,color:totalPend>0?"#92400e":"#166534",boxShadow:"0 1px 3px rgba(0,0,0,0.1)"}}>
+                {verPendientes?"▲ Ocultar":"▼ Ver detalle"}
+              </div>
+            </div>
+
+            {verPendientes&&totalPend>0&&(
+              <div style={{background:"white",padding:16}}>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:14}}>
+                <div>
+                  <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10}}>
+                    <div style={{width:6,height:6,borderRadius:99,background:"#f59e0b"}}/>
+                    <div style={{fontSize:11,fontWeight:800,color:"#374151",textTransform:"uppercase",letterSpacing:0.8}}>Conteos sin terminar ({conteosPend.length})</div>
+                  </div>
+                  {conteosPend.length===0?<div style={{fontSize:12,color:"#16a34a",padding:"8px 12px",background:"#f0fdf4",borderRadius:8}}>✓ Todos los conteos están completos</div>:(
+                    <div style={{display:"flex",flexDirection:"column",gap:8}}>
                       {conteosPend.map(({c,razon})=>{
                         const abierto=pendForm&&pendForm.id===c.id;
                         const faltaC2=c.tipo==="2conteos"&&!c.usuarioC2;
                         const faltaC3=c.estado==="diferencia"&&!c.usuarioC3;
                         const accionable=faltaC2||faltaC3;
                         return(
-                        <div key={c.id} style={{background:"#fffbeb",border:"1px solid #fde047",borderRadius:8,padding:"8px 12px",fontSize:12}}>
+                        <div key={c.id} style={{background:"#fffbeb",border:"1px solid #fde68a",borderRadius:10,padding:"10px 14px",fontSize:12,boxShadow:"0 1px 3px rgba(0,0,0,0.05)"}}>
                           <div onClick={()=>accionable&&setPendForm(abierto?null:{id:c.id,tipo:faltaC2?"c2":"c3",val:""})} style={{cursor:accionable?"pointer":"default"}}>
-                            <div style={{fontWeight:700,color:"#0f172a",display:"flex",justifyContent:"space-between"}}>
+                            <div style={{fontWeight:700,color:"#0f172a",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                               <span>{c.nombre}</span>
-                              {accionable&&<span style={{color:"#2563eb",fontSize:11}}>{abierto?"▲":faltaC2?"+ Asignar C2":"+ Asignar C3"}</span>}
+                              {accionable&&<span style={{background:"#2563eb",color:"white",borderRadius:6,padding:"2px 8px",fontSize:10,fontWeight:700}}>{abierto?"▲ cerrar":faltaC2?"Asignar C2":"Asignar C3"}</span>}
                             </div>
-                            <div style={{color:"#64748b",fontSize:11,marginTop:1}}>📍 {c.locLabel}</div>
-                            <div style={{color:"#92400e",fontSize:11,fontWeight:700,marginTop:3}}>{razon}</div>
+                            <div style={{color:"#64748b",fontSize:11,marginTop:3}}>📍 {c.locLabel}</div>
+                            <div style={{display:"inline-block",background:"#fef3c7",color:"#92400e",borderRadius:5,padding:"2px 7px",fontSize:10,fontWeight:700,marginTop:4}}>{razon}</div>
                           </div>
                           {abierto&&(
-                            <div style={{marginTop:8,display:"flex",gap:6,alignItems:"center"}}>
-                              <select value={pendForm.val} onChange={e=>setPendForm({...pendForm,val:e.target.value})} style={{...inp,fontSize:12,padding:"5px 8px",flex:1}}>
+                            <div style={{marginTop:10,display:"flex",gap:6,alignItems:"center",paddingTop:8,borderTop:"1px solid #fde68a"}}>
+                              <select value={pendForm.val} onChange={e=>setPendForm({...pendForm,val:e.target.value})} style={{...inp,fontSize:12,padding:"6px 8px",flex:1,borderRadius:8}}>
                                 <option value="">Selecciona usuario…</option>
                                 {usuariosActivos().map(u=><option key={u.id}>{u.nombre}</option>)}
                               </select>
-                              <Btn c="#16a34a" small onClick={()=>pendForm.tipo==="c2"?asignarC2Rapido(c.id,pendForm.val):(pendForm.val&&asignarC3(c.id,pendForm.val),setPendForm(null))}>OK</Btn>
+                              <Btn c="#16a34a" small onClick={()=>pendForm.tipo==="c2"?asignarC2Rapido(c.id,pendForm.val):(pendForm.val&&asignarC3(c.id,pendForm.val),setPendForm(null))}>✓</Btn>
                               <Btn c="#64748b" small onClick={()=>setPendForm(null)}>✕</Btn>
                             </div>
                           )}
@@ -1896,36 +1995,39 @@ function VProcesos({G,rerender,showToast,usuario}){
                   )}
                 </div>
                 <div>
-                  <div style={{fontSize:12,fontWeight:700,color:"#374151",marginBottom:8,textTransform:"uppercase",letterSpacing:0.5}}>Ubicaciones sin conteo ({locSinConteo.length})</div>
-                  {locSinConteo.length===0?<div style={{fontSize:12,color:"#16a34a",padding:"6px 0"}}>Todas las ubicaciones tienen conteo</div>:(
-                    <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                  <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10}}>
+                    <div style={{width:6,height:6,borderRadius:99,background:"#2563eb"}}/>
+                    <div style={{fontSize:11,fontWeight:800,color:"#374151",textTransform:"uppercase",letterSpacing:0.8}}>Ubicaciones sin conteo ({locSinConteo.length})</div>
+                  </div>
+                  {locSinConteo.length===0?<div style={{fontSize:12,color:"#16a34a",padding:"8px 12px",background:"#f0fdf4",borderRadius:8}}>✓ Todas las ubicaciones tienen conteo</div>:(
+                    <div style={{display:"flex",flexDirection:"column",gap:8}}>
                       {locSinConteo.map(l=>{
                         const abierto=pendForm&&pendForm.locId===l.id;
                         return(
-                        <div key={l.id} style={{background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:8,padding:"8px 12px",fontSize:12}}>
+                        <div key={l.id} style={{background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:10,padding:"10px 14px",fontSize:12,boxShadow:"0 1px 3px rgba(0,0,0,0.05)"}}>
                           <div onClick={()=>setPendForm(abierto?null:{locId:l.id,tipo:"crear",nombre:`${l.localizacion} ${l.nro}`,c1:"",c2:""})} style={{cursor:"pointer"}}>
-                            <div style={{fontWeight:700,color:"#1e40af",display:"flex",justifyContent:"space-between"}}>
+                            <div style={{fontWeight:700,color:"#1e40af",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                               <span>{l.ubicacion} › {l.localizacion} › {l.nro}</span>
-                              <span style={{color:"#2563eb",fontSize:11}}>{abierto?"▲":"+ Crear conteo"}</span>
+                              <span style={{background:"#2563eb",color:"white",borderRadius:6,padding:"2px 8px",fontSize:10,fontWeight:700}}>{abierto?"▲ cerrar":"+ Crear"}</span>
                             </div>
-                            {l.observacion&&<div style={{color:"#64748b",fontSize:11,marginTop:1}}>{l.observacion}</div>}
-                            {!abierto&&<div style={{color:"#2563eb",fontSize:11,fontWeight:700,marginTop:3}}>Sin conteo programado</div>}
+                            {l.observacion&&<div style={{color:"#64748b",fontSize:11,marginTop:3}}>{l.observacion}</div>}
+                            {!abierto&&<div style={{display:"inline-block",background:"#dbeafe",color:"#1e40af",borderRadius:5,padding:"2px 7px",fontSize:10,fontWeight:700,marginTop:4}}>Sin conteo programado</div>}
                           </div>
                           {abierto&&(
-                            <div style={{marginTop:8,display:"flex",flexDirection:"column",gap:6}}>
-                              <input value={pendForm.nombre} onChange={e=>setPendForm({...pendForm,nombre:e.target.value})} placeholder="Nombre del conteo" style={{...inp,fontSize:12,padding:"5px 8px"}}/>
-                              <select value={pendForm.c1} onChange={e=>setPendForm({...pendForm,c1:e.target.value})} style={{...inp,fontSize:12,padding:"5px 8px"}}>
+                            <div style={{marginTop:10,display:"flex",flexDirection:"column",gap:6,paddingTop:8,borderTop:"1px solid #bfdbfe"}}>
+                              <input value={pendForm.nombre} onChange={e=>setPendForm({...pendForm,nombre:e.target.value})} placeholder="Nombre del conteo" style={{...inp,fontSize:12,padding:"6px 8px",borderRadius:8}}/>
+                              <select value={pendForm.c1} onChange={e=>setPendForm({...pendForm,c1:e.target.value})} style={{...inp,fontSize:12,padding:"6px 8px",borderRadius:8}}>
                                 <option value="">Usuario Conteo 1…</option>
                                 {usuariosActivos().map(u=><option key={u.id}>{u.nombre}</option>)}
                               </select>
                               {G.inventario.tipo==="2conteos"&&(
-                                <select value={pendForm.c2} onChange={e=>setPendForm({...pendForm,c2:e.target.value})} style={{...inp,fontSize:12,padding:"5px 8px"}}>
+                                <select value={pendForm.c2} onChange={e=>setPendForm({...pendForm,c2:e.target.value})} style={{...inp,fontSize:12,padding:"6px 8px",borderRadius:8}}>
                                   <option value="">Usuario Conteo 2 (opcional)…</option>
                                   {usuariosActivos().map(u=><option key={u.id}>{u.nombre}</option>)}
                                 </select>
                               )}
                               <div style={{display:"flex",gap:6}}>
-                                <Btn c="#16a34a" small onClick={()=>crearConteoRapido(l,pendForm.nombre,pendForm.c1,pendForm.c2)} full>✓ Crear</Btn>
+                                <Btn c="#16a34a" small onClick={()=>crearConteoRapido(l,pendForm.nombre,pendForm.c1,pendForm.c2)} full>✓ Crear conteo</Btn>
                                 <Btn c="#64748b" small onClick={()=>setPendForm(null)} full>Cancelar</Btn>
                               </div>
                             </div>
@@ -1936,6 +2038,7 @@ function VProcesos({G,rerender,showToast,usuario}){
                     </div>
                   )}
                 </div>
+              </div>
               </div>
             )}
           </div>
