@@ -959,6 +959,34 @@ function VUbicaciones({G,rerender,showToast}){
 
   return(
     <Section>
+      {/* Header estilo procesos */}
+      <div style={{background:"linear-gradient(135deg,#d97706 0%,#f59e0b 100%)",borderRadius:16,padding:"20px 24px",marginBottom:20,color:"white",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div>
+          <div style={{fontSize:11,fontWeight:600,opacity:0.75,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>Localizaciones</div>
+          <div style={{fontSize:22,fontWeight:800,letterSpacing:-0.5}}>Ubicaciones</div>
+          <div style={{fontSize:12,opacity:0.8,marginTop:4}}>{G.ubicacionesTipos.join(" · ")||"Sin tipos registrados"}</div>
+        </div>
+        <div style={{textAlign:"right"}}>
+          <div style={{fontSize:28,fontWeight:900,letterSpacing:-1}}>{G.localizaciones.length}</div>
+          <div style={{fontSize:11,opacity:0.8}}>localizaciones</div>
+        </div>
+      </div>
+      {/* KPIs */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:12,marginBottom:20}}>
+        {[
+          {icon:"📍",l:"Localizaciones",v:G.localizaciones.length,c:"#d97706",bg:"#fffbeb"},
+          {icon:"🏢",l:"Tipos ubicación",v:G.ubicacionesTipos.length,c:"#2563eb",bg:"#eff6ff"},
+          {icon:"🗂️",l:"Tipos local.",v:G.localizacionTipos.length,c:"#7c3aed",bg:"#faf5ff"},
+          {icon:"✅",l:"Con conteo",v:new Set(G.conteos.map(c=>c.locId)).size,c:"#16a34a",bg:"#f0fdf4"},
+          {icon:"⏳",l:"Sin conteo",v:G.localizaciones.filter(l=>!G.conteos.find(c=>c.locId===l.id)).length,c:"#dc2626",bg:"#fef2f2"},
+        ].map(s=>(
+          <div key={s.l} style={{background:s.bg,borderRadius:14,padding:"14px 16px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",border:`1px solid ${s.c}22`}}>
+            <div style={{fontSize:20,marginBottom:6}}>{s.icon}</div>
+            <div style={{fontSize:26,fontWeight:900,color:s.c,lineHeight:1}}>{s.v}</div>
+            <div style={{fontSize:11,color:"#64748b",marginTop:4,fontWeight:600}}>{s.l}</div>
+          </div>
+        ))}
+      </div>
       {/* Tipos */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:18}}>
         <div style={card}>
@@ -1201,29 +1229,53 @@ function VBaseDatos({G,rerender,showToast}){
     showToast("Plantilla descargada");
   };
 
+  const conEAN=G.productos.filter(p=>p.ean).length;
   return(
     <Section>
+      {/* Header estilo procesos */}
+      <div style={{background:"linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%)",borderRadius:16,padding:"20px 24px",marginBottom:20,color:"white",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div>
+          <div style={{fontSize:11,fontWeight:600,opacity:0.75,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>Productos</div>
+          <div style={{fontSize:22,fontWeight:800,letterSpacing:-0.5}}>Base de Datos</div>
+          <div style={{fontSize:12,opacity:0.8,marginTop:4}}>{cats.length>0?cats.slice(0,3).join(" · ")+(cats.length>3?" …":""):"Sin categorías"}</div>
+        </div>
+        <div style={{textAlign:"right"}}>
+          <div style={{fontSize:28,fontWeight:900,letterSpacing:-1}}>{G.productos.length}</div>
+          <div style={{fontSize:11,opacity:0.8}}>productos</div>
+        </div>
+      </div>
+      {/* KPIs */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:12,marginBottom:20}}>
+        {[
+          {icon:"📦",l:"Total productos",v:G.productos.length,c:"#2563eb",bg:"#eff6ff"},
+          {icon:"🔍",l:"Con EAN",v:conEAN,c:"#16a34a",bg:"#f0fdf4"},
+          {icon:"🏷️",l:"Categorías",v:cats.length,c:"#7c3aed",bg:"#faf5ff"},
+          {icon:"💰",l:"Con costo",v:G.productos.filter(p=>p.costo>0).length,c:"#d97706",bg:"#fffbeb"},
+        ].map(s=>(
+          <div key={s.l} style={{background:s.bg,borderRadius:14,padding:"14px 16px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",border:`1px solid ${s.c}22`}}>
+            <div style={{fontSize:20,marginBottom:6}}>{s.icon}</div>
+            <div style={{fontSize:26,fontWeight:900,color:s.c,lineHeight:1}}>{s.v}</div>
+            <div style={{fontSize:11,color:"#64748b",marginTop:4,fontWeight:600}}>{s.l}</div>
+          </div>
+        ))}
+      </div>
+      {/* Acciones */}
       <div style={{display:"flex",gap:10,marginBottom:16,alignItems:"center",flexWrap:"wrap"}}>
         <label style={{padding:"9px 20px",background:"#2563eb",color:"white",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:13}}>
           ⬆ Cargar / Actualizar Excel<input type="file" accept=".xlsx,.xls" onChange={cargarPreview} style={{display:"none"}}/>
         </label>
         <button onClick={()=>setMostrarEstructura(v=>!v)}
           style={{padding:"9px 16px",background:"#f8fafc",border:"1.5px solid #e2e8f0",color:"#374151",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:13}}>
-          📋 {mostrarEstructura?"Ocultar":"Ver"} estructura del Excel
+          📋 {mostrarEstructura?"Ocultar":"Ver"} estructura
         </button>
         <button onClick={descargarPlantilla}
           style={{padding:"9px 16px",background:"#f0fdf4",border:"1.5px solid #bbf7d0",color:"#166534",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:13}}>
-          ⬇ Descargar plantilla
+          ⬇ Plantilla
         </button>
         {G.productos.length>0&&(
-          <>
-            <div style={{padding:"9px 14px",background:"#f0fdf4",color:"#166534",borderRadius:8,fontSize:13,fontWeight:700,border:"1px solid #bbf7d0"}}>
-              ✅ {G.productos.length} productos cargados
-            </div>
-            <button onClick={()=>{G.productos=[];rerender();showToast("Base de datos limpiada","warn");}} style={{padding:"9px 14px",background:"#fef2f2",color:"#dc2626",border:"1px solid #fecaca",borderRadius:8,fontSize:13,fontWeight:700,cursor:"pointer"}}>
-              🗑 Limpiar base
-            </button>
-          </>
+          <button onClick={()=>{G.productos=[];rerender();showToast("Base de datos limpiada","warn");}} style={{padding:"9px 14px",background:"#fef2f2",color:"#dc2626",border:"1px solid #fecaca",borderRadius:8,fontSize:13,fontWeight:700,cursor:"pointer"}}>
+            🗑 Limpiar base
+          </button>
         )}
         {G.productos.length===0&&!preview&&(
           <div style={{background:"#fef9c3",borderRadius:8,padding:"8px 14px",fontSize:13,color:"#92400e",fontWeight:600}}>
@@ -1418,14 +1470,46 @@ function VConteos({G,rerender,showToast,usuario}){
 
   return(
     <Section>
-      <div style={{marginBottom:16}}>
+      {/* Header estilo procesos */}
+      <div style={{background:"linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%)",borderRadius:16,padding:"20px 24px",marginBottom:20,color:"white",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div>
+          <div style={{fontSize:11,fontWeight:600,opacity:0.75,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>Rondas</div>
+          <div style={{fontSize:22,fontWeight:800,letterSpacing:-0.5}}>Programación de Conteos</div>
+          <div style={{fontSize:12,opacity:0.8,marginTop:4}}>{G.inventario?.nombre||"Sin inventario activo"}</div>
+        </div>
+        <div style={{textAlign:"right"}}>
+          <div style={{fontSize:28,fontWeight:900,letterSpacing:-1}}>{G.conteos.length}</div>
+          <div style={{fontSize:11,opacity:0.8}}>conteos</div>
+        </div>
+      </div>
+      {/* KPIs */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:12,marginBottom:20}}>
+        {[
+          {icon:"📋",l:"Total",v:G.conteos.length,c:"#2563eb",bg:"#eff6ff"},
+          {icon:"✅",l:"Completados",v:G.conteos.filter(c=>["completado","cerradoC1","cerradoC2"].includes(c.estado)).length,c:"#16a34a",bg:"#f0fdf4"},
+          {icon:"⚙️",l:"En curso",v:G.conteos.filter(c=>c.estado==="enCurso").length,c:"#0891b2",bg:"#ecfeff"},
+          {icon:"⏳",l:"Pendientes",v:G.conteos.filter(c=>c.estado==="pendiente").length,c:"#d97706",bg:"#fffbeb"},
+          {icon:"⚠️",l:"Con diferencia",v:G.conteos.filter(c=>c.estado==="diferencia").length,c:"#dc2626",bg:"#fef2f2"},
+        ].map(s=>(
+          <div key={s.l} style={{background:s.bg,borderRadius:14,padding:"14px 16px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",border:`1px solid ${s.c}22`}}>
+            <div style={{fontSize:20,marginBottom:6}}>{s.icon}</div>
+            <div style={{fontSize:26,fontWeight:900,color:s.c,lineHeight:1}}>{s.v}</div>
+            <div style={{fontSize:11,color:"#64748b",marginTop:4,fontWeight:600}}>{s.l}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{marginBottom:16,display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
         <Btn c="#16a34a" onClick={()=>setModal(true)} disabled={!G.inventario||G.productos.length===0}>+ Programar Conteo</Btn>
-        {!G.inventario&&<span style={{marginLeft:12,fontSize:12,color:"#dc2626"}}>Primero crea un inventario.</span>}
-        {G.inventario&&G.productos.length===0&&<span style={{marginLeft:12,fontSize:12,color:"#dc2626"}}>Primero carga la base de productos.</span>}
+        {!G.inventario&&<span style={{fontSize:12,color:"#dc2626",background:"#fef2f2",padding:"5px 10px",borderRadius:7}}>⚠️ Primero crea un inventario.</span>}
+        {G.inventario&&G.productos.length===0&&<span style={{fontSize:12,color:"#dc2626",background:"#fef2f2",padding:"5px 10px",borderRadius:7}}>⚠️ Primero carga la base de productos.</span>}
       </div>
 
       {G.conteos.length===0?(
-        <div style={{...card,textAlign:"center",padding:36,color:"#64748b",fontSize:14}}>No hay conteos programados.</div>
+        <div style={{textAlign:"center",padding:"48px 20px",background:"white",borderRadius:14,border:"2px dashed #e2e8f0",color:"#64748b"}}>
+          <div style={{fontSize:48,marginBottom:12}}>🗂️</div>
+          <div style={{fontSize:15,fontWeight:700,marginBottom:6}}>Sin conteos programados</div>
+          <div style={{fontSize:13}}>Crea el primer conteo para comenzar.</div>
+        </div>
       ):(
         <div style={{...card,padding:0,overflow:"hidden"}}>
           <div style={{overflowX:"auto"}}>
@@ -2684,26 +2768,36 @@ function VReportes({G,showToast,usuario}){
   const difBase=baseCompleta.filter(c=>c.diferencia!==0);
   const valorAjusteTotal=baseCompleta.reduce((s,c)=>s+c.valDif,0);
 
-  const rCards=[
-    {icon:"🔄",titulo:"Diferencias de Conteos",desc:"C1 ≠ C2 por conteo",val:totalDifs,c:"#dc2626",bg:"#fef2f2"},
-    {icon:"⚪",titulo:"Sin Conteo",desc:"Productos no inventariados",val:sinConteo.length,c:"#d97706",bg:"#fffbeb"},
-    {icon:"⚖️",titulo:"Diferencia Inventario",desc:"Físico vs Sistema",val:baseCompleta.length,c:"#2563eb",bg:"#eff6ff"},
-    {icon:"🔧",titulo:"Ajuste de Inventario",desc:"Base completa",val:baseCompleta.length,c:"#16a34a",bg:"#f0fdf4"},
-    {icon:"📄",titulo:"Reporte de Captura",desc:"C1·C2·C3 con ubicación",val:capFinal.length,c:"#7c3aed",bg:"#faf5ff"},
-  ];
   return(
     <Section>
-      {/* Resumen rápido */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginBottom:20}}>
-        {rCards.map(r=>(
-          <div key={r.titulo} style={{background:r.bg,borderRadius:12,padding:"14px 16px",border:`1px solid ${r.c}22`}}>
-            <div style={{fontSize:22,marginBottom:6}}>{r.icon}</div>
-            <div style={{fontSize:24,fontWeight:900,color:r.c}}>{r.val}</div>
-            <div style={{fontSize:11,color:"#64748b",fontWeight:600,marginTop:3}}>{r.titulo}</div>
+      {/* Header estilo procesos */}
+      <div style={{background:"linear-gradient(135deg,#7c3aed 0%,#2563eb 100%)",borderRadius:16,padding:"20px 24px",marginBottom:20,color:"white",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div>
+          <div style={{fontSize:11,fontWeight:600,opacity:0.75,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>Análisis</div>
+          <div style={{fontSize:22,fontWeight:800,letterSpacing:-0.5}}>Reportes</div>
+          <div style={{fontSize:12,opacity:0.8,marginTop:4}}>{G.inventario?.nombre||"Inventario activo"}</div>
+        </div>
+        <div style={{textAlign:"right"}}>
+          <div style={{fontSize:28,fontWeight:900,letterSpacing:-1}}>{G.productos.length}</div>
+          <div style={{fontSize:11,opacity:0.8}}>productos base</div>
+        </div>
+      </div>
+      {/* KPIs */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:12,marginBottom:20}}>
+        {[
+          {icon:"🔄",l:"Diferencias C1/C2",v:totalDifs,c:"#dc2626",bg:"#fef2f2"},
+          {icon:"⚪",l:"Sin Conteo",v:sinConteo.length,c:"#d97706",bg:"#fffbeb"},
+          {icon:"⚖️",l:"Base completa",v:baseCompleta.length,c:"#2563eb",bg:"#eff6ff"},
+          {icon:"📄",l:"Capturados",v:capFinal.length,c:"#7c3aed",bg:"#faf5ff"},
+          {icon:"💰",l:"Valor físico",v:baseCompleta.reduce((s,c)=>s+(c.cantFinal*c.costo||0),0)>0?("$"+Math.round(baseCompleta.reduce((s,c)=>s+(c.cantFinal*(c.costo||0)),0)/1000)+"K"):"—",c:"#16a34a",bg:"#f0fdf4"},
+        ].map(s=>(
+          <div key={s.l} style={{background:s.bg,borderRadius:14,padding:"14px 16px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",border:`1px solid ${s.c}22`}}>
+            <div style={{fontSize:20,marginBottom:6}}>{s.icon}</div>
+            <div style={{fontSize:26,fontWeight:900,color:s.c,lineHeight:1}}>{s.v}</div>
+            <div style={{fontSize:11,color:"#64748b",marginTop:4,fontWeight:600}}>{s.l}</div>
           </div>
         ))}
       </div>
-
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:16}}>
 
         {/* Diferencias de Conteos — expandible */}
@@ -2906,8 +3000,38 @@ function VUsuarios({G,rerender,showToast}){
     showToast("Plantilla descargada ✓");
   };
 
+  const admins=G.usuarios.filter(u=>u.rol==="admin");
+  const caps=G.usuarios.filter(u=>u.rol==="capturador");
+  const activos=G.usuarios.filter(u=>u.activo);
   return(
     <Section>
+      {/* Header estilo procesos */}
+      <div style={{background:"linear-gradient(135deg,#7c3aed 0%,#4f46e5 100%)",borderRadius:16,padding:"20px 24px",marginBottom:20,color:"white",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div>
+          <div style={{fontSize:11,fontWeight:600,opacity:0.75,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>Accesos</div>
+          <div style={{fontSize:22,fontWeight:800,letterSpacing:-0.5}}>Gestión de Usuarios</div>
+          <div style={{fontSize:12,opacity:0.8,marginTop:4}}>{activos.length} activos · {admins.length} admin · {caps.length} capturadores</div>
+        </div>
+        <div style={{textAlign:"right"}}>
+          <div style={{fontSize:28,fontWeight:900,letterSpacing:-1}}>{G.usuarios.length}</div>
+          <div style={{fontSize:11,opacity:0.8}}>usuarios</div>
+        </div>
+      </div>
+      {/* KPIs */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:12,marginBottom:20}}>
+        {[
+          {icon:"👥",l:"Total",v:G.usuarios.length,c:"#7c3aed",bg:"#faf5ff"},
+          {icon:"✅",l:"Activos",v:activos.length,c:"#16a34a",bg:"#f0fdf4"},
+          {icon:"🔑",l:"Admins",v:admins.length,c:"#2563eb",bg:"#eff6ff"},
+          {icon:"📱",l:"Capturadores",v:caps.length,c:"#0891b2",bg:"#ecfeff"},
+        ].map(s=>(
+          <div key={s.l} style={{background:s.bg,borderRadius:14,padding:"14px 16px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",border:`1px solid ${s.c}22`}}>
+            <div style={{fontSize:20,marginBottom:6}}>{s.icon}</div>
+            <div style={{fontSize:26,fontWeight:900,color:s.c,lineHeight:1}}>{s.v}</div>
+            <div style={{fontSize:11,color:"#64748b",marginTop:4,fontWeight:600}}>{s.l}</div>
+          </div>
+        ))}
+      </div>
       <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap"}}>
         <Btn c="#16a34a" onClick={()=>{setForm({nombre:"",pass:"",rol:"capturador",correo:"",telefono:"",editId:null});setModal(true);}}>+ Crear Usuario</Btn>
         <Btn c="#2563eb" onClick={()=>setModalImport(true)}>⬆ Importar desde Excel</Btn>
@@ -3215,50 +3339,65 @@ function VHistorial({G,showToast,usuario}){
   // Vista global
   return(
     <div>
+      {/* Header estilo procesos */}
+      <div style={{background:"linear-gradient(135deg,#1e293b 0%,#0f172a 100%)",borderRadius:16,padding:"20px 24px",marginBottom:20,color:"white",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div>
+          <div style={{fontSize:11,fontWeight:600,opacity:0.75,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>Inventarios</div>
+          <div style={{fontSize:22,fontWeight:800,letterSpacing:-0.5}}>Historial</div>
+          <div style={{fontSize:12,opacity:0.8,marginTop:4}}>{G.historial[0]?.nombre||"Sin inventarios cerrados"}</div>
+        </div>
+        <div style={{textAlign:"right"}}>
+          <div style={{fontSize:28,fontWeight:900,letterSpacing:-1}}>{G.historial.length}</div>
+          <div style={{fontSize:11,opacity:0.8}}>inventarios</div>
+        </div>
+      </div>
       {G.historial.length===0?(
-        <div style={{...card,textAlign:"center",padding:40,color:"#64748b"}}>No hay inventarios cerrados aún.</div>
+        <div style={{textAlign:"center",padding:"48px 20px",background:"white",borderRadius:14,border:"2px dashed #e2e8f0",color:"#64748b"}}>
+          <div style={{fontSize:48,marginBottom:12}}>🏛️</div>
+          <div style={{fontSize:15,fontWeight:700,marginBottom:6}}>Sin historial</div>
+          <div style={{fontSize:13}}>Los inventarios cerrados aparecerán aquí.</div>
+        </div>
       ):G.historial.length===1?(
-        // Un solo inventario — mostrar dashboard directamente
         (()=>{const inv=G.historial[0];const st=getSt(inv);return(
           <div>
             <div style={{...card,marginBottom:16,borderLeft:"4px solid #2563eb"}}>
               <div style={{fontWeight:700,fontSize:16}}>{inv.nombre}</div>
               <div style={{fontSize:12,color:"#64748b",marginTop:3}}>{inv.apertura} → {inv.cierre} · Por: {inv.usuarioApertura}</div>
             </div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12}}>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:12}}>
               {[
-                {l:"💰 Valor físico",v:fmt(st.totalFisico),c:"#16a34a"},
-                {l:"📊 Valor sistema",v:fmt(st.totalSistema),c:"#2563eb"},
-                {l:"⚖️ Ajuste",v:(st.ajuste>=0?"+":"")+fmt(st.ajuste),c:st.ajuste>=0?"#16a34a":"#dc2626"},
-                {l:"📦 Contados",v:`${st.contados}/${st.totalProductos}`,c:"#0891b2"},
-                {l:"✅ Buenos",v:st.buenos.length,c:"#16a34a"},
-                {l:"🔴 Vencidos",v:st.vencidos.length,c:"#dc2626"},
-                {l:"🟡 Averiados",v:st.averiados.length,c:"#d97706"},
-                {l:"⚠️ Con diferencia",v:st.conDif.length,c:"#ef4444"},
+                {l:"Valor físico",v:fmt(st.totalFisico),c:"#16a34a",bg:"#f0fdf4",icon:"💰"},
+                {l:"Valor sistema",v:fmt(st.totalSistema),c:"#2563eb",bg:"#eff6ff",icon:"📊"},
+                {l:"Ajuste",v:(st.ajuste>=0?"+":"")+fmt(st.ajuste),c:st.ajuste>=0?"#16a34a":"#dc2626",bg:st.ajuste>=0?"#f0fdf4":"#fef2f2",icon:"⚖️"},
+                {l:"Contados",v:`${st.contados}/${st.totalProductos}`,c:"#0891b2",bg:"#ecfeff",icon:"📦"},
+                {l:"Buenos",v:st.buenos.length,c:"#16a34a",bg:"#f0fdf4",icon:"✅"},
+                {l:"Vencidos",v:st.vencidos.length,c:"#dc2626",bg:"#fef2f2",icon:"🔴"},
+                {l:"Averiados",v:st.averiados.length,c:"#d97706",bg:"#fffbeb",icon:"🟡"},
+                {l:"Con diferencia",v:st.conDif.length,c:"#ef4444",bg:"#fef2f2",icon:"⚠️"},
               ].map((s,i)=>(
                 <div key={i} onClick={()=>setInvSel(inv)}
-                  style={{...card,borderTop:`3px solid ${s.c}`,padding:"12px 16px",cursor:"pointer"}}
+                  style={{background:s.bg,borderRadius:14,padding:"14px 16px",cursor:"pointer",border:`1px solid ${s.c}22`,boxShadow:"0 1px 4px rgba(0,0,0,0.05)",transition:"box-shadow 0.15s"}}
                   onMouseEnter={e=>e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.12)"}
-                  onMouseLeave={e=>e.currentTarget.style.boxShadow="0 1px 4px rgba(0,0,0,0.07)"}>
-                  <div style={{fontSize:typeof s.v==="string"&&s.v.length>8?14:20,fontWeight:800,color:s.c}}>{s.v}</div>
-                  <div style={{fontSize:11,color:"#64748b",marginTop:3}}>{s.l}</div>
+                  onMouseLeave={e=>e.currentTarget.style.boxShadow="0 1px 4px rgba(0,0,0,0.05)"}>
+                  <div style={{fontSize:18,marginBottom:4}}>{s.icon}</div>
+                  <div style={{fontSize:typeof s.v==="string"&&s.v.length>8?13:22,fontWeight:900,color:s.c,lineHeight:1}}>{s.v}</div>
+                  <div style={{fontSize:11,color:"#64748b",marginTop:4,fontWeight:600}}>{s.l}</div>
                 </div>
               ))}
             </div>
           </div>
         );})()
       ):(
-        // Múltiples inventarios — dashboard global + lista
         <>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:14,marginBottom:20}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:12,marginBottom:20}}>
             {[
-              {l:"Total inventarios",v:G.historial.length,c:"#2563eb",bg:"#eff6ff",icon:"🏛️"},
-              {l:"Último inventario",v:G.historial[0]?.nombre?.substring(0,18)||"—",c:"#16a34a",bg:"#f0fdf4",icon:"📋"},
-              {l:"Fecha de cierre",v:G.historial[0]?.cierre||"—",c:"#0891b2",bg:"#ecfeff",icon:"📅"},
+              {l:"Total",v:G.historial.length,c:"#2563eb",bg:"#eff6ff",icon:"🏛️"},
+              {l:"Último",v:G.historial[0]?.nombre?.substring(0,14)||"—",c:"#16a34a",bg:"#f0fdf4",icon:"📋"},
+              {l:"Fecha cierre",v:G.historial[0]?.cierre||"—",c:"#0891b2",bg:"#ecfeff",icon:"📅"},
             ].map(s=>(
-              <div key={s.l} style={{background:s.bg,borderRadius:14,padding:"16px 18px",border:`1px solid ${s.c}22`,boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
-                <div style={{fontSize:22,marginBottom:8}}>{s.icon}</div>
-                <div style={{fontSize:s.v.toString().length>12?13:22,fontWeight:900,color:s.c}}>{s.v}</div>
+              <div key={s.l} style={{background:s.bg,borderRadius:14,padding:"14px 16px",border:`1px solid ${s.c}22`,boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
+                <div style={{fontSize:22,marginBottom:6}}>{s.icon}</div>
+                <div style={{fontSize:s.v.toString().length>12?12:22,fontWeight:900,color:s.c,lineHeight:1}}>{s.v}</div>
                 <div style={{fontSize:11,color:"#64748b",marginTop:4,fontWeight:600}}>{s.l}</div>
               </div>
             ))}
