@@ -35,6 +35,7 @@ let G = {
   capturas: {},
   alertas: [],
   historial: [],
+  notas: [], // {id, texto, fotos:[], usuario, rol, fecha, hora, inventarioId}
 };
 
 const CAT_C = {"CARNES FRIAS":"#dc2626","CONGELADOS":"#2563eb","SALSAS Y CONSERVAS":"#d97706","LACTEOS Y DERIVADOS":"#0891b2","REPOSTERIA":"#db2777","PANADERIA":"#c2410c","ADOBOS":"#65a30d","CHAMPIÑONES":"#78350f","ACEITES":"#92400e","HARINAS":"#ca8a04","PERECEDEROS":"#16a34a","APANADOS":"#7c2d12"};
@@ -334,7 +335,7 @@ export default function TomficApp(){
   return(
     <>
       {toast&&<div style={{position:"fixed",top:58,right:20,background:toast.type==="err"?"#dc2626":toast.type==="warn"?"#d97706":"#16a34a",color:"white",padding:"10px 20px",borderRadius:10,zIndex:9999,fontSize:14,fontWeight:700,boxShadow:"0 4px 20px rgba(0,0,0,0.2)",pointerEvents:"none",maxWidth:360}}>{toast.msg}</div>}
-      {usuario.rol==="capturador"?<ModCapturador {...p}/>:<ModAdmin {...p}/>}
+      {usuario.rol==="capturador"?<ModCapturador {...p}/>:usuario.rol==="gerente"?<ModGerente {...p}/>:<ModAdmin {...p}/>}
     </>
   );
 }
@@ -538,13 +539,7 @@ function ModAdmin({usuario,setUsuario,G,rerender,recargar,showToast,lastSaved,li
               {G.inventario.nombre}
             </div>
           )}
-          {navActual&&(
-            <div style={{display:"flex",alignItems:"center",gap:6,color:"#64748b",fontSize:12}}>
-              <span style={{color:"#334155"}}>›</span>
-              <span style={{color:"#94a3b8"}}>{navActual.icon}</span>
-              <span style={{color:"#cbd5e1",fontWeight:600}}>{navActual.label}</span>
-            </div>
-          )}
+
         </div>
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
           <button onClick={async()=>{await recargar();showToast("Datos actualizados ✓");}}
@@ -603,16 +598,7 @@ function ModAdmin({usuario,setUsuario,G,rerender,recargar,showToast,lastSaved,li
 
         {/* CONTENIDO */}
         <div style={{flex:1,padding:24,overflowY:"auto",minWidth:0}}>
-          {/* Breadcrumb */}
-          {navActual&&(
-            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:20,padding:"8px 14px",background:"white",borderRadius:10,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",border:"1px solid #e2e8f0",width:"fit-content"}}>
-              <span style={{fontSize:13}}>📦</span>
-              <span style={{fontSize:12,color:"#94a3b8"}}>TOMFIC</span>
-              <span style={{color:"#d1d5db",fontSize:12}}>›</span>
-              <span style={{fontSize:13}}>{navActual.icon}</span>
-              <span style={{fontSize:12,fontWeight:700,color:"#0f172a"}}>{navActual.label}</span>
-            </div>
-          )}
+
           {view==="inventario"&&<VInventario {...props}/>}
           {view==="ubicaciones"&&<VUbicaciones {...props}/>}
           {view==="basedatos"&&<VBaseDatos {...props}/>}
@@ -624,6 +610,7 @@ function ModAdmin({usuario,setUsuario,G,rerender,recargar,showToast,lastSaved,li
         </div>
       </div>
 
+      <BtnNotas G={G} usuario={usuario} rerender={rerender} showToast={showToast}/>
       {modalSalir&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center",padding:16,backdropFilter:"blur(4px)"}}>
           <div style={{background:"white",borderRadius:20,padding:32,width:380,maxWidth:"96vw",boxShadow:"0 30px 80px rgba(0,0,0,0.35)"}}>
@@ -971,22 +958,6 @@ function VUbicaciones({G,rerender,showToast}){
           <div style={{fontSize:11,opacity:0.8}}>localizaciones</div>
         </div>
       </div>
-      {/* KPIs */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:12,marginBottom:20}}>
-        {[
-          {icon:"📍",l:"Localizaciones",v:G.localizaciones.length,c:"#d97706",bg:"#fffbeb"},
-          {icon:"🏢",l:"Tipos ubicación",v:G.ubicacionesTipos.length,c:"#2563eb",bg:"#eff6ff"},
-          {icon:"🗂️",l:"Tipos local.",v:G.localizacionTipos.length,c:"#7c3aed",bg:"#faf5ff"},
-          {icon:"✅",l:"Con conteo",v:new Set(G.conteos.map(c=>c.locId)).size,c:"#16a34a",bg:"#f0fdf4"},
-          {icon:"⏳",l:"Sin conteo",v:G.localizaciones.filter(l=>!G.conteos.find(c=>c.locId===l.id)).length,c:"#dc2626",bg:"#fef2f2"},
-        ].map(s=>(
-          <div key={s.l} style={{background:s.bg,borderRadius:14,padding:"14px 16px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",border:`1px solid ${s.c}22`}}>
-            <div style={{fontSize:20,marginBottom:6}}>{s.icon}</div>
-            <div style={{fontSize:26,fontWeight:900,color:s.c,lineHeight:1}}>{s.v}</div>
-            <div style={{fontSize:11,color:"#64748b",marginTop:4,fontWeight:600}}>{s.l}</div>
-          </div>
-        ))}
-      </div>
       {/* Tipos */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:18}}>
         <div style={card}>
@@ -1244,21 +1215,6 @@ function VBaseDatos({G,rerender,showToast}){
           <div style={{fontSize:11,opacity:0.8}}>productos</div>
         </div>
       </div>
-      {/* KPIs */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:12,marginBottom:20}}>
-        {[
-          {icon:"📦",l:"Total productos",v:G.productos.length,c:"#2563eb",bg:"#eff6ff"},
-          {icon:"🔍",l:"Con EAN",v:conEAN,c:"#16a34a",bg:"#f0fdf4"},
-          {icon:"🏷️",l:"Categorías",v:cats.length,c:"#7c3aed",bg:"#faf5ff"},
-          {icon:"💰",l:"Con costo",v:G.productos.filter(p=>p.costo>0).length,c:"#d97706",bg:"#fffbeb"},
-        ].map(s=>(
-          <div key={s.l} style={{background:s.bg,borderRadius:14,padding:"14px 16px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",border:`1px solid ${s.c}22`}}>
-            <div style={{fontSize:20,marginBottom:6}}>{s.icon}</div>
-            <div style={{fontSize:26,fontWeight:900,color:s.c,lineHeight:1}}>{s.v}</div>
-            <div style={{fontSize:11,color:"#64748b",marginTop:4,fontWeight:600}}>{s.l}</div>
-          </div>
-        ))}
-      </div>
       {/* Acciones */}
       <div style={{display:"flex",gap:10,marginBottom:16,alignItems:"center",flexWrap:"wrap"}}>
         <label style={{padding:"9px 20px",background:"#2563eb",color:"white",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:13}}>
@@ -1482,22 +1438,7 @@ function VConteos({G,rerender,showToast,usuario}){
           <div style={{fontSize:11,opacity:0.8}}>conteos</div>
         </div>
       </div>
-      {/* KPIs */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:12,marginBottom:20}}>
-        {[
-          {icon:"📋",l:"Total",v:G.conteos.length,c:"#2563eb",bg:"#eff6ff"},
-          {icon:"✅",l:"Completados",v:G.conteos.filter(c=>["completado","cerradoC1","cerradoC2"].includes(c.estado)).length,c:"#16a34a",bg:"#f0fdf4"},
-          {icon:"⚙️",l:"En curso",v:G.conteos.filter(c=>c.estado==="enCurso").length,c:"#0891b2",bg:"#ecfeff"},
-          {icon:"⏳",l:"Pendientes",v:G.conteos.filter(c=>c.estado==="pendiente").length,c:"#d97706",bg:"#fffbeb"},
-          {icon:"⚠️",l:"Con diferencia",v:G.conteos.filter(c=>c.estado==="diferencia").length,c:"#dc2626",bg:"#fef2f2"},
-        ].map(s=>(
-          <div key={s.l} style={{background:s.bg,borderRadius:14,padding:"14px 16px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",border:`1px solid ${s.c}22`}}>
-            <div style={{fontSize:20,marginBottom:6}}>{s.icon}</div>
-            <div style={{fontSize:26,fontWeight:900,color:s.c,lineHeight:1}}>{s.v}</div>
-            <div style={{fontSize:11,color:"#64748b",marginTop:4,fontWeight:600}}>{s.l}</div>
-          </div>
-        ))}
-      </div>
+
       <div style={{marginBottom:16,display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
         <Btn c="#16a34a" onClick={()=>setModal(true)} disabled={!G.inventario||G.productos.length===0}>+ Programar Conteo</Btn>
         {!G.inventario&&<span style={{fontSize:12,color:"#dc2626",background:"#fef2f2",padding:"5px 10px",borderRadius:7}}>⚠️ Primero crea un inventario.</span>}
@@ -2782,22 +2723,7 @@ function VReportes({G,showToast,usuario}){
           <div style={{fontSize:11,opacity:0.8}}>productos base</div>
         </div>
       </div>
-      {/* KPIs */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:12,marginBottom:20}}>
-        {[
-          {icon:"🔄",l:"Diferencias C1/C2",v:totalDifs,c:"#dc2626",bg:"#fef2f2"},
-          {icon:"⚪",l:"Sin Conteo",v:sinConteo.length,c:"#d97706",bg:"#fffbeb"},
-          {icon:"⚖️",l:"Base completa",v:baseCompleta.length,c:"#2563eb",bg:"#eff6ff"},
-          {icon:"📄",l:"Capturados",v:capFinal.length,c:"#7c3aed",bg:"#faf5ff"},
-          {icon:"💰",l:"Valor físico",v:baseCompleta.reduce((s,c)=>s+(c.cantFinal*c.costo||0),0)>0?("$"+Math.round(baseCompleta.reduce((s,c)=>s+(c.cantFinal*(c.costo||0)),0)/1000)+"K"):"—",c:"#16a34a",bg:"#f0fdf4"},
-        ].map(s=>(
-          <div key={s.l} style={{background:s.bg,borderRadius:14,padding:"14px 16px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",border:`1px solid ${s.c}22`}}>
-            <div style={{fontSize:20,marginBottom:6}}>{s.icon}</div>
-            <div style={{fontSize:26,fontWeight:900,color:s.c,lineHeight:1}}>{s.v}</div>
-            <div style={{fontSize:11,color:"#64748b",marginTop:4,fontWeight:600}}>{s.l}</div>
-          </div>
-        ))}
-      </div>
+
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:16}}>
 
         {/* Diferencias de Conteos — expandible */}
@@ -3017,21 +2943,6 @@ function VUsuarios({G,rerender,showToast}){
           <div style={{fontSize:11,opacity:0.8}}>usuarios</div>
         </div>
       </div>
-      {/* KPIs */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:12,marginBottom:20}}>
-        {[
-          {icon:"👥",l:"Total",v:G.usuarios.length,c:"#7c3aed",bg:"#faf5ff"},
-          {icon:"✅",l:"Activos",v:activos.length,c:"#16a34a",bg:"#f0fdf4"},
-          {icon:"🔑",l:"Admins",v:admins.length,c:"#2563eb",bg:"#eff6ff"},
-          {icon:"📱",l:"Capturadores",v:caps.length,c:"#0891b2",bg:"#ecfeff"},
-        ].map(s=>(
-          <div key={s.l} style={{background:s.bg,borderRadius:14,padding:"14px 16px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",border:`1px solid ${s.c}22`}}>
-            <div style={{fontSize:20,marginBottom:6}}>{s.icon}</div>
-            <div style={{fontSize:26,fontWeight:900,color:s.c,lineHeight:1}}>{s.v}</div>
-            <div style={{fontSize:11,color:"#64748b",marginTop:4,fontWeight:600}}>{s.l}</div>
-          </div>
-        ))}
-      </div>
       <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap"}}>
         <Btn c="#16a34a" onClick={()=>{setForm({nombre:"",pass:"",rol:"capturador",correo:"",telefono:"",editId:null});setModal(true);}}>+ Crear Usuario</Btn>
         <Btn c="#2563eb" onClick={()=>setModalImport(true)}>⬆ Importar desde Excel</Btn>
@@ -3059,7 +2970,7 @@ function VUsuarios({G,rerender,showToast}){
                   {u.telefono&&<div>📱 {u.telefono}</div>}
                   {!u.correo&&!u.telefono&&<span style={{color:"#d1d5db"}}>—</span>}
                 </td>
-                <td style={{padding:"9px 14px"}}><Badge color={u.rol==="admin"?"#2563eb":"#16a34a"}>{u.rol==="admin"?"ADMIN":"CAPTURADOR"}</Badge></td>
+                <td style={{padding:"9px 14px"}}><Badge color={u.rol==="admin"?"#2563eb":u.rol==="gerente"?"#7c3aed":"#16a34a"}>{u.rol==="admin"?"ADMIN":u.rol==="gerente"?"GERENTE":"CAPTURADOR"}</Badge></td>
                 <td style={{padding:"9px 14px",color:"#64748b"}}>{u.creado}</td>
                 <td style={{padding:"9px 14px"}}><Badge color={u.activo?"#16a34a":"#dc2626"}>{u.activo?"ACTIVO":"INACTIVO"}</Badge></td>
                 <td style={{padding:"9px 14px"}}>
@@ -3106,7 +3017,7 @@ function VUsuarios({G,rerender,showToast}){
           </div>
           <Lbl>Rol</Lbl>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
-            {[["capturador","Capturador","Solo captura"],["admin","Administrador","Acceso total"]].map(([v,t,s])=>(
+            {[["capturador","Capturador","Solo captura"],["admin","Administrador","Acceso total"],["gerente","Gerente","Solo lectura"]].map(([v,t,s])=>(
               <div key={v} onClick={()=>setForm(p=>({...p,rol:v}))} style={{border:`2px solid ${form.rol===v?"#2563eb":"#e2e8f0"}`,borderRadius:10,padding:12,cursor:"pointer",background:form.rol===v?"#eff6ff":"white"}}>
                 <div style={{fontWeight:700,color:form.rol===v?"#2563eb":"#0f172a",fontSize:13}}>{t}</div>
                 <div style={{fontSize:11,color:"#64748b",marginTop:2}}>{s}</div>
@@ -4163,8 +4074,356 @@ function ModCapturador({usuario,setUsuario,G,rerender,recargar,showToast}){
           </div>
         </div>
       )}
+      <BtnNotas G={G} usuario={usuario} rerender={rerender} showToast={showToast}/>
       {showCam&&<CamScanner color={rcol[miRonda]} onClose={()=>setShowCam(false)} onDetect={onCamDetect}/>}
       {modalSalirJSX}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────
+// BOTÓN FLOTANTE DE NOTAS (visible para admin y capturador)
+// ─────────────────────────────────────────
+function BtnNotas({G,usuario,rerender,showToast}){
+  const [open,setOpen]=useState(false);
+  const [texto,setTexto]=useState("");
+  const [fotos,setFotos]=useState([]);
+  const notasInv=G.notas.filter(n=>n.inventarioId===(G.inventario?.id||""));
+
+  const agregarFoto=(e)=>{
+    const files=Array.from(e.target.files);
+    files.forEach(file=>{
+      const reader=new FileReader();
+      reader.onload=(ev)=>setFotos(f=>[...f,{name:file.name,data:ev.target.result}]);
+      reader.readAsDataURL(file);
+    });
+    e.target.value="";
+  };
+
+  const guardar=()=>{
+    if(!texto.trim()&&fotos.length===0)return showToast("Escribe algo o agrega una foto","err");
+    G.notas.push({id:ID(),texto:texto.trim(),fotos:[...fotos],usuario:usuario.nombre,rol:usuario.rol,fecha:TODAY(),hora:HOUR(),inventarioId:G.inventario?.id||""});
+    setTexto("");setFotos([]);rerender();showToast("Nota guardada ✓");
+  };
+
+  const eliminar=(id)=>{G.notas=G.notas.filter(n=>n.id!==id);rerender();};
+
+  if(!open)return(
+    <button onClick={()=>setOpen(true)} style={{position:"fixed",bottom:24,right:24,width:52,height:52,borderRadius:99,background:"linear-gradient(135deg,#2563eb,#7c3aed)",color:"white",border:"none",cursor:"pointer",fontSize:22,boxShadow:"0 4px 20px rgba(37,99,235,0.5)",zIndex:900,display:"flex",alignItems:"center",justifyContent:"center"}}>
+      📝
+      {notasInv.length>0&&<span style={{position:"absolute",top:-4,right:-4,background:"#dc2626",color:"white",borderRadius:99,fontSize:9,fontWeight:800,width:18,height:18,display:"flex",alignItems:"center",justifyContent:"center"}}>{notasInv.length}</span>}
+    </button>
+  );
+
+  return(
+    <div style={{position:"fixed",bottom:24,right:24,width:380,maxWidth:"95vw",background:"white",borderRadius:20,boxShadow:"0 20px 60px rgba(0,0,0,0.25)",zIndex:900,overflow:"hidden"}}>
+      {/* Header */}
+      <div style={{background:"linear-gradient(135deg,#2563eb,#7c3aed)",padding:"14px 18px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div style={{color:"white"}}>
+          <div style={{fontWeight:800,fontSize:14}}>📝 Notas del inventario</div>
+          <div style={{fontSize:11,opacity:0.8}}>{G.inventario?.nombre||"Sin inventario activo"}</div>
+        </div>
+        <button onClick={()=>setOpen(false)} style={{background:"rgba(255,255,255,0.2)",border:"none",color:"white",width:28,height:28,borderRadius:99,cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+      </div>
+      {/* Notas existentes */}
+      <div style={{maxHeight:220,overflowY:"auto",padding:"10px 14px",display:"flex",flexDirection:"column",gap:8}}>
+        {notasInv.length===0&&<div style={{textAlign:"center",color:"#94a3b8",fontSize:13,padding:"12px 0"}}>Sin notas aún. Agrega la primera.</div>}
+        {notasInv.map(n=>(
+          <div key={n.id} style={{background:"#f8fafc",borderRadius:10,padding:"10px 12px",border:"1px solid #e2e8f0"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+              <div style={{display:"flex",alignItems:"center",gap:6}}>
+                <div style={{width:22,height:22,borderRadius:99,background:n.rol==="admin"?"#1e40af":n.rol==="gerente"?"#7c3aed":"#16a34a",color:"white",fontSize:10,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center"}}>{n.usuario[0]}</div>
+                <span style={{fontSize:11,fontWeight:700,color:"#374151"}}>{n.usuario}</span>
+                <span style={{fontSize:10,color:"#94a3b8"}}>{n.fecha} {n.hora}</span>
+              </div>
+              {(usuario.rol==="admin"||n.usuario===usuario.nombre)&&<button onClick={()=>eliminar(n.id)} style={{background:"none",border:"none",color:"#dc2626",cursor:"pointer",fontSize:13}}>✕</button>}
+            </div>
+            {n.texto&&<div style={{fontSize:13,color:"#374151",lineHeight:1.5}}>{n.texto}</div>}
+            {n.fotos?.length>0&&(
+              <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:6}}>
+                {n.fotos.map((f,i)=>(
+                  <img key={i} src={f.data} alt={f.name} onClick={()=>window.open(f.data)} style={{width:60,height:60,objectFit:"cover",borderRadius:6,cursor:"pointer",border:"1px solid #e2e8f0"}}/>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      {/* Nueva nota */}
+      {G.inventario&&(
+        <div style={{padding:"10px 14px",borderTop:"1px solid #f1f5f9"}}>
+          <textarea value={texto} onChange={e=>setTexto(e.target.value)} placeholder="Escribe una nota u observación…" rows={2}
+            style={{width:"100%",padding:"8px 10px",border:"1.5px solid #e2e8f0",borderRadius:8,fontSize:13,resize:"vertical",boxSizing:"border-box",outline:"none",fontFamily:"inherit"}}/>
+          {fotos.length>0&&(
+            <div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:6}}>
+              {fotos.map((f,i)=>(
+                <div key={i} style={{position:"relative"}}>
+                  <img src={f.data} alt={f.name} style={{width:48,height:48,objectFit:"cover",borderRadius:6,border:"1px solid #e2e8f0"}}/>
+                  <button onClick={()=>setFotos(fs=>fs.filter((_,j)=>j!==i))} style={{position:"absolute",top:-4,right:-4,width:16,height:16,background:"#dc2626",color:"white",border:"none",borderRadius:99,cursor:"pointer",fontSize:9,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div style={{display:"flex",gap:8,marginTop:8}}>
+            <label style={{padding:"7px 12px",background:"#f1f5f9",border:"1px solid #e2e8f0",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:600,color:"#374151"}}>
+              📷 Foto<input type="file" accept="image/*" multiple onChange={agregarFoto} style={{display:"none"}}/>
+            </label>
+            <button onClick={guardar} style={{flex:1,padding:"7px",background:"linear-gradient(135deg,#2563eb,#7c3aed)",color:"white",border:"none",borderRadius:8,fontWeight:700,cursor:"pointer",fontSize:13}}>
+              Guardar nota
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────
+// MÓDULO GERENTE — solo lectura
+// ─────────────────────────────────────────
+function ModGerente({usuario,setUsuario,G,rerender,recargar,showToast}){
+  const [view,setView]=useState("resumen");
+  const [modalSalir,setModalSalir]=useState(false);
+
+  useEffect(()=>{
+    const t=setInterval(()=>recargar(),15000);
+    return()=>clearInterval(t);
+  },[]);
+
+  const nav=[
+    {id:"resumen",icon:"📊",label:"Resumen"},
+    {id:"notas",icon:"📝",label:"Notas"},
+    {id:"historial",icon:"🏛️",label:"Historial"},
+  ];
+
+  const pct=G.conteos.length>0?Math.round(G.conteos.filter(c=>c.estado==="completado").length/G.conteos.length*100):0;
+  const notasInv=G.notas.filter(n=>n.inventarioId===(G.inventario?.id||""));
+
+  return(
+    <div style={{minHeight:"100vh",background:"#f0f4f8",fontFamily:"system-ui,sans-serif"}}>
+      {/* Topbar */}
+      <div style={{background:"linear-gradient(135deg,#7c3aed 0%,#4f46e5 100%)",color:"white",padding:"0 20px",display:"flex",alignItems:"center",justifyContent:"space-between",height:58,position:"sticky",top:0,zIndex:100,boxShadow:"0 2px 12px rgba(0,0,0,0.25)"}}>
+        <div style={{display:"flex",alignItems:"center",gap:12}}>
+          <div style={{width:32,height:32,background:"rgba(255,255,255,0.2)",borderRadius:9,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>📦</div>
+          <div>
+            <div style={{fontWeight:800,fontSize:15,letterSpacing:-0.5}}>TOMFIC</div>
+            <div style={{fontSize:9,color:"rgba(255,255,255,0.6)",letterSpacing:1,textTransform:"uppercase"}}>Vista Gerente</div>
+          </div>
+          {G.inventario&&<div style={{background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.25)",fontSize:11,padding:"3px 12px",borderRadius:20,fontWeight:700}}>● {G.inventario.nombre}</div>}
+        </div>
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          <button onClick={async()=>{await recargar();showToast("Actualizado ✓");}} style={{background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.15)",color:"white",padding:"5px 12px",borderRadius:8,fontSize:11,cursor:"pointer"}}>🔄 Sync</button>
+          <div style={{display:"flex",alignItems:"center",gap:6,background:"rgba(255,255,255,0.1)",borderRadius:9,padding:"5px 10px"}}>
+            <div style={{width:24,height:24,background:"linear-gradient(135deg,#7c3aed,#2563eb)",borderRadius:99,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700}}>{usuario.nombre[0]}</div>
+            <span style={{fontSize:12,fontWeight:600}}>{usuario.nombre}</span>
+          </div>
+          <button onClick={()=>setModalSalir(true)} style={{background:"rgba(220,38,38,0.2)",border:"1px solid rgba(220,38,38,0.3)",color:"#fca5a5",padding:"6px 14px",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer"}}>Salir</button>
+        </div>
+      </div>
+
+      <div style={{display:"flex",minHeight:"calc(100vh - 58px)"}}>
+        {/* Sidebar */}
+        <div style={{width:160,background:"linear-gradient(180deg,#4f46e5,#7c3aed)",flexShrink:0,padding:"16px 8px",display:"flex",flexDirection:"column",gap:4}}>
+          {nav.map(n=>{
+            const active=view===n.id;
+            return(
+              <button key={n.id} onClick={()=>setView(n.id)}
+                style={{width:"100%",display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:active?"rgba(255,255,255,0.2)":"transparent",color:"white",border:"none",cursor:"pointer",fontSize:13,borderRadius:10,fontWeight:active?700:400,opacity:active?1:0.7}}>
+                <span>{n.icon}</span><span>{n.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Contenido */}
+        <div style={{flex:1,padding:24,overflowY:"auto"}}>
+          {view==="resumen"&&(
+            <div>
+              {/* Header */}
+              <div style={{background:"linear-gradient(135deg,#7c3aed 0%,#4f46e5 100%)",borderRadius:16,padding:"20px 24px",marginBottom:20,color:"white",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div>
+                  <div style={{fontSize:11,fontWeight:600,opacity:0.75,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>Vista Gerente</div>
+                  <div style={{fontSize:22,fontWeight:800}}>{G.inventario?.nombre||"Sin inventario activo"}</div>
+                  <div style={{fontSize:12,opacity:0.8,marginTop:4}}>Solo lectura · {TODAY()}</div>
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontSize:36,fontWeight:900}}>{pct}%</div>
+                  <div style={{fontSize:11,opacity:0.8}}>completado</div>
+                </div>
+              </div>
+              {!G.inventario?(
+                <div style={{textAlign:"center",padding:"48px 20px",background:"white",borderRadius:14,border:"2px dashed #e2e8f0",color:"#64748b"}}>
+                  <div style={{fontSize:48,marginBottom:12}}>📋</div>
+                  <div style={{fontSize:15,fontWeight:700}}>Sin inventario activo</div>
+                </div>
+              ):(
+                <>
+                  {/* KPIs */}
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:12,marginBottom:16}}>
+                    {[
+                      {icon:"📦",l:"Productos",v:G.productos.length,c:"#2563eb",bg:"#eff6ff"},
+                      {icon:"📋",l:"Conteos",v:G.conteos.length,c:"#475569",bg:"#f8fafc"},
+                      {icon:"✅",l:"Completados",v:G.conteos.filter(c=>c.estado==="completado").length,c:"#16a34a",bg:"#f0fdf4"},
+                      {icon:"⚠️",l:"Diferencias",v:G.conteos.filter(c=>c.estado==="diferencia").length,c:"#dc2626",bg:"#fef2f2"},
+                      {icon:"📝",l:"Notas",v:notasInv.length,c:"#7c3aed",bg:"#faf5ff"},
+                    ].map(s=>(
+                      <div key={s.l} style={{background:s.bg,borderRadius:14,padding:"14px 16px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",border:`1px solid ${s.c}22`}}>
+                        <div style={{fontSize:20,marginBottom:6}}>{s.icon}</div>
+                        <div style={{fontSize:26,fontWeight:900,color:s.c,lineHeight:1}}>{s.v}</div>
+                        <div style={{fontSize:11,color:"#64748b",marginTop:4,fontWeight:600}}>{s.l}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Barra avance */}
+                  <div style={{background:"white",borderRadius:14,padding:"18px 20px",marginBottom:16,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",border:"1px solid #e2e8f0"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                      <div>
+                        <div style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>Avance del inventario</div>
+                        <div style={{fontSize:11,color:"#64748b",marginTop:1}}>{G.conteos.filter(c=>c.estado==="completado").length} de {G.conteos.length} conteos completados</div>
+                      </div>
+                      <div style={{background:"linear-gradient(135deg,#7c3aed,#4f46e5)",borderRadius:10,padding:"6px 14px"}}>
+                        <span style={{fontSize:18,fontWeight:900,color:"white"}}>{pct}%</span>
+                      </div>
+                    </div>
+                    <div style={{background:"#e2e8f0",borderRadius:99,height:14,overflow:"hidden"}}>
+                      <div style={{width:pct+"%",background:"linear-gradient(90deg,#7c3aed,#4f46e5,#2563eb)",borderRadius:99,height:"100%",transition:"width 0.6s ease"}}/>
+                    </div>
+                  </div>
+                  {/* Tabla conteos */}
+                  <div style={{background:"white",borderRadius:14,overflow:"hidden",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",border:"1px solid #e2e8f0"}}>
+                    <div style={{padding:"14px 18px",borderBottom:"1px solid #f1f5f9",fontWeight:700,fontSize:13,color:"#0f172a"}}>Estado de conteos</div>
+                    <div style={{overflowX:"auto"}}>
+                      <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+                        <thead><tr style={{background:"#f8fafc"}}>
+                          {["Nombre","Ubicación","C1","Estado C1","C2","Estado C2","Estado"].map(h=>(
+                            <th key={h} style={{padding:"10px 14px",textAlign:"left",fontWeight:600,color:"#64748b",fontSize:11,whiteSpace:"nowrap"}}>{h}</th>
+                          ))}
+                        </tr></thead>
+                        <tbody>
+                          {G.conteos.map((c,i)=>(
+                            <tr key={c.id} style={{borderBottom:"1px solid #f1f5f9",background:i%2?"#fafafa":"white"}}>
+                              <td style={{padding:"10px 14px",fontWeight:700,color:"#0f172a"}}>{c.nombre}</td>
+                              <td style={{padding:"10px 14px",fontSize:12,color:"#64748b"}}>{c.locLabel||"—"}</td>
+                              <td style={{padding:"10px 14px",color:"#2563eb",fontWeight:600}}>{c.usuarioC1||"—"}</td>
+                              <td style={{padding:"10px 14px"}}>{c.usuarioC1?<span style={{background:["cerradoC1","cerradoC2","completado"].includes(c.estado)?"#f0fdf4":"#fffbeb",color:["cerradoC1","cerradoC2","completado"].includes(c.estado)?"#16a34a":"#d97706",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:700}}>{["cerradoC1","cerradoC2","completado"].includes(c.estado)?"OK ✓":"En curso"}</span>:"—"}</td>
+                              <td style={{padding:"10px 14px",color:"#16a34a",fontWeight:600}}>{c.usuarioC2||"N/A"}</td>
+                              <td style={{padding:"10px 14px"}}>{c.usuarioC2?<span style={{background:["cerradoC2","completado"].includes(c.estado)?"#f0fdf4":"#fffbeb",color:["cerradoC2","completado"].includes(c.estado)?"#16a34a":"#d97706",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:700}}>{["cerradoC2","completado"].includes(c.estado)?"OK ✓":"Pendiente"}</span>:"—"}</td>
+                              <td style={{padding:"10px 14px"}}><span style={{background:c.estado==="completado"?"#f0fdf4":c.estado==="diferencia"?"#fef2f2":"#f8fafc",color:c.estado==="completado"?"#16a34a":c.estado==="diferencia"?"#dc2626":"#64748b",borderRadius:6,padding:"3px 8px",fontSize:11,fontWeight:700}}>{c.estado}</span></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {view==="notas"&&(
+            <div>
+              <div style={{background:"linear-gradient(135deg,#2563eb 0%,#7c3aed 100%)",borderRadius:16,padding:"20px 24px",marginBottom:20,color:"white",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div>
+                  <div style={{fontSize:11,fontWeight:600,opacity:0.75,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>Observaciones</div>
+                  <div style={{fontSize:22,fontWeight:800}}>Notas del inventario</div>
+                </div>
+                <div style={{fontSize:28,fontWeight:900}}>{notasInv.length}</div>
+              </div>
+              {notasInv.length===0?(
+                <div style={{textAlign:"center",padding:"48px 20px",background:"white",borderRadius:14,border:"2px dashed #e2e8f0",color:"#64748b"}}>
+                  <div style={{fontSize:48,marginBottom:12}}>📝</div>
+                  <div style={{fontSize:15,fontWeight:700}}>Sin notas aún</div>
+                  <div style={{fontSize:13,marginTop:4}}>El admin y los capturadores pueden agregar notas durante el inventario.</div>
+                </div>
+              ):(
+                <div style={{display:"flex",flexDirection:"column",gap:12}}>
+                  {notasInv.map(n=>(
+                    <div key={n.id} style={{background:"white",borderRadius:14,padding:"16px 18px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",border:"1px solid #e2e8f0"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+                        <div style={{width:32,height:32,borderRadius:99,background:n.rol==="admin"?"#1e40af":n.rol==="gerente"?"#7c3aed":"#16a34a",color:"white",fontSize:13,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center"}}>{n.usuario[0]}</div>
+                        <div>
+                          <div style={{fontWeight:700,fontSize:13,color:"#0f172a"}}>{n.usuario} <span style={{fontSize:10,color:"#94a3b8",fontWeight:400,textTransform:"uppercase"}}>{n.rol}</span></div>
+                          <div style={{fontSize:11,color:"#94a3b8"}}>{n.fecha} · {n.hora}</div>
+                        </div>
+                      </div>
+                      {n.texto&&<div style={{fontSize:14,color:"#374151",lineHeight:1.6,background:"#f8fafc",borderRadius:8,padding:"10px 12px"}}>{n.texto}</div>}
+                      {n.fotos?.length>0&&(
+                        <div style={{display:"flex",flexWrap:"wrap",gap:8,marginTop:10}}>
+                          {n.fotos.map((f,i)=>(
+                            <img key={i} src={f.data} alt={f.name} onClick={()=>window.open(f.data)} style={{width:80,height:80,objectFit:"cover",borderRadius:8,cursor:"pointer",border:"1px solid #e2e8f0",boxShadow:"0 1px 4px rgba(0,0,0,0.08)"}}/>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {view==="historial"&&(
+            <div>
+              <div style={{background:"linear-gradient(135deg,#1e293b 0%,#0f172a 100%)",borderRadius:16,padding:"20px 24px",marginBottom:20,color:"white",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div>
+                  <div style={{fontSize:11,fontWeight:600,opacity:0.75,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>Inventarios</div>
+                  <div style={{fontSize:22,fontWeight:800}}>Historial</div>
+                </div>
+                <div style={{fontSize:28,fontWeight:900}}>{G.historial.length}</div>
+              </div>
+              {G.historial.length===0?(
+                <div style={{textAlign:"center",padding:"48px 20px",background:"white",borderRadius:14,border:"2px dashed #e2e8f0",color:"#64748b"}}>
+                  <div style={{fontSize:48,marginBottom:12}}>🏛️</div>
+                  <div style={{fontSize:15,fontWeight:700}}>Sin historial</div>
+                </div>
+              ):(
+                <div style={{display:"flex",flexDirection:"column",gap:12}}>
+                  {G.historial.map((h,i)=>{
+                    const notasH=G.notas.filter(n=>n.inventarioId===h.id);
+                    return(
+                      <div key={i} style={{background:"white",borderRadius:14,padding:"18px 20px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",border:"1px solid #e2e8f0",borderLeft:"4px solid #7c3aed"}}>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8}}>
+                          <div>
+                            <div style={{fontWeight:800,fontSize:16,color:"#0f172a"}}>{h.nombre}</div>
+                            <div style={{fontSize:12,color:"#64748b",marginTop:3}}>{h.apertura} → {h.cierre} · Por: {h.usuarioApertura}</div>
+                          </div>
+                          <span style={{background:h.tipo==="2conteos"?"#eff6ff":"#f0fdf4",color:h.tipo==="2conteos"?"#2563eb":"#16a34a",borderRadius:8,padding:"3px 10px",fontSize:11,fontWeight:700}}>{h.tipo==="2conteos"?"2 Conteos":"1 Conteo"}</span>
+                        </div>
+                        {notasH.length>0&&(
+                          <div style={{marginTop:12,paddingTop:12,borderTop:"1px solid #f1f5f9"}}>
+                            <div style={{fontSize:11,fontWeight:700,color:"#94a3b8",marginBottom:8,textTransform:"uppercase",letterSpacing:0.5}}>📝 {notasH.length} nota{notasH.length>1?"s":""}</div>
+                            <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                              {notasH.map(n=>(
+                                <div key={n.id} style={{background:"#f8fafc",borderRadius:8,padding:"8px 12px",fontSize:13,color:"#374151"}}>
+                                  <span style={{fontWeight:700,color:"#7c3aed"}}>{n.usuario}:</span> {n.texto||"[foto]"} <span style={{color:"#94a3b8",fontSize:10}}>· {n.fecha}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {modalSalir&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center",backdropFilter:"blur(4px)"}}>
+          <div style={{background:"white",borderRadius:20,padding:32,width:380,maxWidth:"96vw"}}>
+            <div style={{textAlign:"center",marginBottom:16}}>
+              <div style={{fontSize:40,marginBottom:8}}>👋</div>
+              <h3 style={{margin:"0 0 8px",fontSize:18,fontWeight:800}}>¿Cerrar sesión?</h3>
+            </div>
+            <div style={{display:"flex",gap:10,marginTop:24}}>
+              <Btn c="#dc2626" onClick={()=>setUsuario(null)} full>Sí, salir</Btn>
+              <Btn c="#64748b" onClick={()=>setModalSalir(false)} full outline>Cancelar</Btn>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
