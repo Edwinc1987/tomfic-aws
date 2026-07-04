@@ -1,12 +1,46 @@
 import { useState, useRef, useEffect } from "react";
 import * as XLSX from "xlsx";
 import { createClient } from "@supabase/supabase-js";
+import {
+  Package, ClipboardList, Database, MapPin, FolderOpen, Radio, BarChart2,
+  Users, Landmark, Bell, RefreshCw, Eye, EyeOff, AlertTriangle, CheckCircle,
+  Settings, Pencil, Trash2, FileText, Calendar, Scale, Wrench, Download,
+  Upload, Printer, Search, Lightbulb, DollarSign, Clock, Cloud, Menu,
+  ChevronRight, LogOut, Key, Smartphone, BarChart, TrendingDown, Circle,
+  AlertCircle, XCircle, Plus, X, Mail, UserPlus, Lock, ChevronDown, ChevronUp, ChevronLeft, Camera, CornerDownLeft, Globe,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge as UIBadge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import { PageHeader } from "@/components/ui/page-header";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import Landing from "@/Landing";
+import { mergeLanding } from "@/landingContent";
 
 const supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_KEY);
 
 const TODAY = () => new Date().toLocaleDateString("es-CO");
 const HOUR  = () => new Date().toLocaleTimeString("es-CO");
 const ID    = () => Date.now().toString(36) + Math.random().toString(36).slice(2,5);
+// Slug: minúsculas, sin acentos, [^a-z0-9]→'-'. DEBE coincidir con slugify() en el SQL.
+const slugify = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"");
+// Email sintético de un miembro de empresa (capturador/gerente/admin migrado).
+const memberEmail = (nombre, slug) => `${slugify(nombre)}@${slugify(slug)}.tomfic.app`;
+
+// Exporta filas crudas a XLSX (encabezado + datos, sin filas de título). Sirve
+// para plantillas y para importaciones externas como el ajuste de Siigo.
+const exportSheet = (rows, header, fname, sheetName = "Datos") => {
+  const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  XLSX.writeFile(wb, fname);
+};
+// Encabezados del formato "Importación de comprobante de ajuste" de Siigo.
+const SIIGO_AJUSTE_COLS = ["Código del producto (Obligatorio)", "Nombre del producto / Servicio", "Referencia de fábrica", "Aumenta/Disminuye (Obligatorio)", "Cantidad", "Costo Unitario"];
 
 // ─────────────────────────────────────────
 // ESTADO GLOBAL
@@ -36,6 +70,8 @@ let G = {
   alertas: [],
   historial: [],
   notas: [], // {id, texto, fotos:[], usuario, rol, fecha, hora, inventarioId}
+  tenantId: null,   // empresa (tenant) del usuario logueado; null = dueño/super-admin
+  tenants: [],      // lista de empresas (solo la carga el dueño)
 };
 
 const CAT_C = {"CARNES FRIAS":"#dc2626","CONGELADOS":"#2563eb","SALSAS Y CONSERVAS":"#d97706","LACTEOS Y DERIVADOS":"#0891b2","REPOSTERIA":"#db2777","PANADERIA":"#c2410c","ADOBOS":"#65a30d","CHAMPIÑONES":"#78350f","ACEITES":"#92400e","HARINAS":"#ca8a04","PERECEDEROS":"#16a34a","APANADOS":"#7c2d12"};
@@ -45,42 +81,12 @@ const catC = c => CAT_C[c?.trim()] || "#6b7280";
 // ESTILOS BASE
 // ─────────────────────────────────────────
 const inp = {width:"100%",padding:"9px 12px",border:"1.5px solid #e2e8f0",borderRadius:8,fontSize:14,boxSizing:"border-box",outline:"none",background:"white",color:"#0f172a"};
-const lbl = {fontSize:11,fontWeight:700,color:"#374151",textTransform:"uppercase",letterSpacing:"0.8px",display:"block",marginBottom:5};
 const card = {background:"white",borderRadius:14,padding:20,boxShadow:"0 2px 8px rgba(0,0,0,0.06)",border:"1px solid #f1f5f9"};
 
-function Lbl({children,color}){return <label style={{...lbl,...(color?{color}:{})}}>{children}</label>;}
-function Inp({value,onChange,placeholder,type="text",disabled,onKeyDown,style={},min}){
-  return <input type={type} value={value} onChange={onChange} placeholder={placeholder} disabled={disabled} onKeyDown={onKeyDown} min={min} style={{...inp,...style,background:disabled?"#f8fafc":"white"}}/>;
-}
-function Sel({value,onChange,children,style={}}){
-  return <select value={value} onChange={onChange} style={{...inp,...style}}>{children}</select>;
-}
-function Btn({c="#2563eb",onClick,disabled,children,full,small,outline}){
-  const bg=disabled?"#e2e8f0":outline?"white":c;
-  const col=disabled?"#94a3b8":outline?c:"white";
-  const border=outline?`1.5px solid ${c}`:"none";
-  return <button onClick={onClick} disabled={disabled} style={{padding:small?"5px 12px":"9px 20px",background:bg,color:col,border,borderRadius:8,cursor:disabled?"not-allowed":"pointer",fontWeight:700,fontSize:small?12:13,width:full?"100%":"auto",whiteSpace:"nowrap"}}>{children}</button>;
-}
-function Badge({color="#6b7280",children,small}){
-  return <span style={{background:color+"22",color,padding:small?"2px 7px":"3px 10px",borderRadius:20,fontSize:small?10:12,fontWeight:700,whiteSpace:"nowrap"}}>{children}</span>;
-}
 function EstBadge({e}){
   const m={BUENO:["#dcfce7","#166534"],VENCIDO:["#fee2e2","#dc2626"],AVERIADO:["#fef3c7","#92400e"],"NO APTO VENTA":["#fee2e2","#991b1b"],BAJAS:["#fef9c3","#854d0e"],"SIN REVISAR":["#f1f5f9","#475569"]};
   const [bg,tc]=m[e]||["#f1f5f9","#475569"];
   return <span style={{background:bg,color:tc,padding:"2px 8px",borderRadius:12,fontSize:11,fontWeight:700}}>{e||"—"}</span>;
-}
-function Modal({titulo,onClose,children,wide}){
-  return(
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:1000,display:"flex",alignItems:"flex-start",justifyContent:"center",paddingTop:30,overflowY:"auto",paddingBottom:30}}>
-      <div style={{background:"white",borderRadius:16,padding:28,width:wide?680:480,maxWidth:"96vw",boxShadow:"0 25px 60px rgba(0,0,0,0.3)"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-          <h3 style={{margin:0,fontSize:17,fontWeight:700,color:"#0f172a"}}>{titulo}</h3>
-          <button onClick={onClose} style={{background:"transparent",border:"none",fontSize:22,cursor:"pointer",color:"#94a3b8",lineHeight:1}}>✕</button>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
 }
 function Section({titulo,children,subtitle}){
   return(
@@ -152,7 +158,7 @@ const CONFIG_KEY  = "tomfic_config_v1";
 // --- Serialización ---
 const capsDeConteo=(cid)=>{const o={};Object.entries(G.capturas).forEach(([k,v])=>{if(v.conteoId===cid)o[k]=v;});return o;};
 const serConteo=(c,invId)=>({
-  id:c.id, inventario_id:invId||(G.inventario?G.inventario.id:"")||"",
+  id:c.id, tenant_id:G.tenantId||null, inventario_id:invId||(G.inventario?G.inventario.id:"")||"",
   nombre:c.nombre||"", obs:c.obs||"", tipo:c.tipo||"",
   usuario_c1:c.usuarioC1||"", usuario_c2:c.usuarioC2||"", usuario_c3:c.usuarioC3||"",
   estado:c.estado||"", loc_label:c.locLabel||"", localizacion_id:c.locId||"",
@@ -167,35 +173,49 @@ const deserConteo=(r)=>{
   return {c,caps};
 };
 const serInv=(inv,estado)=>({
-  id:inv.id,nombre:inv.nombre||"",fecha:inv.fecha||"",estado,tipo:inv.tipo||"",obs:inv.obs||"",
+  id:inv.id,tenant_id:G.tenantId||null,nombre:inv.nombre||"",fecha:inv.fecha||"",estado,tipo:inv.tipo||"",obs:inv.obs||"",
   apertura:inv.apertura||"",hora_apertura:inv.horaApertura||"",usuario_apertura:inv.usuarioApertura||"",
   cierre:inv.cierre||"",hora_cierre:inv.horaCierre||"",usuario_cierre:inv.usuarioCierre||"",
   conteos_snapshot:inv.conteos?JSON.stringify(inv.conteos):null,
   capturas_snapshot:inv.capturas?JSON.stringify(inv.capturas):null,
   productos_snapshot:inv.productos?JSON.stringify(inv.productos):null,
 });
-const prodCols=(p)=>({id:p.id,ean:p.ean||"",codigo:p.codigo||"",nombre:p.nombre||"",referencia:p.referencia||"",categoria:p.categoria||"",subcategoria:p.subcategoria||"",subgrupo:p.subgrupo||"",determinada:p.determinada||"",localizacion:p.localizacion||"",ubicacion:p.ubicacion||"",observacion:p.observacion||"",saldo:p.saldo||0,costo:p.costo||0,nit:p.nit||"",proveedor:p.proveedor||""});
-const userCols=(u)=>({id:u.id,nombre:u.nombre,pass:u.pass,rol:u.rol,activo:u.activo,creado:u.creado||TODAY(),correo:u.correo||"",telefono:u.telefono||"",cargo:u.cargo||"",turno:u.turno||"",zona:u.zona||"",obs:u.obs||""});
+const prodCols=(p)=>({id:p.id,tenant_id:G.tenantId||null,ean:p.ean||"",codigo:p.codigo||"",nombre:p.nombre||"",referencia:p.referencia||"",categoria:p.categoria||"",subcategoria:p.subcategoria||"",subgrupo:p.subgrupo||"",determinada:p.determinada||"",localizacion:p.localizacion||"",ubicacion:p.ubicacion||"",observacion:p.observacion||"",saldo:p.saldo||0,costo:p.costo||0,nit:p.nit||"",proveedor:p.proveedor||""});
+const userCols=(u)=>({id:u.id,tenant_id:u.tenant_id||G.tenantId||null,nombre:u.nombre,pass:u.pass,rol:u.rol,activo:u.activo,creado:u.creado||TODAY(),correo:u.correo||"",telefono:u.telefono||"",cargo:u.cargo||"",turno:u.turno||"",zona:u.zona||"",obs:u.obs||""});
 
 // --- Operaciones Supabase ---
 const SB={
-  async loadAll(){
-    const [u,p,inv,c]=await Promise.all([
-      supabase.from("usuarios").select("*"),
-      supabase.from("productos").select("*"),
-      supabase.from("inventarios").select("*"),
-      supabase.from("conteos").select("*"),
-    ]);
+  // Perfil propio del usuario autenticado (id = auth.uid()).
+  loadMyProfile:(uid)=>supabase.from("usuarios").select("*").eq("id",uid).maybeSingle(),
+  loadTenant:(tid)=>supabase.from("tenants").select("*").eq("id",tid).maybeSingle(),
+  // RPCs (SECURITY DEFINER en la base): creación/gestión privilegiada de usuarios y empresas.
+  registerTenant:(empresa,slug,email,pass,nombre,nit)=>supabase.rpc("register_tenant",{p_empresa:empresa,p_slug:slug,p_email:email,p_pass:pass,p_admin_nombre:nombre||"",p_nit:nit||""}),
+  createMember:(nombre,pass,rol,correo,telefono)=>supabase.rpc("create_member",{p_nombre:nombre,p_pass:pass,p_rol:rol,p_correo:correo||"",p_telefono:telefono||""}),
+  resetMemberPassword:(id,pass)=>supabase.rpc("reset_member_password",{p_user_id:id,p_pass:pass}),
+  deleteMember:(id)=>supabase.rpc("delete_member",{p_user_id:id}),
+  setTenantActive:(tid,activo)=>supabase.rpc("set_tenant_active",{p_tid:tid,p_activo:activo}),
+  loadUsuarios:(tid)=>supabase.from("usuarios").select("*").eq("tenant_id",tid),
+  // Datos de UNA empresa (tenant). Si tid es null, trae todo (compatibilidad).
+  async loadAll(tid){
+    const f=(t)=>tid?supabase.from(t).select("*").eq("tenant_id",tid):supabase.from(t).select("*");
+    const [u,p,inv,c]=await Promise.all([f("usuarios"),f("productos"),f("inventarios"),f("conteos")]);
     return {usuarios:u.data||[],productos:p.data||[],inventarios:inv.data||[],conteos:c.data||[]};
   },
+  // Empresas (tenants)
+  listTenants:()=>supabase.from("tenants").select("*").order("created_at",{ascending:false}),
+  upsertTenant:(t)=>supabase.from("tenants").upsert(t,{onConflict:"id"}),
   upsertUsuario:(u)=>supabase.from("usuarios").upsert(u,{onConflict:"id"}),
+  updateUsuario:(id,patch)=>supabase.from("usuarios").update(patch).eq("id",id),
   deleteUsuario:(id)=>supabase.from("usuarios").delete().eq("id",id),
   async upsertProductosBulk(prods){for(let i=0;i<prods.length;i+=500){await supabase.from("productos").upsert(prods.slice(i,i+500),{onConflict:"id"});}},
-  deleteAllProductos:()=>supabase.from("productos").delete().neq("id","__none__"),
+  deleteAllProductos:(tid)=>tid?supabase.from("productos").delete().eq("tenant_id",tid):supabase.from("productos").delete().neq("id","__none__"),
   upsertInventario:(inv)=>supabase.from("inventarios").upsert(inv,{onConflict:"id"}),
   upsertConteo:(c)=>supabase.from("conteos").upsert(c,{onConflict:"id"}),
   deleteConteo:(id)=>supabase.from("conteos").delete().eq("id",id),
   deleteInventario:(id)=>supabase.from("inventarios").delete().eq("id",id),
+  // Configuración global key/value (ej: contenido de la landing). Tabla: app_config(key text pk, value jsonb)
+  getConfig:async(key)=>{try{const{data}=await supabase.from("app_config").select("value").eq("key",key).maybeSingle();return data?data.value:null;}catch(e){return null;}},
+  setConfig:(key,value)=>supabase.from("app_config").upsert({key,value},{onConflict:"key"}),
 };
 
 // --- Config local (localizaciones, tipos, alertas) ---
@@ -204,9 +224,9 @@ const loadLocalConfig=()=>{try{const raw=localStorage.getItem(CONFIG_KEY);if(!ra
 const saveLocalCache=()=>{try{localStorage.setItem(STORAGE_KEY,JSON.stringify({productos:G.productos,usuarios:G.usuarios,inventario:G.inventario,conteos:G.conteos,capturas:G.capturas,historial:G.historial,savedAt:new Date().toISOString()}));}catch(e){}};
 
 // --- Snapshot para sincronización por diferencias ---
-let _snap={u:{},c:{},inv:"",hist:{},prods:""};
+let _snap={u:{},c:{},inv:"",hist:{},prods:"",cfg:""};
 const initSnap=()=>{
-  _snap={u:{},c:{},inv:"",hist:{},prods:""};
+  _snap={u:{},c:{},inv:"",hist:{},prods:"",cfg:""};
   G.usuarios.forEach(u=>{_snap.u[u.id]=JSON.stringify(userCols(u));});
   _snap.prods=JSON.stringify(G.productos.map(prodCols));
   _snap.inv=G.inventario?JSON.stringify(serInv(G.inventario,"abierto")):"";
@@ -220,11 +240,10 @@ const doSync=async()=>{
   if(_syncing){_pending=true;return;}
   _syncing=true;
   try{
-    const curU={};G.usuarios.forEach(u=>{curU[u.id]=userCols(u);});
-    for(const id in curU){const s=JSON.stringify(curU[id]);if(_snap.u[id]!==s){await SB.upsertUsuario(curU[id]);_snap.u[id]=s;}}
-    for(const id in _snap.u){if(!curU[id]){await SB.deleteUsuario(id);delete _snap.u[id];}}
+    // Los usuarios NO se sincronizan aquí: se crean/editan/eliminan con RPCs y
+    // updates explícitos (VUsuarios), porque cada uno tiene credencial en Auth.
     const ps=JSON.stringify(G.productos.map(prodCols));
-    if(ps!==_snap.prods){await SB.deleteAllProductos();if(G.productos.length)await SB.upsertProductosBulk(G.productos.map(prodCols));_snap.prods=ps;}
+    if(ps!==_snap.prods){await SB.deleteAllProductos(G.tenantId);if(G.productos.length)await SB.upsertProductosBulk(G.productos.map(prodCols));_snap.prods=ps;}
     const invObj=G.inventario?serInv(G.inventario,"abierto"):null;
     const invS=invObj?JSON.stringify(invObj):"";
     if(invS!==_snap.inv){if(invObj)await SB.upsertInventario(invObj);_snap.inv=invS;}
@@ -234,6 +253,11 @@ const doSync=async()=>{
     const curC={};G.conteos.forEach(c=>{curC[c.id]=serConteo(c);});
     for(const id in curC){const s=JSON.stringify(curC[id]);if(_snap.c[id]!==s){await SB.upsertConteo(curC[id]);_snap.c[id]=s;}}
     for(const id in _snap.c){if(!curC[id]){await SB.deleteConteo(id);delete _snap.c[id];}}
+    // Config por-empresa (localizaciones/tipos/alertas/notas) → app_config key tenant:<id>:config
+    if(G.tenantId){
+      const cfg=JSON.stringify({localizaciones:G.localizaciones,ubicacionesTipos:G.ubicacionesTipos,localizacionTipos:G.localizacionTipos,alertas:G.alertas,notas:G.notas});
+      if(cfg!==_snap.cfg){await SB.setConfig(`tenant:${G.tenantId}:config`,JSON.parse(cfg));_snap.cfg=cfg;}
+    }
   }catch(e){console.warn("Error de sincronización:",e);}
   _syncing=false;
   if(_pending){_pending=false;doSync();}
@@ -241,11 +265,27 @@ const doSync=async()=>{
 const scheduleSync=()=>{if(_syncTimer)clearTimeout(_syncTimer);_syncTimer=setTimeout(doSync,400);};
 if(typeof window!=="undefined"){window.addEventListener("beforeunload",()=>{try{doSync();}catch(e){}});}
 
-const loadFromSupabase=async()=>{
-  loadLocalConfig();
-  const {usuarios,productos,inventarios,conteos}=await SB.loadAll();
-  if(usuarios.length===0){const demos=G.usuarios;for(const u of demos)await SB.upsertUsuario(userCols(u));G.usuarios=demos;}
-  else G.usuarios=usuarios;
+// Carga inicial mínima (al montar): solo el contenido público de la web.
+// Los usuarios ya NO se precargan: cada login autentica contra Supabase Auth y
+// luego carga el perfil + los datos de su empresa.
+const loadBootstrap=async()=>{
+  G.landingContent=await SB.getConfig("landing"); // contenido editable de la web pública
+};
+
+// Carga de los datos de UNA empresa (tenant), tras el login del usuario.
+const loadTenantData=async(tid)=>{
+  G.tenantId=tid;
+  // Config de la empresa (localizaciones/tipos/alertas/notas) desde la nube; si no hay, cae a localStorage.
+  const cfg=await SB.getConfig(`tenant:${tid}:config`);
+  if(cfg){
+    if(cfg.localizaciones)G.localizaciones=cfg.localizaciones;
+    if(cfg.ubicacionesTipos&&cfg.ubicacionesTipos.length)G.ubicacionesTipos=cfg.ubicacionesTipos;
+    if(cfg.localizacionTipos&&cfg.localizacionTipos.length)G.localizacionTipos=cfg.localizacionTipos;
+    if(cfg.alertas)G.alertas=cfg.alertas;
+    if(cfg.notas)G.notas=cfg.notas;
+  } else { loadLocalConfig(); }
+  const {usuarios,productos,inventarios,conteos}=await SB.loadAll(tid);
+  if(usuarios.length)G.usuarios=usuarios; // usuarios de esta empresa
   G.productos=productos||[];
   const active=inventarios.find(i=>i.estado==="abierto");
   if(active){
@@ -262,19 +302,60 @@ const loadFromSupabase=async()=>{
   initSnap();
 };
 
+// Lista de empresas (para el panel del dueño).
+const loadTenants=async()=>{const t=await SB.listTenants();G.tenants=t.data||[];};
+
 // ─────────────────────────────────────────
 // APP
 // ─────────────────────────────────────────
 export default function TomficApp(){
   const [usuario,setUsuario]=useState(null);
-  const [loginForm,setLoginForm]=useState({user:"",pass:""});
+  const [loginForm,setLoginForm]=useState({tab:"equipo",empresa:"",user:"",email:"",pass:""});
   const [loginErr,setLoginErr]=useState("");
+  const [entrar,setEntrar]=useState(false); // false = landing pública · true = pantalla de login
   const [,tick]=useState(0);
   const [lastSaved,setLastSaved]=useState(null);
   const [loading,setLoading]=useState(true);
+  const [loadingTenant,setLoadingTenant]=useState(false); // cargando datos de la empresa tras el login
   const [loadErr,setLoadErr]=useState("");
 
-  useEffect(()=>{(async()=>{try{await loadFromSupabase();}catch(e){console.error(e);setLoadErr("Error de conexión con la nube");}setLoading(false);})();},[]);
+  // Tras autenticarse (login nuevo o sesión restaurada al recargar): cargar el
+  // perfil propio + los datos de su empresa. Devuelve true si quedó logueado.
+  const afterAuth=async()=>{
+    const {data:{user:au}}=await supabase.auth.getUser();
+    if(!au)return false;
+    const {data:perfil}=await SB.loadMyProfile(au.id);
+    if(!perfil){await supabase.auth.signOut();setLoginErr("Tu usuario no tiene perfil. Contacta al administrador.");return false;}
+    if(perfil.activo===false){await supabase.auth.signOut();setLoginErr("Tu usuario está inactivo.");return false;}
+    if(perfil.rol!=="dueno"){
+      const {data:ten}=await SB.loadTenant(perfil.tenant_id);
+      if(!ten||ten.activo===false){await supabase.auth.signOut();setLoginErr("Tu empresa está pendiente de aprobación o ha sido suspendida.");return false;}
+    }
+    setLoadingTenant(true);
+    try{
+      if(perfil.rol==="dueno"){G.tenantId=null;await loadTenants();}
+      else{await loadTenantData(perfil.tenant_id);}
+    }catch(e){console.warn("Error cargando datos de la empresa:",e);}
+    setLoadingTenant(false);
+    setUsuario(perfil);
+    return true;
+  };
+
+  useEffect(()=>{
+    (async()=>{
+      try{await loadBootstrap();}catch(e){console.error(e);setLoadErr("Error de conexión con la nube");}
+      try{
+        const {data:{session}}=await supabase.auth.getSession();
+        if(session)await afterAuth();
+      }catch(e){console.warn(e);}
+      setLoading(false);
+    })();
+    // Mantener el estado en sincronía si la sesión expira o se cierra en otra pestaña.
+    const {data:sub}=supabase.auth.onAuthStateChange((event)=>{
+      if(event==="SIGNED_OUT"){G.tenantId=null;setUsuario(null);}
+    });
+    return ()=>{try{sub.subscription.unsubscribe();}catch(e){}};
+  },[]);
 
   // CSS responsive global para celular (se inyecta una sola vez)
   useEffect(()=>{
@@ -306,7 +387,7 @@ export default function TomficApp(){
     scheduleSync();
     setLastSaved(new Date().toLocaleTimeString("es-CO"));
   };
-  const recargar=async()=>{if(_busy||_syncing)return;try{await loadFromSupabase();}catch(e){}tick(n=>n+1);};
+  const recargar=async()=>{if(_busy||_syncing)return;try{if(usuario&&usuario.rol==="dueno")await loadTenants();else if(G.tenantId)await loadTenantData(G.tenantId);}catch(e){}tick(n=>n+1);};
 
   const toastRef=useRef(null);
   const [toast,setToast]=useState(null);
@@ -321,21 +402,55 @@ export default function TomficApp(){
     window.location.reload();
   };
 
-  const login=()=>{
-    const u=loginForm.user.toUpperCase().trim();
-    const found=G.usuarios.find(x=>x.nombre===u&&x.pass===loginForm.pass&&x.activo);
-    if(found){setUsuario(found);setLoginErr("");}
-    else setLoginErr("Usuario o contraseña incorrectos");
+  const login=async()=>{
+    setLoginErr("");
+    const pass=loginForm.pass;
+    let email;
+    if(loginForm.tab==="admin"){
+      email=(loginForm.email||"").trim().toLowerCase();
+      if(!email||!pass)return setLoginErr("Ingresa tu email y contraseña");
+    }else{
+      const emp=slugify(loginForm.empresa), usr=slugify(loginForm.user);
+      if(!emp||!usr||!pass)return setLoginErr("Completa empresa, usuario y contraseña");
+      email=memberEmail(usr,emp); // usuario@empresa.tomfic.app
+    }
+    setLoadingTenant(true);
+    const {error}=await supabase.auth.signInWithPassword({email,password:pass});
+    if(error){
+      setLoadingTenant(false);
+      return setLoginErr(loginForm.tab==="admin"?"Email o contraseña incorrectos":"Empresa, usuario o contraseña incorrectos");
+    }
+    const ok=await afterAuth();
+    if(!ok)setLoadingTenant(false);
   };
 
-  if(loading)return(<div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#0f172a",fontFamily:"system-ui,sans-serif"}}><div style={{textAlign:"center",color:"white"}}><div style={{fontSize:52,marginBottom:16}}>📦</div><div style={{fontSize:24,fontWeight:900,marginBottom:8}}>TOMFIC</div><div style={{fontSize:14,color:"#64748b"}}>{loadErr||"Cargando datos de la nube..."}</div><div style={{marginTop:20,width:200,height:4,background:"#1e293b",borderRadius:99,overflow:"hidden",margin:"20px auto 0"}}><div style={{width:"60%",height:"100%",background:"linear-gradient(90deg,#2563eb,#16a34a)",borderRadius:99}}/></div></div></div>);
+  // Registro autoservicio de empresa desde la landing (queda pendiente de aprobación).
+  const registrarEmpresa=async({empresa,slug,email,pass,nombre,nit})=>{
+    const {data,error}=await SB.registerTenant(empresa,slug,email,pass,nombre,nit);
+    if(error)return {ok:false,error:error.message||"No se pudo completar el registro"};
+    return {ok:true,data};
+  };
 
-  if(!usuario) return <Login lf={loginForm} setLf={setLoginForm} err={loginErr} onLogin={login} lastSaved={lastSaved}/>;
-  const p={usuario,setUsuario,G,rerender,recargar,showToast,lastSaved,limpiarDatos};
+  // Cierre de sesión: termina la sesión de Auth y limpia el estado en memoria.
+  const logout=async()=>{
+    try{await supabase.auth.signOut();}catch(e){}
+    G.tenantId=null;G.tenants=[];G.productos=[];G.conteos=[];G.capturas={};G.inventario=null;G.historial=[];G.notas=[];
+    setEntrar(false);setLoginForm({tab:"equipo",empresa:"",user:"",email:"",pass:""});setLoginErr("");
+    setUsuario(null);
+  };
+
+  if(loading)return(<div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#0f172a",fontFamily:"system-ui,sans-serif"}}><div style={{textAlign:"center",color:"white"}}><div style={{display:"flex",justifyContent:"center",marginBottom:16}}><Package size={52} color="#2563eb"/></div><div style={{fontSize:24,fontWeight:900,marginBottom:8}}>TOMFIC</div><div style={{fontSize:14,color:"#64748b"}}>{loadErr||"Cargando datos de la nube..."}</div><div style={{marginTop:20,width:200,height:4,background:"#1e293b",borderRadius:99,overflow:"hidden",margin:"20px auto 0"}}><div style={{width:"60%",height:"100%",background:"linear-gradient(90deg,#2563eb,#16a34a)",borderRadius:99}}/></div></div></div>);
+
+  if(loadingTenant)return(<div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#0f172a",fontFamily:"system-ui,sans-serif"}}><div style={{textAlign:"center",color:"white"}}><div style={{display:"flex",justifyContent:"center",marginBottom:16}}><Package size={52} color="#2563eb"/></div><div style={{fontSize:24,fontWeight:900,marginBottom:8}}>TOMFIC</div><div style={{fontSize:14,color:"#64748b"}}>Cargando tu empresa…</div></div></div>);
+
+  if(!usuario) return entrar
+    ? <Login lf={loginForm} setLf={setLoginForm} err={loginErr} onLogin={login} lastSaved={lastSaved} onBack={()=>{setEntrar(false);setLoginErr("");}}/>
+    : <Landing onEnter={()=>setEntrar(true)} onRegister={registrarEmpresa} content={mergeLanding(G.landingContent)}/>;
+  const p={usuario,setUsuario,logout,G,rerender,recargar,showToast,lastSaved,limpiarDatos};
   return(
     <>
       {toast&&<div style={{position:"fixed",top:58,right:20,background:toast.type==="err"?"#dc2626":toast.type==="warn"?"#d97706":"#16a34a",color:"white",padding:"10px 20px",borderRadius:10,zIndex:9999,fontSize:14,fontWeight:700,boxShadow:"0 4px 20px rgba(0,0,0,0.2)",pointerEvents:"none",maxWidth:360}}>{toast.msg}</div>}
-      {usuario.rol==="capturador"?<ModCapturador {...p}/>:usuario.rol==="gerente"?<ModGerente {...p}/>:<ModAdmin {...p}/>}
+      {usuario.rol==="dueno"?<PanelDueno {...p}/>:usuario.rol==="capturador"?<ModCapturador {...p}/>:usuario.rol==="gerente"?<ModGerente {...p}/>:<ModAdmin {...p}/>}
     </>
   );
 }
@@ -343,7 +458,7 @@ export default function TomficApp(){
 // ─────────────────────────────────────────
 // LOGIN
 // ─────────────────────────────────────────
-function Login({lf,setLf,err,onLogin,lastSaved}){
+function Login({lf,setLf,err,onLogin,lastSaved,onBack}){
   const [showPass,setShowPass]=useState(false);
   const [showRecuperar,setShowRecuperar]=useState(false);
   return(
@@ -384,13 +499,13 @@ function Login({lf,setLf,err,onLogin,lastSaved}){
         {/* Features */}
         <div style={{marginTop:40,display:"flex",flexDirection:"column",gap:12,width:"100%",maxWidth:300}}>
           {[
-            {icon:"📦","txt":"Gestión de conteos por ubicación"},
-            {icon:"👥","txt":"Múltiples capturadores simultáneos"},
-            {icon:"📊","txt":"Reportes y diferencias en tiempo real"},
-            {icon:"🔒","txt":"Historial permanente de inventarios"},
+            {icon:Package,   "txt":"Gestión de conteos por ubicación"},
+            {icon:Users,     "txt":"Múltiples capturadores simultáneos"},
+            {icon:BarChart2, "txt":"Reportes y diferencias en tiempo real"},
+            {icon:Landmark,  "txt":"Historial permanente de inventarios"},
           ].map((f,i)=>(
             <div key={i} style={{display:"flex",alignItems:"center",gap:12,background:"rgba(255,255,255,0.05)",borderRadius:10,padding:"10px 14px",border:"1px solid rgba(255,255,255,0.08)"}}>
-              <span style={{fontSize:18}}>{f.icon}</span>
+              <f.icon size={18} color="#93c5fd" />
               <span style={{fontSize:13,color:"#cbd5e1"}}>{f.txt}</span>
             </div>
           ))}
@@ -424,37 +539,70 @@ function Login({lf,setLf,err,onLogin,lastSaved}){
 
           {/* Form */}
           <div style={{background:"white",borderRadius:16,padding:"28px 28px",boxShadow:"0 4px 24px rgba(0,0,0,0.08)",border:"1px solid #e2e8f0"}}>
+            {onBack&&(
+              <button onClick={onBack} className="mb-4 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-900 transition-colors">
+                <ChevronLeft size={16}/> Volver al inicio
+              </button>
+            )}
             <div style={{marginBottom:16,background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:10,padding:"10px 14px",fontSize:12,color:"#1e40af",display:"flex",alignItems:"center",gap:8}}>
-              <span style={{fontSize:16}}>☁️</span>
+              <Cloud size={16} color="#2563eb" />
               <div>
                 <b>Conectado a la nube</b><br/>
                 <span style={{fontSize:11,color:"#64748b"}}>Datos sincronizados en tiempo real</span>
               </div>
             </div>
-            <div style={{marginBottom:20}}>
-              <Lbl>Usuario</Lbl>
-              <Inp value={lf.user} onChange={e=>setLf(p=>({...p,user:e.target.value}))}
-                placeholder="Ingresa tu usuario" onKeyDown={e=>e.key==="Enter"&&onLogin()}
-                style={{fontSize:15}}/>
+            {/* Selector de tipo de acceso */}
+            <div className="mb-5 grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1">
+              {[["equipo","Equipo"],["admin","Administrador"]].map(([v,t])=>(
+                <button key={v} type="button" onClick={()=>setLf(p=>({...p,tab:v}))}
+                  className={`h-9 rounded-md text-sm font-bold transition-colors ${lf.tab===v?"bg-white text-primary shadow-sm":"text-slate-500 hover:text-slate-700"}`}>
+                  {t}
+                </button>
+              ))}
             </div>
-            <div style={{marginBottom:20}}>
-              <Lbl>Contraseña</Lbl>
-              <div style={{position:"relative"}}>
-                <input type={showPass?"text":"password"} value={lf.pass}
+
+            {lf.tab==="admin"?(
+              <div className="mb-5 space-y-1.5">
+                <Label>Email</Label>
+                <Input type="email" value={lf.email} onChange={e=>setLf(p=>({...p,email:e.target.value}))}
+                  placeholder="tucorreo@empresa.com" onKeyDown={e=>e.key==="Enter"&&onLogin()}
+                  className="h-11 text-[15px]"/>
+              </div>
+            ):(
+              <>
+                <div className="mb-4 space-y-1.5">
+                  <Label>Empresa (NIT)</Label>
+                  <Input value={lf.empresa} onChange={e=>setLf(p=>({...p,empresa:e.target.value}))}
+                    placeholder="NIT de tu empresa" onKeyDown={e=>e.key==="Enter"&&onLogin()}
+                    className="h-11 text-[15px]"/>
+                </div>
+                <div className="mb-5 space-y-1.5">
+                  <Label>Usuario</Label>
+                  <Input value={lf.user} onChange={e=>setLf(p=>({...p,user:e.target.value}))}
+                    placeholder="Tu nombre de usuario" onKeyDown={e=>e.key==="Enter"&&onLogin()}
+                    className="h-11 text-[15px]"/>
+                </div>
+              </>
+            )}
+
+            <div className="mb-5 space-y-1.5">
+              <Label>Contraseña</Label>
+              <div className="relative">
+                <Input type={showPass?"text":"password"} value={lf.pass}
                   onChange={e=>setLf(p=>({...p,pass:e.target.value}))}
                   onKeyDown={e=>e.key==="Enter"&&onLogin()}
                   placeholder="••••••••"
-                  style={{...inp,paddingRight:44,fontSize:15}}/>
+                  className="h-11 pr-11 text-[15px]"/>
                 <button onClick={()=>setShowPass(v=>!v)}
-                  style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"transparent",border:"none",cursor:"pointer",fontSize:18,color:"#94a3b8",lineHeight:1}}>
-                  {showPass?"🙈":"👁"}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
+                  {showPass?<EyeOff size={18}/>:<Eye size={18}/>}
                 </button>
               </div>
             </div>
 
             {err&&(
               <div style={{background:"#fef2f2",color:"#dc2626",padding:"10px 14px",borderRadius:8,marginBottom:16,fontSize:13,fontWeight:600,display:"flex",alignItems:"center",gap:8}}>
-                ⚠️ {err}
+                <AlertTriangle size={14} style={{flexShrink:0}}/> {err}
               </div>
             )}
 
@@ -488,20 +636,20 @@ function Login({lf,setLf,err,onLogin,lastSaved}){
 // ─────────────────────────────────────────
 // ADMIN
 // ─────────────────────────────────────────
-function ModAdmin({usuario,setUsuario,G,rerender,recargar,showToast,lastSaved,limpiarDatos}){
+function ModAdmin({usuario,setUsuario,logout,G,rerender,recargar,showToast,lastSaved,limpiarDatos}){
   const [view,setView]=useState("inventario");
   const [modalSalir,setModalSalir]=useState(false);
   const [sideCollapsed,setSideCollapsed]=useState(false);
   const alertas=G.alertas.filter(a=>!a.leida).length;
   const nav=[
-    {id:"inventario",icon:"📋",label:"Inventario",desc:"Gestión activa"},
-    {id:"basedatos",icon:"🗄️",label:"Base de datos",desc:"Productos"},
-    {id:"ubicaciones",icon:"📍",label:"Ubicaciones",desc:"Localizaciones"},
-    {id:"conteos",icon:"🗂️",label:"Conteos",desc:"Rondas"},
-    {id:"procesos",icon:"📡",label:"Procesos",desc:"Avance"},
-    {id:"reportes",icon:"📊",label:"Reportes",desc:"Análisis"},
-    {id:"usuarios",icon:"👥",label:"Usuarios",desc:"Accesos"},
-    {id:"historial",icon:"🏛️",label:"Historial",desc:"Inventarios"},
+    {id:"inventario",icon:ClipboardList,label:"Inventario",desc:"Gestión activa"},
+    {id:"basedatos",icon:Database,       label:"Base de datos",desc:"Productos"},
+    {id:"ubicaciones",icon:MapPin,       label:"Ubicaciones",desc:"Localizaciones"},
+    {id:"conteos",icon:FolderOpen,       label:"Conteos",desc:"Rondas"},
+    {id:"procesos",icon:Radio,           label:"Procesos",desc:"Avance"},
+    {id:"reportes",icon:BarChart2,       label:"Reportes",desc:"Análisis"},
+    {id:"usuarios",icon:Users,           label:"Usuarios",desc:"Accesos"},
+    {id:"historial",icon:Landmark,       label:"Historial",desc:"Inventarios"},
   ];
   const props={usuario,setUsuario,G,rerender,recargar,showToast};
 
@@ -524,10 +672,10 @@ function ModAdmin({usuario,setUsuario,G,rerender,recargar,showToast,lastSaved,li
       <div style={{background:"linear-gradient(135deg,#0f172a 0%,#1e293b 100%)",color:"white",padding:"0 20px",display:"flex",alignItems:"center",justifyContent:"space-between",height:58,position:"sticky",top:0,zIndex:100,boxShadow:"0 2px 12px rgba(0,0,0,0.25)"}}>
         <div style={{display:"flex",alignItems:"center",gap:12}}>
           <button onClick={()=>setSideCollapsed(v=>!v)} style={{background:"rgba(255,255,255,0.08)",border:"none",color:"white",width:34,height:34,borderRadius:8,cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>
-            {sideCollapsed?"→":"☰"}
+            {sideCollapsed?<ChevronRight size={16}/>:<Menu size={16}/>}
           </button>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <div style={{width:32,height:32,background:"linear-gradient(135deg,#2563eb,#0891b2)",borderRadius:9,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>📦</div>
+            <div style={{width:32,height:32,background:"linear-gradient(135deg,#2563eb,#0891b2)",borderRadius:9,display:"flex",alignItems:"center",justifyContent:"center"}}><Package size={18} color="white"/></div>
             <div>
               <div style={{fontWeight:800,fontSize:15,letterSpacing:-0.5}}>TOMFIC</div>
               <div style={{fontSize:9,color:"#64748b",marginTop:-2,letterSpacing:1,textTransform:"uppercase"}}>Inventarios</div>
@@ -544,15 +692,15 @@ function ModAdmin({usuario,setUsuario,G,rerender,recargar,showToast,lastSaved,li
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
           <button onClick={async()=>{await recargar();showToast("Datos actualizados ✓");}}
             style={{background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.1)",color:"#94a3b8",padding:"5px 12px",borderRadius:8,fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}>
-            🔄 <span>Sync</span>
+            <RefreshCw size={13}/> <span>Sync</span>
           </button>
           {alertas>0&&(
             <button onClick={()=>{G.alertas=G.alertas.map(a=>({...a,leida:true}));rerender();setView("procesos");}}
               style={{background:"#dc2626",color:"white",border:"none",padding:"5px 14px",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:700,display:"flex",alignItems:"center",gap:5,animation:"pulse 2s infinite"}}>
-              🔔 {alertas}
+              <Bell size={13}/> {alertas}
             </button>
           )}
-          {lastSaved&&<span style={{fontSize:10,color:"#475569",display:"flex",alignItems:"center",gap:4}}>☁️ {lastSaved}</span>}
+          {lastSaved&&<span style={{fontSize:10,color:"#475569",display:"flex",alignItems:"center",gap:4}}><Cloud size={12}/> {lastSaved}</span>}
           <div style={{display:"flex",alignItems:"center",gap:7,background:"rgba(255,255,255,0.07)",borderRadius:9,padding:"5px 10px",border:"1px solid rgba(255,255,255,0.08)"}}>
             <div style={{width:24,height:24,background:"linear-gradient(135deg,#2563eb,#7c3aed)",borderRadius:99,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700}}>{usuario.nombre.charAt(0)}</div>
             <span style={{fontSize:12,color:"#cbd5e1",fontWeight:600}}>{usuario.nombre}</span>
@@ -564,10 +712,10 @@ function ModAdmin({usuario,setUsuario,G,rerender,recargar,showToast,lastSaved,li
         </div>
       </div>
 
-      <div style={{display:"flex",minHeight:"calc(100vh - 58px)"}}>
+      <div style={{display:"flex",height:"calc(100vh - 58px)",overflow:"hidden"}}>
 
         {/* SIDEBAR */}
-        <div style={{width:sideCollapsed?64:210,background:"linear-gradient(180deg,#1e293b 0%,#0f172a 100%)",flexShrink:0,position:"sticky",top:58,height:"calc(100vh - 58px)",overflowY:"auto",overflowX:"hidden",transition:"width 0.25s ease",boxShadow:"2px 0 12px rgba(0,0,0,0.2)"}}>
+        <div style={{width:sideCollapsed?64:210,background:"linear-gradient(180deg,#1e293b 0%,#0f172a 100%)",flexShrink:0,height:"100%",overflowY:"auto",overflowX:"hidden",transition:"width 0.25s ease",boxShadow:"2px 0 12px rgba(0,0,0,0.2)"}}>
           <div style={{padding:sideCollapsed?"12px 8px":"16px 10px",display:"flex",flexDirection:"column",gap:3}}>
             {nav.map(n=>{
               const active=view===n.id;
@@ -576,7 +724,7 @@ function ModAdmin({usuario,setUsuario,G,rerender,recargar,showToast,lastSaved,li
                   title={sideCollapsed?n.label:""}
                   style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:sideCollapsed?"10px":"10px 12px",background:active?"linear-gradient(135deg,#2563eb,#1d4ed8)":"transparent",color:active?"white":"#64748b",border:"none",cursor:"pointer",fontSize:13,textAlign:"left",borderRadius:10,transition:"all 0.15s",position:"relative",overflow:"hidden"}}>
                   {active&&<div style={{position:"absolute",left:0,top:"20%",bottom:"20%",width:3,background:"#60a5fa",borderRadius:"0 3px 3px 0"}}/>}
-                  <span style={{fontSize:18,flexShrink:0,filter:active?"none":"grayscale(0.3)"}}>{n.icon}</span>
+                  <n.icon size={18} style={{flexShrink:0,opacity:active?1:0.5}}/>
                   {!sideCollapsed&&(
                     <div style={{overflow:"hidden"}}>
                       <div style={{fontWeight:active?700:500,fontSize:13,whiteSpace:"nowrap",color:active?"white":"#94a3b8"}}>{n.label}</div>
@@ -591,7 +739,7 @@ function ModAdmin({usuario,setUsuario,G,rerender,recargar,showToast,lastSaved,li
           {!sideCollapsed&&(
             <div style={{margin:"12px 10px 0",padding:"10px 12px",background:"rgba(255,255,255,0.04)",borderRadius:10,border:"1px solid rgba(255,255,255,0.06)"}}>
               <div style={{fontSize:9,color:"#334155",textTransform:"uppercase",letterSpacing:1,fontWeight:700,marginBottom:4}}>Sistema</div>
-              <div style={{fontSize:11,color:"#475569"}}>v2.1 · {G.productos.length} productos</div>
+              <div style={{fontSize:11,color:"#475569"}}>v2.1</div>
             </div>
           )}
         </div>
@@ -611,21 +759,15 @@ function ModAdmin({usuario,setUsuario,G,rerender,recargar,showToast,lastSaved,li
       </div>
 
       <BtnNotas G={G} usuario={usuario} rerender={rerender} showToast={showToast}/>
-      {modalSalir&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center",padding:16,backdropFilter:"blur(4px)"}}>
-          <div style={{background:"white",borderRadius:20,padding:32,width:380,maxWidth:"96vw",boxShadow:"0 30px 80px rgba(0,0,0,0.35)"}}>
-            <div style={{textAlign:"center",marginBottom:16}}>
-              <div style={{fontSize:40,marginBottom:8}}>👋</div>
-              <h3 style={{margin:"0 0 8px",fontSize:18,fontWeight:800,color:"#0f172a"}}>¿Cerrar sesión?</h3>
-              <p style={{fontSize:14,color:"#64748b",lineHeight:1.6,margin:0}}>Vas a salir de TOMFIC. Tus datos ya están guardados en la nube.</p>
-            </div>
-            <div style={{display:"flex",gap:10,marginTop:24}}>
-              <Btn c="#dc2626" onClick={()=>setUsuario(null)} full>Sí, salir</Btn>
-              <Btn c="#64748b" onClick={()=>setModalSalir(false)} full outline>Cancelar</Btn>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={modalSalir}
+        onOpenChange={setModalSalir}
+        icon={LogOut}
+        title="¿Cerrar sesión?"
+        description="Vas a salir de TOMFIC. Tus datos ya están guardados en la nube."
+        confirmText="Sí, salir"
+        onConfirm={logout}
+      />
     </div>
   );
 }
@@ -724,11 +866,11 @@ function VInventario({G,rerender,showToast,usuario}){
   return(
     <Section>
       {!G.inventario?(
-        <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"60px 20px",background:"white",borderRadius:20,boxShadow:"0 2px 8px rgba(0,0,0,0.06)",border:"2px dashed #e2e8f0",textAlign:"center"}}>
-          <div style={{fontSize:64,marginBottom:16}}>📋</div>
-          <div style={{fontSize:20,fontWeight:800,color:"#0f172a",marginBottom:8}}>Sin inventario activo</div>
-          <div style={{fontSize:14,color:"#64748b",marginBottom:24,maxWidth:360}}>Crea un nuevo inventario para comenzar a registrar conteos de productos.</div>
-          <Btn c="#16a34a" onClick={()=>setModal(true)}>+ Crear Inventario</Btn>
+        <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-white py-16 px-5 text-center shadow-sm">
+          <ClipboardList size={64} className="text-slate-400 mb-4"/>
+          <div className="text-xl font-extrabold text-slate-900 mb-2">Sin inventario activo</div>
+          <div className="text-sm text-muted-foreground mb-6 max-w-sm">Crea un nuevo inventario para comenzar a registrar conteos de productos.</div>
+          <Button onClick={()=>setModal(true)}><Plus size={16}/> Crear Inventario</Button>
         </div>
       ):(
         <>
@@ -754,13 +896,13 @@ function VInventario({G,rerender,showToast,usuario}){
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(110px,1fr))",gap:10,marginTop:20}}>
               {[
-                {l:"Productos",v:G.productos.length,icon:"📦"},
-                {l:"Conteos",v:G.conteos.length,icon:"📋"},
-                {l:"Completados",v:st.comp,icon:"✅"},
-                {l:"Diferencias",v:st.dif,icon:"⚠️"},
+                {l:"Productos",v:G.productos.length,icon:Package},
+                {l:"Conteos",v:G.conteos.length,icon:ClipboardList},
+                {l:"Completados",v:st.comp,icon:CheckCircle},
+                {l:"Diferencias",v:st.dif,icon:AlertTriangle},
               ].map(s=>(
                 <div key={s.l} style={{background:"rgba(255,255,255,0.07)",borderRadius:12,padding:"12px 14px",border:"1px solid rgba(255,255,255,0.08)"}}>
-                  <div style={{fontSize:16,marginBottom:4}}>{s.icon}</div>
+                  <div style={{marginBottom:4}}><s.icon size={16} color="white"/></div>
                   <div style={{fontSize:22,fontWeight:900,color:"white"}}>{s.v}</div>
                   <div style={{fontSize:10,color:"#94a3b8",marginTop:2,textTransform:"uppercase",letterSpacing:0.5}}>{s.l}</div>
                 </div>
@@ -768,69 +910,85 @@ function VInventario({G,rerender,showToast,usuario}){
             </div>
           </div>
           {/* Acciones */}
-          <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap"}}>
-            <Btn c="#dc2626" onClick={intentarCerrar}>⬛ Cerrar Inventario</Btn>
-            <Btn c="#2563eb" outline onClick={()=>{setEditForm({nombre:G.inventario.nombre,obs:G.inventario.obs||""});setModalEdit(true);}}>✏️ Editar</Btn>
-            <Btn c="#dc2626" outline onClick={()=>setModalEliminar(true)}>🗑 Eliminar</Btn>
+          <div className="flex gap-2.5 mb-4 flex-wrap">
+            <Button variant="destructive" onClick={intentarCerrar}><Lock size={15}/> Cerrar Inventario</Button>
+            <Button variant="outline" onClick={()=>{setEditForm({nombre:G.inventario.nombre,obs:G.inventario.obs||""});setModalEdit(true);}}><Pencil size={15}/> Editar</Button>
+            <Button variant="outline" className="text-destructive border-red-200 hover:bg-red-50 hover:text-destructive" onClick={()=>setModalEliminar(true)}><Trash2 size={15}/> Eliminar</Button>
           </div>
-          {G.inventario.obs&&<div style={{marginBottom:12,background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:10,padding:"10px 14px",fontSize:13,color:"#64748b"}}>📝 {G.inventario.obs}</div>}
-          {G.productos.length===0&&<div style={{background:"#fef9c3",border:"1px solid #fde047",borderRadius:10,padding:"12px 16px",fontSize:13,color:"#92400e",fontWeight:600}}>⚠️ La base de productos está vacía. Ve a "Base de datos" y carga el Excel del cliente antes de programar conteos.</div>}
-          {G.productos.length>0&&<div style={{background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:10,padding:"12px 16px",fontSize:13,color:"#166534",fontWeight:600}}>✅ Base lista: {G.productos.length} productos disponibles. Puedes programar los conteos.</div>}
+          {G.inventario.obs&&<div className="mb-3 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-muted-foreground"><FileText size={15} className="shrink-0"/> {G.inventario.obs}</div>}
+          {G.productos.length===0&&<div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-700"><AlertTriangle size={15} className="shrink-0"/> La base de productos está vacía. Ve a "Base de datos" y carga el Excel del cliente antes de programar conteos.</div>}
+          {G.productos.length>0&&<div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm font-semibold text-green-700"><CheckCircle size={15} className="shrink-0"/> Base lista: {G.productos.length} productos disponibles. Puedes programar los conteos.</div>}
         </>
       )}
-      {modal&&(
-        <Modal titulo="Nuevo Inventario" onClose={()=>setModal(false)}>
-          <Lbl>Nombre del inventario</Lbl>
-          <Inp value={form.nombre} onChange={e=>setForm(p=>({...p,nombre:e.target.value}))} placeholder="Ej: Inventario General Junio 2025" style={{marginBottom:14}}/>
-          <Lbl>Fecha</Lbl>
-          <Inp value={form.fecha} onChange={e=>setForm(p=>({...p,fecha:e.target.value}))} style={{marginBottom:14}}/>
-          <Lbl>Tipo de conteo</Lbl>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
-            {[["1conteo","1 Conteo","Un solo pase"],["2conteos","2 Conteos","C1 + C2 + C3 si hay diferencia"]].map(([v,t,s])=>(
-              <div key={v} onClick={()=>setForm(p=>({...p,tipo:v}))} style={{border:`2px solid ${form.tipo===v?"#2563eb":"#e2e8f0"}`,borderRadius:10,padding:12,cursor:"pointer",background:form.tipo===v?"#eff6ff":"white"}}>
-                <div style={{fontWeight:700,color:form.tipo===v?"#2563eb":"#0f172a",fontSize:14}}>{t}</div>
-                <div style={{fontSize:11,color:"#64748b",marginTop:2}}>{s}</div>
+      <Dialog open={modal} onOpenChange={setModal}>
+        <DialogContent className="max-w-md max-h-[92vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Nuevo Inventario</DialogTitle></DialogHeader>
+          <div className="space-y-3.5">
+            <div className="space-y-1.5">
+              <Label>Nombre del inventario</Label>
+              <Input value={form.nombre} onChange={e=>setForm(p=>({...p,nombre:e.target.value}))} placeholder="Ej: Inventario General Junio 2025"/>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Fecha</Label>
+              <Input value={form.fecha} onChange={e=>setForm(p=>({...p,fecha:e.target.value}))}/>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Tipo de conteo</Label>
+              <div className="grid grid-cols-2 gap-2.5">
+                {[["1conteo","1 Conteo","Un solo pase"],["2conteos","2 Conteos","C1 + C2 + C3 si hay diferencia"]].map(([v,t,s])=>(
+                  <div key={v} onClick={()=>setForm(p=>({...p,tipo:v}))} className={`rounded-lg border-2 p-3 cursor-pointer transition-colors ${form.tipo===v?"border-primary bg-blue-50":"border-slate-200 hover:border-slate-300"}`}>
+                    <div className={`font-bold text-sm ${form.tipo===v?"text-primary":"text-slate-900"}`}>{t}</div>
+                    <div className="text-[11px] text-muted-foreground mt-0.5">{s}</div>
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
+            <div className="space-y-1.5">
+              <Label>Observaciones</Label>
+              <Input value={form.obs} onChange={e=>setForm(p=>({...p,obs:e.target.value}))} placeholder="Opcional..."/>
+            </div>
+            <Button className="w-full" onClick={crear}><Plus size={16}/> Crear Inventario</Button>
           </div>
-          <Lbl>Observaciones</Lbl>
-          <Inp value={form.obs} onChange={e=>setForm(p=>({...p,obs:e.target.value}))} placeholder="Opcional..." style={{marginBottom:20}}/>
-          <Btn c="#16a34a" onClick={crear} full>✓ Crear Inventario</Btn>
-        </Modal>
-      )}
-      {modalEdit&&(
-        <Modal titulo="Editar Inventario" onClose={()=>setModalEdit(false)}>
-          <Lbl>Nombre del inventario</Lbl>
-          <Inp value={editForm.nombre} onChange={e=>setEditForm(p=>({...p,nombre:e.target.value}))} style={{marginBottom:14}}/>
-          <Lbl>Observaciones</Lbl>
-          <Inp value={editForm.obs} onChange={e=>setEditForm(p=>({...p,obs:e.target.value}))} placeholder="Opcional..." style={{marginBottom:20}}/>
-          <Btn c="#2563eb" onClick={guardarEdit} full>✓ Guardar cambios</Btn>
-        </Modal>
-      )}
-      {modalCerrar&&(
-        <Modal titulo="⬛ Cerrar Inventario" onClose={()=>setModalCerrar(false)}>
-          <div style={{background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:10,padding:16,marginBottom:18,fontSize:14,color:"#166534",lineHeight:1.5}}>
-            Todos los conteos están completos. ✅<br/><br/>
-            Al cerrar, se guardará el inventario en el <b>historial</b>, se actualizarán los <b>saldos</b> con las cantidades contadas, y este inventario dejará de estar activo.
+        </DialogContent>
+      </Dialog>
+      <Dialog open={modalEdit} onOpenChange={setModalEdit}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Editar Inventario</DialogTitle></DialogHeader>
+          <div className="space-y-3.5">
+            <div className="space-y-1.5">
+              <Label>Nombre del inventario</Label>
+              <Input value={editForm.nombre} onChange={e=>setEditForm(p=>({...p,nombre:e.target.value}))}/>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Observaciones</Label>
+              <Input value={editForm.obs} onChange={e=>setEditForm(p=>({...p,obs:e.target.value}))} placeholder="Opcional..."/>
+            </div>
+            <Button className="w-full" onClick={guardarEdit}><CheckCircle size={16}/> Guardar cambios</Button>
           </div>
-          <div style={{display:"flex",gap:10}}>
-            <Btn c="#dc2626" onClick={cerrar} full>Sí, cerrar inventario</Btn>
-            <Btn c="#64748b" onClick={()=>setModalCerrar(false)} full outline>Cancelar</Btn>
-          </div>
-        </Modal>
-      )}
-      {modalEliminar&&(
-        <Modal titulo="🗑 Eliminar Inventario" onClose={()=>!eliminando&&setModalEliminar(false)}>
-          <div style={{background:"#fef2f2",border:"1px solid #fecaca",borderRadius:10,padding:16,marginBottom:18,fontSize:14,color:"#991b1b",lineHeight:1.5}}>
-            Esto borrará <b>por completo</b> el inventario <b>{G.inventario?.nombre}</b> junto con <b>todos sus conteos y capturas</b>, en este dispositivo y en la nube.<br/><br/>
-            Esta acción <b>no se puede deshacer</b>. Úsala solo si el inventario quedó mal creado.
-          </div>
-          <div style={{display:"flex",gap:10}}>
-            <Btn c="#dc2626" onClick={eliminarInventario} full disabled={eliminando}>{eliminando?"Eliminando...":"Sí, eliminar todo"}</Btn>
-            <Btn c="#64748b" onClick={()=>setModalEliminar(false)} full disabled={eliminando}>Cancelar</Btn>
-          </div>
-        </Modal>
-      )}
+        </DialogContent>
+      </Dialog>
+      <ConfirmDialog
+        open={modalCerrar}
+        onOpenChange={setModalCerrar}
+        icon={CheckCircle}
+        iconClassName="text-green-600"
+        iconBg="bg-green-50"
+        title="Cerrar Inventario"
+        description={<>Todos los conteos están completos. Al cerrar, se guardará el inventario en el <b>historial</b>, se actualizarán los <b>saldos</b> con las cantidades contadas, y dejará de estar activo.</>}
+        confirmText="Sí, cerrar inventario"
+        confirmVariant="default"
+        onConfirm={cerrar}
+      />
+      <ConfirmDialog
+        open={modalEliminar}
+        onOpenChange={setModalEliminar}
+        icon={Trash2}
+        title="Eliminar Inventario"
+        description={<>Esto borrará <b>por completo</b> el inventario <b>{G.inventario?.nombre}</b> junto con <b>todos sus conteos y capturas</b>, en este dispositivo y en la nube. Esta acción <b>no se puede deshacer</b>.</>}
+        confirmText="Sí, eliminar todo"
+        onConfirm={eliminarInventario}
+        loading={eliminando}
+      />
     </Section>
   );
 }
@@ -946,159 +1104,158 @@ function VUbicaciones({G,rerender,showToast}){
 
   return(
     <Section>
-      {/* Header estilo procesos */}
-      <div style={{background:"linear-gradient(135deg,#d97706 0%,#f59e0b 100%)",borderRadius:16,padding:"20px 24px",marginBottom:20,color:"white",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-        <div>
-          <div style={{fontSize:11,fontWeight:600,opacity:0.75,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>Localizaciones</div>
-          <div style={{fontSize:22,fontWeight:800,letterSpacing:-0.5}}>Ubicaciones</div>
-          <div style={{fontSize:12,opacity:0.8,marginTop:4}}>{G.ubicacionesTipos.join(" · ")||"Sin tipos registrados"}</div>
-        </div>
-        <div style={{textAlign:"right"}}>
-          <div style={{fontSize:28,fontWeight:900,letterSpacing:-1}}>{G.localizaciones.length}</div>
-          <div style={{fontSize:11,opacity:0.8}}>localizaciones</div>
-        </div>
-      </div>
+      {/* Header */}
+      <PageHeader
+        label="Localizaciones"
+        title="Ubicaciones"
+        icon={MapPin}
+        subtitle={G.ubicacionesTipos.join(" · ")||"Sin tipos registrados"}
+        count={G.localizaciones.length}
+        countLabel="localizaciones"
+      />
+
       {/* Tipos */}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:18}}>
-        <div style={card}>
-          <div style={{fontSize:13,fontWeight:700,marginBottom:10,color:"#374151"}}>Tipos de Ubicación</div>
-          <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:10}}>
-            {G.ubicacionesTipos.map(u=><Badge key={u} color="#2563eb">{u}</Badge>)}
-            {G.ubicacionesTipos.length===0&&<span style={{fontSize:12,color:"#94a3b8"}}>Sin tipos — agrega uno</span>}
-          </div>
-          <div style={{display:"flex",gap:8}}>
-            <Inp value={newUbicTipo} onChange={e=>setNewUbicTipo(e.target.value.toUpperCase())} placeholder="Ej: BODEGA, SALA DE VENTAS…" onKeyDown={e=>e.key==="Enter"&&agregarUbicTipo()} style={{flex:1}}/>
-            <Btn c="#16a34a" small onClick={agregarUbicTipo}>+</Btn>
-          </div>
-        </div>
-        <div style={card}>
-          <div style={{fontSize:13,fontWeight:700,marginBottom:10,color:"#374151"}}>Tipos de Localización</div>
-          <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:10}}>
-            {G.localizacionTipos.map(l=><Badge key={l} color="#d97706">{l}</Badge>)}
-            {G.localizacionTipos.length===0&&<span style={{fontSize:12,color:"#94a3b8"}}>Sin tipos — agrega uno</span>}
-          </div>
-          <div style={{display:"flex",gap:8}}>
-            <Inp value={newLocTipo} onChange={e=>setNewLocTipo(e.target.value.toUpperCase())} placeholder="Ej: MUEBLE, NEVERA, LINEAL…" onKeyDown={e=>e.key==="Enter"&&agregarLocTipo()} style={{flex:1}}/>
-            <Btn c="#16a34a" small onClick={agregarLocTipo}>+</Btn>
-          </div>
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <Card>
+          <CardContent className="p-5">
+            <div className="text-sm font-semibold text-slate-700 mb-3">Tipos de Ubicación</div>
+            <div className="flex flex-wrap gap-2 mb-3 min-h-[26px]">
+              {G.ubicacionesTipos.map(u=><UIBadge key={u} variant="secondary" className="bg-blue-100 text-blue-700">{u}</UIBadge>)}
+              {G.ubicacionesTipos.length===0&&<span className="text-xs text-muted-foreground">Sin tipos — agrega uno</span>}
+            </div>
+            <div className="flex gap-2">
+              <Input value={newUbicTipo} onChange={e=>setNewUbicTipo(e.target.value.toUpperCase())} placeholder="Ej: BODEGA, SALA DE VENTAS…" onKeyDown={e=>e.key==="Enter"&&agregarUbicTipo()}/>
+              <Button size="icon" className="shrink-0" onClick={agregarUbicTipo}><Plus size={18}/></Button>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-5">
+            <div className="text-sm font-semibold text-slate-700 mb-3">Tipos de Localización</div>
+            <div className="flex flex-wrap gap-2 mb-3 min-h-[26px]">
+              {G.localizacionTipos.map(l=><UIBadge key={l} variant="secondary" className="bg-amber-100 text-amber-700">{l}</UIBadge>)}
+              {G.localizacionTipos.length===0&&<span className="text-xs text-muted-foreground">Sin tipos — agrega uno</span>}
+            </div>
+            <div className="flex gap-2">
+              <Input value={newLocTipo} onChange={e=>setNewLocTipo(e.target.value.toUpperCase())} placeholder="Ej: MUEBLE, NEVERA, LINEAL…" onKeyDown={e=>e.key==="Enter"&&agregarLocTipo()}/>
+              <Button size="icon" className="shrink-0" onClick={agregarLocTipo}><Plus size={18}/></Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Agregar */}
-      <div style={{...card,marginBottom:18}}>
-        <div style={{fontSize:13,fontWeight:700,marginBottom:12,color:"#374151"}}>Agregar nueva localización</div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr auto",gap:10,alignItems:"end"}}>
-          <div>
-            <Lbl>Ubicación</Lbl>
-            <Sel value={form.ubicacion} onChange={e=>setForm(p=>({...p,ubicacion:e.target.value,nro:""}))}>
-              <option value="">Seleccionar…</option>
-              {G.ubicacionesTipos.map(u=><option key={u}>{u}</option>)}
-            </Sel>
+      <Card className="mb-4">
+        <CardContent className="p-5">
+          <div className="text-sm font-semibold text-slate-700 mb-4">Agregar nueva localización</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_auto] gap-3 items-end">
+            <div className="space-y-1.5">
+              <Label>Ubicación</Label>
+              <Select value={form.ubicacion} onValueChange={v=>setForm(p=>({...p,ubicacion:v,nro:""}))}>
+                <SelectTrigger><SelectValue placeholder="Seleccionar…"/></SelectTrigger>
+                <SelectContent>
+                  {G.ubicacionesTipos.map(u=><SelectItem key={u} value={u}>{u}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Localización</Label>
+              <Select value={form.localizacion} onValueChange={v=>setForm(p=>({...p,localizacion:v,nro:""}))}>
+                <SelectTrigger><SelectValue placeholder="Seleccionar…"/></SelectTrigger>
+                <SelectContent>
+                  {G.localizacionTipos.map(l=><SelectItem key={l} value={l}>{l}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>N° (auto: {siguienteNro()||"—"})</Label>
+              <Input value={form.nro} onChange={e=>setForm(p=>({...p,nro:e.target.value.toUpperCase()}))} placeholder={siguienteNro()||"Auto"}/>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Observación</Label>
+              <Input value={form.observacion} onChange={e=>setForm(p=>({...p,observacion:e.target.value}))} placeholder="Ej: DETERGENTES"/>
+            </div>
+            <Button onClick={agregar}><Plus size={16}/> Agregar</Button>
           </div>
-          <div>
-            <Lbl>Localización</Lbl>
-            <Sel value={form.localizacion} onChange={e=>setForm(p=>({...p,localizacion:e.target.value,nro:""}))}>
-              <option value="">Seleccionar…</option>
-              {G.localizacionTipos.map(l=><option key={l}>{l}</option>)}
-            </Sel>
-          </div>
-          <div>
-            <Lbl>N° (auto: {siguienteNro()||"—"})</Lbl>
-            <Inp value={form.nro} onChange={e=>setForm(p=>({...p,nro:e.target.value.toUpperCase()}))} placeholder={siguienteNro()||"Auto"}/>
-          </div>
-          <div>
-            <Lbl>Observación</Lbl>
-            <Inp value={form.observacion} onChange={e=>setForm(p=>({...p,observacion:e.target.value}))} placeholder="Ej: DETERGENTES"/>
-          </div>
-          <div>
-            <Btn c="#16a34a" onClick={agregar}>+ Agregar</Btn>
-          </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Tabla */}
-      <div style={card}>
-        <div style={{fontSize:13,fontWeight:700,marginBottom:12,color:"#374151"}}>
-          Localizaciones registradas ({G.localizaciones.length})
-          {G.localizaciones.length===0&&<span style={{fontSize:12,color:"#94a3b8",fontWeight:400,marginLeft:8}}>— Agrega ubicaciones usando el formulario de arriba</span>}
-        </div>
-        {G.localizaciones.length>0&&(
-          <div style={{overflowX:"auto"}}>
-            <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
-              <thead>
-                <tr style={{background:"#0f172a",color:"white"}}>
-                  {["Ubicación","Localización","N° Localización","Observación","Acciones"].map(h=><th key={h} style={{padding:"8px 12px",textAlign:"left",fontWeight:600,whiteSpace:"nowrap"}}>{h}</th>)}
-                </tr>
-              </thead>
-              <tbody>
-                {G.localizaciones.map((l,i)=>(
-                  <tr key={l.id} style={{background:i%2?"#f8fafc":"white",borderBottom:"1px solid #f1f5f9"}}>
-                    <td style={{padding:"7px 12px",fontWeight:700,color:"#2563eb"}}>{l.ubicacion}</td>
-                    <td style={{padding:"7px 12px",color:"#64748b"}}>{l.localizacion}</td>
-                    <td style={{padding:"7px 12px",fontWeight:600}}>{l.nro}</td>
-                    <td style={{padding:"7px 12px",color:"#64748b"}}>{l.observacion||"—"}</td>
-                    <td style={{padding:"7px 12px"}}>
-                      <div style={{display:"flex",gap:6}}>
-                        <button onClick={()=>imprimirEtiqueta(l)}
-                          style={{background:"#eff6ff",color:"#2563eb",border:"1px solid #bfdbfe",borderRadius:6,padding:"4px 10px",cursor:"pointer",fontWeight:700,fontSize:11}}>
-                          🖨️ Etiqueta
-                        </button>
-                        <button onClick={()=>{setEditLoc(l);setEditFormLoc({nro:l.nro,observacion:l.observacion||"",ubicacion:l.ubicacion,localizacion:l.localizacion});}}
-                          style={{background:"#fef9c3",color:"#92400e",border:"1px solid #fde047",borderRadius:6,padding:"4px 10px",cursor:"pointer",fontWeight:700,fontSize:11}}>
-                          ✏️ Editar
-                        </button>
-                        <button onClick={()=>eliminar(l.id)}
-                          style={{background:"transparent",border:"none",color:"#dc2626",cursor:"pointer",fontWeight:700,fontSize:15}}>✕</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      <Card>
+        <CardContent className="p-5">
+          <div className="text-sm font-semibold text-slate-700 mb-4">
+            Localizaciones registradas ({G.localizaciones.length})
           </div>
-        )}
-      </div>
+          {G.localizaciones.length===0?(
+            <div className="text-center py-12 text-muted-foreground text-sm border-2 border-dashed rounded-xl">
+              <MapPin className="mx-auto mb-2 opacity-30" size={34}/>
+              Agrega localizaciones usando el formulario de arriba
+            </div>
+          ):(
+            <div className="overflow-x-auto rounded-lg border">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-slate-900 text-white">
+                    {["Ubicación","Localización","N° Localización","Observación","Acciones"].map(h=><th key={h} className="px-4 py-2.5 text-left font-semibold whitespace-nowrap">{h}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {G.localizaciones.map((l)=>(
+                    <tr key={l.id} className="border-b last:border-0 hover:bg-slate-50 transition-colors">
+                      <td className="px-4 py-2.5 font-bold text-primary whitespace-nowrap">{l.ubicacion}</td>
+                      <td className="px-4 py-2.5 text-muted-foreground">{l.localizacion}</td>
+                      <td className="px-4 py-2.5 font-semibold">{l.nro}</td>
+                      <td className="px-4 py-2.5 text-muted-foreground">{l.observacion||"—"}</td>
+                      <td className="px-4 py-2.5">
+                        <div className="flex gap-2 items-center">
+                          <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100 hover:text-blue-700" onClick={()=>imprimirEtiqueta(l)}><Printer size={11}/> Etiqueta</Button>
+                          <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100" onClick={()=>{setEditLoc(l);setEditFormLoc({nro:l.nro,observacion:l.observacion||"",ubicacion:l.ubicacion,localizacion:l.localizacion});}}><Pencil size={11}/> Editar</Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive hover:bg-red-50" onClick={()=>eliminar(l.id)}><X size={15}/></Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Modal editar localización */}
-      {editLoc&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center"}}>
-          <div style={{background:"white",borderRadius:14,padding:28,width:400,maxWidth:"95vw",boxShadow:"0 20px 60px rgba(0,0,0,0.25)"}}>
-            <h3 style={{margin:"0 0 16px",fontSize:16,fontWeight:700}}>Editar localización</h3>
-            <div style={{marginBottom:12}}>
-              <div style={{fontSize:11,color:"#94a3b8",fontWeight:700,marginBottom:4}}>UBICACIÓN</div>
-              <div style={{padding:"8px 12px",background:"#f8fafc",borderRadius:7,fontSize:13,color:"#374151"}}>{editForm.ubicacion}</div>
+      <Dialog open={!!editLoc} onOpenChange={(v)=>!v&&setEditLoc(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar localización</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <div className="text-[11px] font-bold uppercase text-muted-foreground mb-1">Ubicación</div>
+              <div className="px-3 py-2 bg-muted rounded-md text-sm text-slate-700">{editForm.ubicacion}</div>
             </div>
-            <div style={{marginBottom:12}}>
-              <div style={{fontSize:11,color:"#94a3b8",fontWeight:700,marginBottom:4}}>LOCALIZACIÓN</div>
-              <div style={{padding:"8px 12px",background:"#f8fafc",borderRadius:7,fontSize:13,color:"#374151"}}>{editForm.localizacion}</div>
+            <div>
+              <div className="text-[11px] font-bold uppercase text-muted-foreground mb-1">Localización</div>
+              <div className="px-3 py-2 bg-muted rounded-md text-sm text-slate-700">{editForm.localizacion}</div>
             </div>
-            <div style={{marginBottom:12}}>
-              <div style={{fontSize:11,color:"#94a3b8",fontWeight:700,marginBottom:4}}>N° LOCALIZACIÓN</div>
-              <input value={editForm.nro} onChange={e=>setEditFormLoc(f=>({...f,nro:e.target.value.toUpperCase()}))}
-                style={{width:"100%",padding:"8px 12px",borderRadius:7,border:"1.5px solid #e2e8f0",fontSize:13,boxSizing:"border-box"}}/>
+            <div className="space-y-1.5">
+              <Label>N° Localización</Label>
+              <Input value={editForm.nro} onChange={e=>setEditFormLoc(f=>({...f,nro:e.target.value.toUpperCase()}))}/>
             </div>
-            <div style={{marginBottom:20}}>
-              <div style={{fontSize:11,color:"#94a3b8",fontWeight:700,marginBottom:4}}>OBSERVACIÓN</div>
-              <input value={editForm.observacion} onChange={e=>setEditFormLoc(f=>({...f,observacion:e.target.value}))}
-                placeholder="Ej: Tienda Gourmet"
-                style={{width:"100%",padding:"8px 12px",borderRadius:7,border:"1.5px solid #e2e8f0",fontSize:13,boxSizing:"border-box"}}/>
-            </div>
-            <div style={{display:"flex",gap:10}}>
-              <button onClick={()=>{
-                if(!editForm.nro.trim())return showToast("El N° no puede estar vacío","err");
-                G.localizaciones=G.localizaciones.map(l=>l.id===editLoc.id?{...l,nro:editForm.nro.trim(),observacion:editForm.observacion.trim()}:l);
-                rerender();showToast("Localización actualizada");setEditLoc(null);
-              }} style={{flex:1,padding:"9px 0",background:"#2563eb",color:"white",border:"none",borderRadius:8,fontWeight:700,cursor:"pointer"}}>
-                Guardar
-              </button>
-              <button onClick={()=>setEditLoc(null)}
-                style={{flex:1,padding:"9px 0",background:"#f1f5f9",color:"#374151",border:"none",borderRadius:8,fontWeight:700,cursor:"pointer"}}>
-                Cancelar
-              </button>
+            <div className="space-y-1.5">
+              <Label>Observación</Label>
+              <Input value={editForm.observacion} onChange={e=>setEditFormLoc(f=>({...f,observacion:e.target.value}))} placeholder="Ej: Tienda Gourmet"/>
             </div>
           </div>
-        </div>
-      )}
+          <div className="flex gap-2 mt-2">
+            <Button className="flex-1" onClick={()=>{
+              if(!editForm.nro.trim())return showToast("El N° no puede estar vacío","err");
+              G.localizaciones=G.localizaciones.map(l=>l.id===editLoc.id?{...l,nro:editForm.nro.trim(),observacion:editForm.observacion.trim()}:l);
+              rerender();showToast("Localización actualizada");setEditLoc(null);
+            }}>Guardar</Button>
+            <Button variant="outline" className="flex-1" onClick={()=>setEditLoc(null)}>Cancelar</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Section>
   );
 }
@@ -1156,7 +1313,7 @@ function VBaseDatos({G,rerender,showToast}){
     G.productos=mapped;setPreview(null);setRawData(null);
     // Subir directamente a la nube y ESPERAR a que termine, antes de permitir refrescos.
     try{
-      await SB.deleteAllProductos();
+      await SB.deleteAllProductos(G.tenantId);
       if(mapped.length)await SB.upsertProductosBulk(mapped.map(prodCols));
       _snap.prods=JSON.stringify(mapped.map(prodCols)); // marca como ya sincronizado
     }catch(e){console.warn("Error subiendo productos:",e);showToast("Error subiendo a la nube, revisa tu conexión","err");}
@@ -1196,154 +1353,162 @@ function VBaseDatos({G,rerender,showToast}){
   const descargarPlantilla=()=>{
     const cols=["EAN13","CODIGOINTERNO","NOMBRE PRODUCTO","NOMBRE REFERENCIA","NOMBRE CATEGORIA","NOMBRE SUBCATEGORIA","NOMBRE SUBGRUPO","NOMBRE DETERMINADA","CANTIDAD","COSTO","NIT","NOMBRE PROVEEDOR","LOCALIZACION","UBICACION","OBSERVACION"];
     const ej=["7701101300176","00009","HAMBURGUESA ZENU X 30 UND","30 und","CARNES FRIAS","HAMBURGUESA","RES","CAVA 1",12,18500,"860001697","ZENU","NEVERA","SALA DE VENTAS","IMPORTADO"];
-    expXLSX([ej],cols,"plantilla_productos_TOMFIC.xlsx","PRODUCTOS");
-    showToast("Plantilla descargada");
+    exportSheet([ej],cols,"plantilla_productos_TOMFIC.xlsx","PRODUCTOS");
+    showToast("Plantilla descargada ✓");
   };
 
   const conEAN=G.productos.filter(p=>p.ean).length;
   return(
     <Section>
-      {/* Header estilo procesos */}
-      <div style={{background:"linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%)",borderRadius:16,padding:"20px 24px",marginBottom:20,color:"white",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-        <div>
-          <div style={{fontSize:11,fontWeight:600,opacity:0.75,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>Productos</div>
-          <div style={{fontSize:22,fontWeight:800,letterSpacing:-0.5}}>Base de Datos</div>
-          <div style={{fontSize:12,opacity:0.8,marginTop:4}}>{cats.length>0?cats.slice(0,3).join(" · ")+(cats.length>3?" …":""):"Sin categorías"}</div>
-        </div>
-        <div style={{textAlign:"right"}}>
-          <div style={{fontSize:28,fontWeight:900,letterSpacing:-1}}>{G.productos.length}</div>
-          <div style={{fontSize:11,opacity:0.8}}>productos</div>
-        </div>
-      </div>
+      {/* Header */}
+      <PageHeader
+        label="Productos"
+        title="Base de Datos"
+        icon={Database}
+        subtitle={cats.length>0?cats.slice(0,3).join(" · ")+(cats.length>3?" …":""):"Sin categorías"}
+        count={G.productos.length}
+        countLabel="productos"
+      />
       {/* Acciones */}
-      <div style={{display:"flex",gap:10,marginBottom:16,alignItems:"center",flexWrap:"wrap"}}>
-        <label style={{padding:"9px 20px",background:"#2563eb",color:"white",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:13}}>
-          ⬆ Cargar / Actualizar Excel<input type="file" accept=".xlsx,.xls" onChange={cargarPreview} style={{display:"none"}}/>
-        </label>
-        <button onClick={()=>setMostrarEstructura(v=>!v)}
-          style={{padding:"9px 16px",background:"#f8fafc",border:"1.5px solid #e2e8f0",color:"#374151",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:13}}>
-          📋 {mostrarEstructura?"Ocultar":"Ver"} estructura
-        </button>
-        <button onClick={descargarPlantilla}
-          style={{padding:"9px 16px",background:"#f0fdf4",border:"1.5px solid #bbf7d0",color:"#166534",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:13}}>
-          ⬇ Plantilla
-        </button>
+      <div className="flex gap-2.5 mb-4 items-center flex-wrap">
+        <Button asChild>
+          <label className="cursor-pointer">
+            <Upload size={15}/> Cargar / Actualizar Excel
+            <input type="file" accept=".xlsx,.xls" onChange={cargarPreview} className="hidden"/>
+          </label>
+        </Button>
+        <Button variant="outline" onClick={()=>setMostrarEstructura(v=>!v)}>
+          <ClipboardList size={15}/> {mostrarEstructura?"Ocultar":"Ver"} estructura
+        </Button>
+        <Button variant="outline" onClick={descargarPlantilla}>
+          <Download size={15}/> Plantilla
+        </Button>
         {G.productos.length>0&&(
-          <button onClick={()=>{G.productos=[];rerender();showToast("Base de datos limpiada","warn");}} style={{padding:"9px 14px",background:"#fef2f2",color:"#dc2626",border:"1px solid #fecaca",borderRadius:8,fontSize:13,fontWeight:700,cursor:"pointer"}}>
-            🗑 Limpiar base
-          </button>
+          <Button variant="outline" className="text-destructive border-red-200 hover:bg-red-50 hover:text-destructive" onClick={()=>{G.productos=[];rerender();showToast("Base de datos limpiada","warn");}}>
+            <Trash2 size={15}/> Limpiar base
+          </Button>
         )}
         {G.productos.length===0&&!preview&&(
-          <div style={{background:"#fef9c3",borderRadius:8,padding:"8px 14px",fontSize:13,color:"#92400e",fontWeight:600}}>
-            ⚠️ Base vacía — carga el Excel del cliente
+          <div className="flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 px-4 py-2 text-sm font-semibold text-amber-700">
+            <AlertTriangle size={15}/> Base vacía — carga el Excel del cliente
           </div>
         )}
       </div>
 
       {/* Estructura del Excel */}
       {mostrarEstructura&&(
-        <div style={{...card,marginBottom:16,border:"1.5px solid #bfdbfe"}}>
-          <div style={{fontWeight:700,fontSize:14,color:"#1e40af",marginBottom:12}}>📋 Estructura requerida del Excel</div>
-          <div style={{fontSize:12,color:"#64748b",marginBottom:12}}>
-            La primera fila del archivo debe ser el encabezado con los nombres de columna exactamente como se muestran abajo. Las columnas marcadas como <b style={{color:"#dc2626"}}>Obligatorio</b> son necesarias para importar correctamente.
-          </div>
-          <div style={{overflowX:"auto"}}>
-            <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-              <thead>
-                <tr style={{background:"#1e40af",color:"white"}}>
-                  {["Nombre de columna en Excel","Descripción","Ejemplo","Requerido"].map(h=>(
-                    <th key={h} style={{padding:"8px 12px",textAlign:"left",fontWeight:700,whiteSpace:"nowrap"}}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {ESTRUCTURA.map((e,i)=>(
-                  <tr key={i} style={{background:i%2?"#f8fafc":"white",borderBottom:"1px solid #e2e8f0"}}>
-                    <td style={{padding:"6px 12px",fontFamily:"monospace",fontWeight:700,color:"#1e40af"}}>{e.col}</td>
-                    <td style={{padding:"6px 12px",color:"#374151"}}>{e.desc}</td>
-                    <td style={{padding:"6px 12px",color:"#64748b",fontStyle:"italic"}}>{e.ej}</td>
-                    <td style={{padding:"6px 12px"}}>
-                      <span style={{background:e.req==="Obligatorio"?"#fee2e2":e.req==="Recomendado"?"#fef9c3":"#f1f5f9",color:e.req==="Obligatorio"?"#dc2626":e.req==="Recomendado"?"#92400e":"#64748b",padding:"2px 8px",borderRadius:12,fontSize:11,fontWeight:700}}>{e.req}</span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div style={{marginTop:12,background:"#eff6ff",borderRadius:8,padding:"8px 12px",fontSize:12,color:"#1e40af"}}>
-            💡 <b>Tip:</b> Los nombres de las columnas pueden tener espacios al final — el sistema los elimina automáticamente al importar.
-          </div>
-        </div>
-      )}
-
-      {/* Vista previa */}
-      {preview&&(
-        <div style={{...card,marginBottom:16,border:"2px solid #2563eb"}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-            <div style={{fontWeight:700,fontSize:15,color:"#1e40af"}}>Vista previa — {rawData.length} filas detectadas</div>
-            <div style={{display:"flex",gap:10}}>
-              <Btn c="#dc2626" outline onClick={()=>{setPreview(null);setRawData(null);}}>Cancelar</Btn>
-              <Btn c="#16a34a" onClick={confirmarImport}>✓ Confirmar importación</Btn>
+        <Card className="mb-4 border-blue-200">
+          <CardContent className="p-5">
+            <div className="flex items-center gap-2 text-sm font-bold text-blue-800 mb-3"><ClipboardList size={15}/> Estructura requerida del Excel</div>
+            <div className="text-xs text-muted-foreground mb-3">
+              La primera fila del archivo debe ser el encabezado con los nombres de columna exactamente como se muestran abajo. Las columnas marcadas como <b className="text-destructive">Obligatorio</b> son necesarias para importar correctamente.
             </div>
-          </div>
-          <div style={{overflowX:"auto"}}>
-            <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-              <thead>
-                <tr style={{background:"#eff6ff"}}>
-                  {Object.keys(preview[0]||{}).slice(0,10).map(k=><th key={k} style={{padding:"7px 10px",textAlign:"left",fontWeight:700,color:"#1e40af",borderBottom:"2px solid #bfdbfe",whiteSpace:"nowrap"}}>{k}</th>)}
-                </tr>
-              </thead>
-              <tbody>
-                {preview.map((row,i)=>(
-                  <tr key={i} style={{background:i%2?"#f8fafc":"white",borderBottom:"1px solid #e2e8f0"}}>
-                    {Object.keys(row).slice(0,10).map(k=><td key={k} style={{padding:"6px 10px",color:"#374151"}}>{String(row[k]).substring(0,30)}</td>)}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div style={{marginTop:8,fontSize:12,color:"#64748b"}}>Mostrando las primeras {preview.length} filas de {rawData.length} · Solo se muestran las primeras 10 columnas</div>
-        </div>
-      )}
-
-      {/* Filtros y tabla */}
-      {G.productos.length>0&&(
-        <>
-          <div style={{display:"flex",gap:12,marginBottom:14,flexWrap:"wrap"}}>
-            <Inp value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar nombre, código, EAN…" style={{flex:1,minWidth:200}}/>
-            <Sel value={catF} onChange={e=>setCatF(e.target.value)} style={{width:"auto",minWidth:180}}>
-              <option value="">Todas las categorías</option>
-              {cats.map(c=><option key={c}>{c}</option>)}
-            </Sel>
-            <div style={{padding:"9px 14px",background:"#e0f2fe",color:"#0369a1",borderRadius:8,fontSize:13,fontWeight:700}}>{filtrados.length}</div>
-          </div>
-          <div style={{...card,padding:0,overflow:"hidden"}}>
-            <div style={{overflowX:"auto",maxHeight:500}}>
-              <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-                <thead style={{position:"sticky",top:0}}>
-                  <tr style={{background:"#0f172a",color:"white"}}>
-                    {["Código","EAN","Nombre","Referencia","Categoría","Proveedor","Saldo","Costo"].map(h=>(
-                      <th key={h} style={{padding:"9px 11px",textAlign:"left",fontWeight:600,whiteSpace:"nowrap"}}>{h}</th>
+            <div className="overflow-x-auto rounded-lg border">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="bg-blue-700 text-white">
+                    {["Nombre de columna en Excel","Descripción","Ejemplo","Requerido"].map(h=>(
+                      <th key={h} className="px-3 py-2 text-left font-semibold whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {filtrados.slice(0,500).map((p,i)=>(
-                    <tr key={p.id} style={{background:i%2?"#f8fafc":"white",borderBottom:"1px solid #f1f5f9"}}>
-                      <td style={{padding:"6px 11px",fontFamily:"monospace",color:"#2563eb",fontWeight:700}}>{p.codigo}</td>
-                      <td style={{padding:"6px 11px",color:"#94a3b8",fontSize:10}}>{p.ean}</td>
-                      <td style={{padding:"6px 11px",fontWeight:500}}>{p.nombre}</td>
-                      <td style={{padding:"6px 11px",color:"#64748b"}}>{p.referencia}</td>
-                      <td style={{padding:"6px 11px"}}><Badge color={catC(p.categoria)} small>{p.categoria||"—"}</Badge></td>
-                      <td style={{padding:"6px 11px",color:"#64748b"}}>{p.proveedor||"—"}</td>
-                      <td style={{padding:"6px 11px",textAlign:"center",fontWeight:700,color:p.saldo>0?"#16a34a":"#94a3b8"}}>{p.saldo}</td>
-                      <td style={{padding:"6px 11px",textAlign:"right",color:"#64748b"}}>{p.costo>0?"$"+p.costo.toLocaleString("es-CO"):"—"}</td>
+                  {ESTRUCTURA.map((e,i)=>(
+                    <tr key={i} className="border-b last:border-0 hover:bg-slate-50">
+                      <td className="px-3 py-1.5 font-mono font-bold text-blue-700">{e.col}</td>
+                      <td className="px-3 py-1.5 text-slate-700">{e.desc}</td>
+                      <td className="px-3 py-1.5 text-muted-foreground italic">{e.ej}</td>
+                      <td className="px-3 py-1.5">
+                        <UIBadge variant={e.req==="Obligatorio"?"destructive":e.req==="Recomendado"?"warning":"secondary"}>{e.req}</UIBadge>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+            <div className="mt-3 flex items-start gap-2 rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-800">
+              <Lightbulb size={14} className="shrink-0 mt-0.5"/><span><b>Tip:</b> Los nombres de las columnas pueden tener espacios al final — el sistema los elimina automáticamente al importar.</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Vista previa */}
+      {preview&&(
+        <Card className="mb-4 border-2 border-primary">
+          <CardContent className="p-5">
+            <div className="flex justify-between items-center mb-3 gap-3 flex-wrap">
+              <div className="font-bold text-base text-blue-800">Vista previa — {rawData.length} filas detectadas</div>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={()=>{setPreview(null);setRawData(null);}}>Cancelar</Button>
+                <Button onClick={confirmarImport}><CheckCircle size={15}/> Confirmar importación</Button>
+              </div>
+            </div>
+            <div className="overflow-x-auto rounded-lg border">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="bg-blue-50">
+                    {Object.keys(preview[0]||{}).slice(0,10).map(k=><th key={k} className="px-2.5 py-2 text-left font-bold text-blue-800 whitespace-nowrap">{k}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {preview.map((row,i)=>(
+                    <tr key={i} className="border-b last:border-0">
+                      {Object.keys(row).slice(0,10).map(k=><td key={k} className="px-2.5 py-1.5 text-slate-700">{String(row[k]).substring(0,30)}</td>)}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="mt-2 text-xs text-muted-foreground">Mostrando las primeras {preview.length} filas de {rawData.length} · Solo se muestran las primeras 10 columnas</div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Filtros y tabla */}
+      {G.productos.length>0&&(
+        <>
+          <div className="flex gap-3 mb-3.5 flex-wrap items-center">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"/>
+              <Input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar nombre, código, EAN…" className="pl-9"/>
+            </div>
+            <Select value={catF||"all"} onValueChange={v=>setCatF(v==="all"?"":v)}>
+              <SelectTrigger className="w-[200px]"><SelectValue/></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas las categorías</SelectItem>
+                {cats.map(c=><SelectItem key={c} value={c}>{c}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <UIBadge variant="secondary" className="bg-sky-100 text-sky-700 h-9 px-3 text-sm rounded-md">{filtrados.length}</UIBadge>
           </div>
+          <Card className="overflow-hidden">
+            <div className="overflow-auto max-h-[500px]">
+              <table className="w-full text-xs">
+                <thead className="sticky top-0 z-10">
+                  <tr className="bg-slate-900 text-white">
+                    {["Código","EAN","Nombre","Referencia","Categoría","Proveedor","Saldo","Costo"].map(h=>(
+                      <th key={h} className="px-3 py-2.5 text-left font-semibold whitespace-nowrap">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtrados.slice(0,500).map((p)=>(
+                    <tr key={p.id} className="border-b last:border-0 hover:bg-slate-50 transition-colors">
+                      <td className="px-3 py-1.5 font-mono text-primary font-bold whitespace-nowrap">{p.codigo}</td>
+                      <td className="px-3 py-1.5 text-muted-foreground text-[10px]">{p.ean}</td>
+                      <td className="px-3 py-1.5 font-medium">{p.nombre}</td>
+                      <td className="px-3 py-1.5 text-muted-foreground">{p.referencia}</td>
+                      <td className="px-3 py-1.5"><UIBadge variant="secondary">{p.categoria||"—"}</UIBadge></td>
+                      <td className="px-3 py-1.5 text-muted-foreground">{p.proveedor||"—"}</td>
+                      <td className={`px-3 py-1.5 text-center font-bold ${p.saldo>0?"text-green-600":"text-muted-foreground"}`}>{p.saldo}</td>
+                      <td className="px-3 py-1.5 text-right text-muted-foreground">{p.costo>0?"$"+p.costo.toLocaleString("es-CO"):"—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
         </>
       )}
     </Section>
@@ -1422,124 +1587,121 @@ function VConteos({G,rerender,showToast,usuario}){
   };
 
   const stC={pendiente:"#94a3b8",enCurso:"#2563eb",cerradoC1:"#d97706",cerradoC2:"#16a34a",diferencia:"#dc2626",enC3:"#7c3aed",completado:"#16a34a"};
-  const stL={pendiente:"Pendiente",enCurso:"En curso",cerradoC1:"C1 cerrado",cerradoC2:"Completado",diferencia:"⚠️ Diferencia",enC3:"En C3",completado:"Completado"};
+  const stL={pendiente:"Pendiente",enCurso:"En curso",cerradoC1:"C1 cerrado",cerradoC2:"Completado",diferencia:"Diferencia",enC3:"En C3",completado:"Completado"};
 
   return(
     <Section>
-      {/* Header estilo procesos */}
-      <div style={{background:"linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%)",borderRadius:16,padding:"20px 24px",marginBottom:20,color:"white",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-        <div>
-          <div style={{fontSize:11,fontWeight:600,opacity:0.75,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>Rondas</div>
-          <div style={{fontSize:22,fontWeight:800,letterSpacing:-0.5}}>Programación de Conteos</div>
-          <div style={{fontSize:12,opacity:0.8,marginTop:4}}>{G.inventario?.nombre||"Sin inventario activo"}</div>
-        </div>
-        <div style={{textAlign:"right"}}>
-          <div style={{fontSize:28,fontWeight:900,letterSpacing:-1}}>{G.conteos.length}</div>
-          <div style={{fontSize:11,opacity:0.8}}>conteos</div>
-        </div>
-      </div>
+      <PageHeader
+        label="Rondas"
+        title="Programación de Conteos"
+        icon={FolderOpen}
+        subtitle={G.inventario?.nombre||"Sin inventario activo"}
+        count={G.conteos.length}
+        countLabel="conteos"
+      />
 
-      <div style={{marginBottom:16,display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
-        <Btn c="#16a34a" onClick={()=>setModal(true)} disabled={!G.inventario||G.productos.length===0}>+ Programar Conteo</Btn>
-        {!G.inventario&&<span style={{fontSize:12,color:"#dc2626",background:"#fef2f2",padding:"5px 10px",borderRadius:7}}>⚠️ Primero crea un inventario.</span>}
-        {G.inventario&&G.productos.length===0&&<span style={{fontSize:12,color:"#dc2626",background:"#fef2f2",padding:"5px 10px",borderRadius:7}}>⚠️ Primero carga la base de productos.</span>}
+      <div className="flex items-center gap-3 mb-4 flex-wrap">
+        <Button onClick={()=>setModal(true)} disabled={!G.inventario||G.productos.length===0}><Plus size={15}/> Programar Conteo</Button>
+        {!G.inventario&&<span className="inline-flex items-center gap-1.5 rounded-md bg-red-50 px-2.5 py-1.5 text-xs text-destructive"><AlertTriangle size={13}/> Primero crea un inventario.</span>}
+        {G.inventario&&G.productos.length===0&&<span className="inline-flex items-center gap-1.5 rounded-md bg-red-50 px-2.5 py-1.5 text-xs text-destructive"><AlertTriangle size={13}/> Primero carga la base de productos.</span>}
       </div>
 
       {G.conteos.length===0?(
-        <div style={{textAlign:"center",padding:"48px 20px",background:"white",borderRadius:14,border:"2px dashed #e2e8f0",color:"#64748b"}}>
-          <div style={{fontSize:48,marginBottom:12}}>🗂️</div>
-          <div style={{fontSize:15,fontWeight:700,marginBottom:6}}>Sin conteos programados</div>
-          <div style={{fontSize:13}}>Crea el primer conteo para comenzar.</div>
+        <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-200 bg-white py-12 px-5 text-center text-muted-foreground">
+          <FolderOpen size={48} className="text-slate-400 mb-3"/>
+          <div className="text-base font-bold text-slate-900 mb-1.5">Sin conteos programados</div>
+          <div className="text-sm">Crea el primer conteo para comenzar.</div>
         </div>
       ):(
-        <div style={{...card,padding:0,overflow:"hidden"}}>
-          <div style={{overflowX:"auto"}}>
-            <table style={{width:"100%",borderCollapse:"collapse",fontSize:13,minWidth:800}}>
+        <Card className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-[13px] min-w-[800px]">
               <thead>
-                <tr style={{background:"#0f172a",color:"white"}}>
+                <tr className="bg-slate-900 text-white">
                   {["Nombre","Ubicación","Tipo","C1","Estado C1","C2","Estado C2","C3","Estado C3","Estado","Acciones"].map(h=>(
-                    <th key={h} style={{padding:"10px 12px",textAlign:"left",fontWeight:600,whiteSpace:"nowrap",fontSize:11}}>{h}</th>
+                    <th key={h} className="px-3 py-2.5 text-left font-semibold whitespace-nowrap text-[11px]">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {G.conteos.map((c,i)=>{
+                {G.conteos.map((c)=>{
                   const rc=c.rondasCerradas||[];
                   const c1Cerrado=rc.includes("C1")||["cerradoC1","cerradoC2","completado","diferencia","enC3"].includes(c.estado);
                   const c2Cerrado=rc.includes("C2")||["cerradoC2","completado","diferencia"].includes(c.estado);
+                  const estCol=stC[c.estado]||"#6b7280";
+                  const c3Caps=getCapsRonda(c.id,"C3").length;
                   return(
-                    <tr key={c.id} style={{background:i%2?"#f8fafc":"white",borderBottom:"1px solid #f1f5f9",verticalAlign:"middle"}}>
-                      <td style={{padding:"10px 12px"}}>
-                        <div style={{fontWeight:700,color:"#0f172a"}}>{c.nombre}</div>
-                        {c.obs&&<div style={{fontSize:11,color:"#64748b",marginTop:2}}>📝 {c.obs}</div>}
+                    <tr key={c.id} className="border-b last:border-0 hover:bg-slate-50 align-middle">
+                      <td className="px-3 py-2.5">
+                        <div className="font-bold text-slate-900">{c.nombre}</div>
+                        {c.obs&&<div className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1"><FileText size={10}/> {c.obs}</div>}
                       </td>
-                      <td style={{padding:"10px 12px",fontSize:12,color:"#64748b"}}>{c.locLabel}</td>
-                      <td style={{padding:"10px 12px"}}><Badge color={c.tipo==="2conteos"?"#2563eb":"#16a34a"} small>{c.tipo==="2conteos"?"2 Conteos":"1 Conteo"}</Badge></td>
-                      <td style={{padding:"10px 12px",fontWeight:600,color:"#2563eb"}}>{c.usuarioC1||"—"}</td>
-                      <td style={{padding:"10px 12px"}}>
-                        <button onClick={()=>c1Cerrado&&setModalCaps({conteoId:c.id,ronda:"C1",nombre:c.nombre})} title={c1Cerrado?"Ver capturas C1":""}
-                          style={{display:"inline-flex",alignItems:"center",justifyContent:"center",minWidth:40,height:22,borderRadius:6,background:c1Cerrado?"#16a34a":"#94a3b8",border:"none",padding:"0 8px",cursor:c1Cerrado?"pointer":"default"}}>
-                          <span style={{color:"white",fontSize:10,fontWeight:800}}>{c1Cerrado?"OK 👁":"?"}</span>
+                      <td className="px-3 py-2.5 text-xs text-muted-foreground">{c.locLabel}</td>
+                      <td className="px-3 py-2.5"><UIBadge className="border-transparent" style={{background:(c.tipo==="2conteos"?"#2563eb":"#16a34a")+"22",color:c.tipo==="2conteos"?"#2563eb":"#16a34a"}}>{c.tipo==="2conteos"?"2 Conteos":"1 Conteo"}</UIBadge></td>
+                      <td className="px-3 py-2.5 font-semibold text-primary">{c.usuarioC1||"—"}</td>
+                      <td className="px-3 py-2.5">
+                        <button onClick={()=>c1Cerrado&&setModalCaps({conteoId:c.id,ronda:"C1",nombre:c.nombre})} title={c1Cerrado?"Ver capturas C1":""} disabled={!c1Cerrado}
+                          className={`inline-flex items-center justify-center gap-1 min-w-[40px] h-6 rounded-md px-2 text-[10px] font-extrabold text-white ${c1Cerrado?"bg-green-600 hover:bg-green-700 cursor-pointer":"bg-slate-400 cursor-default"}`}>
+                          {c1Cerrado?<>OK <Eye size={11}/></>:"?"}
                         </button>
                       </td>
-                      <td style={{padding:"10px 12px",fontWeight:600,color:"#16a34a"}}>
+                      <td className="px-3 py-2.5 font-semibold text-green-600">
                         {c.tipo==="2conteos"?(
                           c.usuarioC2?c.usuarioC2:(
-                            <button onClick={()=>{setEditC2(c.id);setC2Val("");}}
-                              style={{background:"#fef9c3",border:"1px solid #fde047",color:"#92400e",borderRadius:6,padding:"3px 8px",fontSize:11,cursor:"pointer",fontWeight:700}}>+ Asignar</button>
+                            <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs text-amber-700 border-amber-300 bg-amber-50 hover:bg-amber-100 hover:text-amber-700" onClick={()=>{setEditC2(c.id);setC2Val("");}}><Plus size={12}/> Asignar</Button>
                           )
-                        ):<span style={{color:"#d1d5db"}}>N/A</span>}
+                        ):<span className="text-slate-300">N/A</span>}
                       </td>
-                      <td style={{padding:"10px 12px"}}>
+                      <td className="px-3 py-2.5">
                         {c.tipo==="2conteos"&&c.usuarioC2?(
-                          <button onClick={()=>c2Cerrado&&setModalCaps({conteoId:c.id,ronda:"C2",nombre:c.nombre})} title={c2Cerrado?"Ver capturas C2":""}
-                            style={{display:"inline-flex",alignItems:"center",justifyContent:"center",minWidth:40,height:22,borderRadius:6,background:c2Cerrado?"#16a34a":"#94a3b8",border:"none",padding:"0 8px",cursor:c2Cerrado?"pointer":"default"}}>
-                            <span style={{color:"white",fontSize:10,fontWeight:800}}>{c2Cerrado?"OK 👁":"?"}</span>
+                          <button onClick={()=>c2Cerrado&&setModalCaps({conteoId:c.id,ronda:"C2",nombre:c.nombre})} title={c2Cerrado?"Ver capturas C2":""} disabled={!c2Cerrado}
+                            className={`inline-flex items-center justify-center gap-1 min-w-[40px] h-6 rounded-md px-2 text-[10px] font-extrabold text-white ${c2Cerrado?"bg-green-600 hover:bg-green-700 cursor-pointer":"bg-slate-400 cursor-default"}`}>
+                            {c2Cerrado?<>OK <Eye size={11}/></>:"?"}
                           </button>
-                        ):<span style={{color:"#d1d5db",fontSize:11}}>—</span>}
+                        ):<span className="text-slate-300 text-[11px]">—</span>}
                       </td>
-                      <td style={{padding:"10px 12px",fontWeight:600,color:"#7c3aed"}}>
+                      <td className="px-3 py-2.5 font-semibold text-purple-600">
                         {c.usuarioC3?c.usuarioC3:(
-                          c.estado==="diferencia"?<span style={{color:"#dc2626",fontSize:11,fontWeight:700}}>Por asignar</span>:<span style={{color:"#d1d5db",fontSize:11}}>—</span>
+                          c.estado==="diferencia"?<span className="text-destructive text-[11px] font-bold">Por asignar</span>:<span className="text-slate-300 text-[11px]">—</span>
                         )}
                       </td>
-                      <td style={{padding:"10px 12px"}}>
+                      <td className="px-3 py-2.5">
                         {c.usuarioC3?(
-                          <button onClick={()=>getCapsRonda(c.id,"C3").length>0&&setModalCaps({conteoId:c.id,ronda:"C3",nombre:c.nombre})} title="Ver capturas C3"
-                            style={{display:"inline-flex",alignItems:"center",justifyContent:"center",minWidth:40,height:22,borderRadius:6,background:c.estado==="completado"?"#16a34a":"#7c3aed",border:"none",padding:"0 8px",cursor:getCapsRonda(c.id,"C3").length>0?"pointer":"default"}}>
-                            <span style={{color:"white",fontSize:10,fontWeight:800}}>{c.estado==="completado"?"OK 👁":"…"}</span>
+                          <button onClick={()=>c3Caps>0&&setModalCaps({conteoId:c.id,ronda:"C3",nombre:c.nombre})} title="Ver capturas C3" disabled={c3Caps===0}
+                            className={`inline-flex items-center justify-center gap-1 min-w-[40px] h-6 rounded-md px-2 text-[10px] font-extrabold text-white ${c.estado==="completado"?"bg-green-600 hover:bg-green-700":"bg-purple-600"} ${c3Caps>0?"cursor-pointer":"cursor-default"}`}>
+                            {c.estado==="completado"?<>OK <Eye size={11}/></>:"…"}
                           </button>
-                        ):<span style={{color:"#d1d5db",fontSize:11}}>—</span>}
+                        ):<span className="text-slate-300 text-[11px]">—</span>}
                       </td>
-                      <td style={{padding:"10px 12px"}}><Badge color={stC[c.estado]||"#6b7280"} small>{stL[c.estado]||c.estado}</Badge></td>
-                      <td style={{padding:"10px 12px",whiteSpace:"nowrap"}}>
-                        <div style={{display:"flex",gap:6}}>
-                          <button onClick={()=>{setModalMod(c);setModForm({obs:c.obs||"",usuarioC1:c.usuarioC1,usuarioC2:c.usuarioC2||""});}}
-                            style={{background:"#eff6ff",color:"#2563eb",border:"1px solid #bfdbfe",borderRadius:6,padding:"4px 10px",cursor:"pointer",fontWeight:700,fontSize:11}}>Modificar</button>
+                      <td className="px-3 py-2.5"><UIBadge className="border-transparent" style={{background:estCol+"22",color:estCol}}>{stL[c.estado]||c.estado}</UIBadge></td>
+                      <td className="px-3 py-2.5 whitespace-nowrap">
+                        <div className="flex gap-1.5 items-center">
+                          <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" onClick={()=>{setModalMod(c);setModForm({obs:c.obs||"",usuarioC1:c.usuarioC1,usuarioC2:c.usuarioC2||""});}}>Modificar</Button>
                           {rondasReabribles(c).length>0&&(
-                            <button onClick={()=>setModalReabrir(c)}
-                              style={{background:"#fef9c3",border:"1px solid #fde047",color:"#92400e",borderRadius:6,padding:"4px 10px",cursor:"pointer",fontWeight:700,fontSize:11}}>Reabrir</button>
+                            <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs text-amber-700 border-amber-200 hover:bg-amber-50 hover:text-amber-700" onClick={()=>setModalReabrir(c)}><RefreshCw size={12}/> Reabrir</Button>
                           )}
                           {c.tipo==="2conteos"&&(
-                            <button onClick={()=>{setBusqComp("");setModalComp(c);}}
-                              style={{background:"#f3e8ff",color:"#7c3aed",border:"1px solid #d8b4fe",borderRadius:6,padding:"4px 10px",cursor:"pointer",fontWeight:700,fontSize:11}}>⚖ Comparar</button>
+                            <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs text-purple-700 border-purple-200 hover:bg-purple-50 hover:text-purple-700" onClick={()=>{setBusqComp("");setModalComp(c);}}><Scale size={12}/> Comparar</Button>
                           )}
                           {c.estado==="diferencia"&&!c.usuarioC3&&(
-                            <select defaultValue="" onChange={e=>e.target.value&&asignarC3(c.id,e.target.value)}
-                              style={{...inp,width:"auto",fontSize:11,padding:"4px 8px",height:28}}>
-                              <option value="" disabled>+ C3</option>
-                              {G.usuarios.filter(u=>u.activo).map(u=><option key={u.id}>{u.nombre}</option>)}
-                            </select>
+                            <Select onValueChange={v=>v&&asignarC3(c.id,v)}>
+                              <SelectTrigger className="h-7 w-auto gap-1 px-2 text-xs"><SelectValue placeholder="+ C3"/></SelectTrigger>
+                              <SelectContent>
+                                {G.usuarios.filter(u=>u.activo).map(u=><SelectItem key={u.id} value={u.nombre}>{u.nombre}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
                           )}
                         </div>
                         {editC2===c.id&&(
-                          <div style={{marginTop:6,display:"flex",gap:6}}>
-                            <Sel value={c2Val} onChange={e=>setC2Val(e.target.value)} style={{width:"auto",fontSize:11}}>
-                              <option value="">Usuario C2…</option>
-                              {G.usuarios.filter(u=>u.activo).map(u=><option key={u.id}>{u.nombre}</option>)}
-                            </Sel>
-                            <Btn c="#16a34a" small onClick={()=>guardarC2(c.id)}>OK</Btn>
-                            <Btn c="#64748b" small onClick={()=>setEditC2(null)}>✕</Btn>
+                          <div className="mt-1.5 flex gap-1.5 items-center">
+                            <Select value={c2Val||undefined} onValueChange={setC2Val}>
+                              <SelectTrigger className="h-8 w-auto text-xs"><SelectValue placeholder="Usuario C2…"/></SelectTrigger>
+                              <SelectContent>
+                                {G.usuarios.filter(u=>u.activo).map(u=><SelectItem key={u.id} value={u.nombre}>{u.nombre}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                            <Button size="sm" className="h-8" onClick={()=>guardarC2(c.id)}>OK</Button>
+                            <Button size="sm" variant="outline" className="h-8 px-2.5" onClick={()=>setEditC2(null)}><X size={13}/></Button>
                           </div>
                         )}
                       </td>
@@ -1549,83 +1711,115 @@ function VConteos({G,rerender,showToast,usuario}){
               </tbody>
             </table>
           </div>
-        </div>
+        </Card>
       )}
 
       {/* Modal programar */}
-      {modal&&(
-        <Modal titulo="Programar Nuevo Conteo" onClose={()=>setModal(false)}>
-          <Lbl>Nombre del conteo</Lbl>
-          <Inp value={form.nombre} onChange={e=>setForm(p=>({...p,nombre:e.target.value}))} placeholder="Ej: Conteo Bodega Turno Mañana" style={{marginBottom:14}}/>
-          <Lbl>Localización</Lbl>
-          <Sel value={form.locId} onChange={e=>setForm(p=>({...p,locId:e.target.value}))} style={{marginBottom:14}}>
-            <option value="">Seleccionar localización…</option>
-            {G.localizaciones.map(l=><option key={l.id} value={l.id}>{l.ubicacion} › {l.localizacion} › {l.nro}{l.observacion?" — "+l.observacion:""}</option>)}
-          </Sel>
-          <Lbl>Usuario — Conteo 1 *</Lbl>
-          <Sel value={form.usuarioC1} onChange={e=>setForm(p=>({...p,usuarioC1:e.target.value}))} style={{marginBottom:14}}>
-            <option value="">Seleccionar usuario…</option>
-            {G.usuarios.filter(u=>u.activo).map(u=><option key={u.id}>{u.nombre}</option>)}
-          </Sel>
-          {G.inventario?.tipo==="2conteos"&&<>
-            <Lbl>Usuario — Conteo 2 (opcional)</Lbl>
-            <Sel value={form.usuarioC2} onChange={e=>setForm(p=>({...p,usuarioC2:e.target.value}))} style={{marginBottom:14}}>
-              <option value="">Sin asignar por ahora…</option>
-              {G.usuarios.filter(u=>u.activo).map(u=><option key={u.id}>{u.nombre}</option>)}
-            </Sel>
-          </>}
-          <div style={{background:"#eff6ff",borderRadius:8,padding:"8px 12px",fontSize:13,color:"#1e40af",marginBottom:18}}>
-            📦 Total productos en la base: <b>{G.productos.length}</b>
+      <Dialog open={modal} onOpenChange={setModal}>
+        <DialogContent className="max-w-md max-h-[92vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Programar Nuevo Conteo</DialogTitle></DialogHeader>
+          <div className="space-y-3.5">
+            <div className="space-y-1.5">
+              <Label>Nombre del conteo</Label>
+              <Input value={form.nombre} onChange={e=>setForm(p=>({...p,nombre:e.target.value}))} placeholder="Ej: Conteo Bodega Turno Mañana"/>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Localización</Label>
+              <Select value={form.locId||undefined} onValueChange={v=>setForm(p=>({...p,locId:v}))}>
+                <SelectTrigger><SelectValue placeholder="Seleccionar localización…"/></SelectTrigger>
+                <SelectContent>
+                  {G.localizaciones.map(l=><SelectItem key={l.id} value={l.id}>{l.ubicacion} › {l.localizacion} › {l.nro}{l.observacion?" — "+l.observacion:""}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Usuario — Conteo 1 *</Label>
+              <Select value={form.usuarioC1||undefined} onValueChange={v=>setForm(p=>({...p,usuarioC1:v}))}>
+                <SelectTrigger><SelectValue placeholder="Seleccionar usuario…"/></SelectTrigger>
+                <SelectContent>
+                  {G.usuarios.filter(u=>u.activo).map(u=><SelectItem key={u.id} value={u.nombre}>{u.nombre}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            {G.inventario?.tipo==="2conteos"&&(
+              <div className="space-y-1.5">
+                <Label>Usuario — Conteo 2 (opcional)</Label>
+                <Select value={form.usuarioC2||undefined} onValueChange={v=>setForm(p=>({...p,usuarioC2:v}))}>
+                  <SelectTrigger><SelectValue placeholder="Sin asignar por ahora…"/></SelectTrigger>
+                  <SelectContent>
+                    {G.usuarios.filter(u=>u.activo).map(u=><SelectItem key={u.id} value={u.nombre}>{u.nombre}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <div className="flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-800">
+              <Package size={14} className="shrink-0"/> Total productos en la base: <b>{G.productos.length}</b>
+            </div>
+            <Button className="w-full" onClick={crear}><Plus size={16}/> Programar Conteo</Button>
           </div>
-          <Btn c="#16a34a" onClick={crear} full>✓ Programar Conteo</Btn>
-        </Modal>
-      )}
+        </DialogContent>
+      </Dialog>
 
       {/* Modal modificar */}
-      {modalMod&&(
-        <Modal titulo={`Modificar: ${modalMod.nombre}`} onClose={()=>setModalMod(null)}>
-          <Lbl>Observación del conteo</Lbl>
-          <Inp value={modForm.obs} onChange={e=>setModForm(p=>({...p,obs:e.target.value}))} placeholder="Ej: Contar productos de refrigeración" style={{marginBottom:14}}/>
-          <Lbl>Usuario — Conteo 1</Lbl>
-          <Sel value={modForm.usuarioC1} onChange={e=>setModForm(p=>({...p,usuarioC1:e.target.value}))} style={{marginBottom:14}}>
-            <option value="">Seleccionar…</option>
-            {G.usuarios.filter(u=>u.activo).map(u=><option key={u.id}>{u.nombre}</option>)}
-          </Sel>
-          {modalMod.tipo==="2conteos"&&<>
-            <Lbl>Usuario — Conteo 2</Lbl>
-            <Sel value={modForm.usuarioC2} onChange={e=>setModForm(p=>({...p,usuarioC2:e.target.value}))} style={{marginBottom:14}}>
-              <option value="">Sin asignar…</option>
-              {G.usuarios.filter(u=>u.activo).map(u=><option key={u.id}>{u.nombre}</option>)}
-            </Sel>
-          </>}
-          <Btn c="#2563eb" onClick={guardarMod} full>✓ Guardar cambios</Btn>
-        </Modal>
-      )}
-      {modalReabrir&&(
-        <Modal titulo="¿Qué conteo deseas reabrir?" onClose={()=>setModalReabrir(null)}>
-          <div style={{fontSize:13,color:"#64748b",marginBottom:16}}>
-            Conteo: <b style={{color:"#0f172a"}}>{modalReabrir.nombre}</b> · {modalReabrir.locLabel}
+      <Dialog open={!!modalMod} onOpenChange={(v)=>!v&&setModalMod(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Modificar: {modalMod?.nombre}</DialogTitle></DialogHeader>
+          {modalMod&&(
+          <div className="space-y-3.5">
+            <div className="space-y-1.5">
+              <Label>Observación del conteo</Label>
+              <Input value={modForm.obs} onChange={e=>setModForm(p=>({...p,obs:e.target.value}))} placeholder="Ej: Contar productos de refrigeración"/>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Usuario — Conteo 1</Label>
+              <Select value={modForm.usuarioC1||undefined} onValueChange={v=>setModForm(p=>({...p,usuarioC1:v}))}>
+                <SelectTrigger><SelectValue placeholder="Seleccionar…"/></SelectTrigger>
+                <SelectContent>{G.usuarios.filter(u=>u.activo).map(u=><SelectItem key={u.id} value={u.nombre}>{u.nombre}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            {modalMod.tipo==="2conteos"&&(
+              <div className="space-y-1.5">
+                <Label>Usuario — Conteo 2</Label>
+                <Select value={modForm.usuarioC2||undefined} onValueChange={v=>setModForm(p=>({...p,usuarioC2:v}))}>
+                  <SelectTrigger><SelectValue placeholder="Sin asignar…"/></SelectTrigger>
+                  <SelectContent>{G.usuarios.filter(u=>u.activo).map(u=><SelectItem key={u.id} value={u.nombre}>{u.nombre}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+            )}
+            <Button className="w-full" onClick={guardarMod}><CheckCircle size={16}/> Guardar cambios</Button>
           </div>
-          <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            {rondasReabribles(modalReabrir).map(r=>{
-              const col={C1:"#2563eb",C2:"#16a34a",C3:"#7c3aed"}[r];
-              const quien=r==="C1"?modalReabrir.usuarioC1:r==="C2"?modalReabrir.usuarioC2:modalReabrir.usuarioC3;
-              const txt={C1:"Conteo 1",C2:"Conteo 2",C3:"Conteo 3"}[r];
-              return(
-                <button key={r} onClick={()=>reabrirRonda(modalReabrir,r)}
-                  style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 16px",border:`2px solid ${col}`,borderRadius:10,background:"white",cursor:"pointer",textAlign:"left"}}>
-                  <div>
-                    <div style={{fontWeight:700,color:col,fontSize:15}}>🔓 Reabrir {txt}</div>
-                    <div style={{fontSize:12,color:"#64748b",marginTop:2}}>Usuario: {quien||"—"}</div>
-                  </div>
-                  <span style={{color:col,fontSize:18}}>→</span>
-                </button>
-              );
-            })}
-          </div>
-          <div style={{marginTop:16}}><Btn c="#64748b" onClick={()=>setModalReabrir(null)} full outline>Cancelar</Btn></div>
-        </Modal>
-      )}
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!modalReabrir} onOpenChange={(v)=>!v&&setModalReabrir(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>¿Qué conteo deseas reabrir?</DialogTitle></DialogHeader>
+          {modalReabrir&&(<>
+            <div className="text-sm text-muted-foreground -mt-1">
+              Conteo: <b className="text-slate-900">{modalReabrir.nombre}</b> · {modalReabrir.locLabel}
+            </div>
+            <div className="flex flex-col gap-2.5">
+              {rondasReabribles(modalReabrir).map(r=>{
+                const col={C1:"#2563eb",C2:"#16a34a",C3:"#7c3aed"}[r];
+                const quien=r==="C1"?modalReabrir.usuarioC1:r==="C2"?modalReabrir.usuarioC2:modalReabrir.usuarioC3;
+                const txt={C1:"Conteo 1",C2:"Conteo 2",C3:"Conteo 3"}[r];
+                return(
+                  <button key={r} onClick={()=>reabrirRonda(modalReabrir,r)}
+                    className="flex items-center justify-between rounded-lg border-2 bg-white px-4 py-3.5 text-left transition-colors hover:bg-slate-50" style={{borderColor:col}}>
+                    <div>
+                      <div className="flex items-center gap-1.5 font-bold text-[15px]" style={{color:col}}><RefreshCw size={15}/> Reabrir {txt}</div>
+                      <div className="text-xs text-muted-foreground mt-0.5">Usuario: {quien||"—"}</div>
+                    </div>
+                    <ChevronRight size={18} style={{color:col}}/>
+                  </button>
+                );
+              })}
+            </div>
+            <Button variant="outline" className="w-full" onClick={()=>setModalReabrir(null)}>Cancelar</Button>
+          </>)}
+        </DialogContent>
+      </Dialog>
       {modalCaps&&(()=>{
         const {conteoId,ronda,nombre}=modalCaps;
         const rCaps=getCapsRonda(conteoId,ronda);
@@ -1635,29 +1829,29 @@ function VConteos({G,rerender,showToast,usuario}){
         const lista=q?todo.filter(c=>(c.codigo&&c.codigo.toLowerCase().includes(q))||(c.ean&&String(c.ean).toLowerCase().includes(q))||(c.nombre&&c.nombre.toLowerCase().includes(q))):todo;
         const cerrar=()=>{setBusqCaps("");setModalCaps(null);};
         return(
-          <Modal titulo={`${ronda} — ${nombre} (${lista.length}${q?" de "+todo.length:""} productos)`} onClose={cerrar} wide>
-            <div style={{marginBottom:12}}>
-              <input value={busqCaps} onChange={e=>setBusqCaps(e.target.value)} placeholder="🔍 Buscar por código de barras o nombre…" autoFocus style={{...inp,fontSize:14,border:"1.5px solid #2563eb"}}/>
-            </div>
-            <div style={{maxHeight:460,overflowY:"auto"}}>
-              <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-                <thead><tr style={{background:"#0f172a",color:"white",position:"sticky",top:0}}>{["Código","Nombre","Referencia","Total","Estado","Usuario"].map(h=><th key={h} style={{padding:"7px 10px",textAlign:"left",fontWeight:600}}>{h}</th>)}</tr></thead>
-                <tbody>
-                  {lista.length===0?(<tr><td colSpan={6} style={{padding:20,textAlign:"center",color:"#64748b"}}>{q?`No se encontró "${busqCaps}"`:"Sin capturas"}</td></tr>):lista.map((c,i)=>(
-                    <tr key={i} style={{background:i%2?"#f8fafc":"white",borderBottom:"1px solid #f1f5f9"}}>
-                      <td style={{padding:"6px 10px",fontFamily:"monospace",color:"#2563eb",fontWeight:700}}>{c.codigo}</td>
-                      <td style={{padding:"6px 10px",fontWeight:500}}>{c.nombre}</td>
-                      <td style={{padding:"6px 10px",color:"#64748b",fontSize:11}}>{c.referencia}</td>
-                      <td style={{padding:"6px 10px",textAlign:"center",fontWeight:800,color:"#2563eb",fontSize:15}}>{c.total}</td>
-                      <td style={{padding:"6px 10px"}}><EstBadge e={c.estado}/></td>
-                      <td style={{padding:"6px 10px",color:"#64748b"}}>{c.usuario}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div style={{marginTop:14,display:"flex",justifyContent:"flex-end"}}><Btn c="#64748b" onClick={cerrar}>Cerrar</Btn></div>
-          </Modal>
+          <Dialog open onOpenChange={(v)=>!v&&cerrar()}>
+            <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto">
+              <DialogHeader><DialogTitle>{`${ronda} — ${nombre} (${lista.length}${q?" de "+todo.length:""} productos)`}</DialogTitle></DialogHeader>
+              <Input value={busqCaps} onChange={e=>setBusqCaps(e.target.value)} placeholder="Buscar por código de barras o nombre…" autoFocus className="border-primary"/>
+              <div className="max-h-[460px] overflow-y-auto rounded-lg border">
+                <table className="w-full text-xs">
+                  <thead><tr className="bg-slate-900 text-white sticky top-0">{["Código","Nombre","Referencia","Total","Estado","Usuario"].map(h=><th key={h} className="px-2.5 py-2 text-left font-semibold">{h}</th>)}</tr></thead>
+                  <tbody>
+                    {lista.length===0?(<tr><td colSpan={6} className="p-5 text-center text-muted-foreground">{q?`No se encontró "${busqCaps}"`:"Sin capturas"}</td></tr>):lista.map((c,i)=>(
+                      <tr key={i} className="border-b last:border-0 hover:bg-slate-50">
+                        <td className="px-2.5 py-1.5 font-mono text-primary font-bold">{c.codigo}</td>
+                        <td className="px-2.5 py-1.5 font-medium">{c.nombre}</td>
+                        <td className="px-2.5 py-1.5 text-muted-foreground text-[11px]">{c.referencia}</td>
+                        <td className="px-2.5 py-1.5 text-center font-extrabold text-primary text-[15px]">{c.total}</td>
+                        <td className="px-2.5 py-1.5"><EstBadge e={c.estado}/></td>
+                        <td className="px-2.5 py-1.5 text-muted-foreground">{c.usuario}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </DialogContent>
+          </Dialog>
         );
       })()}
       {modalComp&&(()=>{
@@ -1675,35 +1869,35 @@ function VConteos({G,rerender,showToast,usuario}){
         const nDif=filas.filter(f=>f.difiere).length;
         const cerrar=()=>{setBusqComp("");setModalComp(null);};
         return(
-          <Modal titulo={`⚖ Comparativo — ${c.nombre}`} onClose={cerrar} wide>
-            <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
-              <Badge color="#2563eb">C1: {c.usuarioC1||"—"}</Badge>
-              <Badge color="#16a34a">C2: {c.usuarioC2||"—"}</Badge>
-              {c.usuarioC3&&<Badge color="#7c3aed">C3: {c.usuarioC3}</Badge>}
-              <Badge color={nDif>0?"#dc2626":"#16a34a"}>{nDif} con diferencia</Badge>
-            </div>
-            <div style={{marginBottom:12}}>
-              <input value={busqComp} onChange={e=>setBusqComp(e.target.value)} placeholder="🔍 Buscar por código o nombre…" style={{...inp,fontSize:14,border:"1.5px solid #7c3aed"}}/>
-            </div>
-            <div style={{maxHeight:460,overflowY:"auto"}}>
-              <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-                <thead><tr style={{background:"#0f172a",color:"white",position:"sticky",top:0}}>{["Código","Nombre","C1","C2","C3","Dif"].map(h=><th key={h} style={{padding:"7px 10px",textAlign:h==="Código"||h==="Nombre"?"left":"center",fontWeight:600}}>{h}</th>)}</tr></thead>
-                <tbody>
-                  {lista.length===0?(<tr><td colSpan={6} style={{padding:20,textAlign:"center",color:"#64748b"}}>{q?`No se encontró "${busqComp}"`:"Sin capturas"}</td></tr>):lista.map((f,i)=>(
-                    <tr key={i} style={{background:f.difiere?"#fef2f2":i%2?"#f8fafc":"white",borderBottom:"1px solid #f1f5f9"}}>
-                      <td style={{padding:"6px 10px",fontFamily:"monospace",color:"#2563eb",fontWeight:700}}>{f.codigo}</td>
-                      <td style={{padding:"6px 10px",fontWeight:500}}>{f.nombre}</td>
-                      <td style={{padding:"6px 10px",textAlign:"center",fontWeight:700,color:"#2563eb"}}>{f.t1||"—"}</td>
-                      <td style={{padding:"6px 10px",textAlign:"center",fontWeight:700,color:"#16a34a"}}>{f.t2||"—"}</td>
-                      <td style={{padding:"6px 10px",textAlign:"center",fontWeight:700,color:"#7c3aed"}}>{f.t3||"—"}</td>
-                      <td style={{padding:"6px 10px",textAlign:"center",fontWeight:800,color:f.difiere?"#dc2626":"#16a34a"}}>{f.difiere?(f.t1-f.t2>0?"+":"")+(f.t1-f.t2):"✓"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div style={{marginTop:14,display:"flex",justifyContent:"flex-end"}}><Btn c="#64748b" onClick={cerrar}>Cerrar</Btn></div>
-          </Modal>
+          <Dialog open onOpenChange={(v)=>!v&&cerrar()}>
+            <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto">
+              <DialogHeader><DialogTitle>Comparativo — {c.nombre}</DialogTitle></DialogHeader>
+              <div className="flex gap-2 flex-wrap">
+                <UIBadge className="border-transparent" style={{background:"#2563eb22",color:"#2563eb"}}>C1: {c.usuarioC1||"—"}</UIBadge>
+                <UIBadge className="border-transparent" style={{background:"#16a34a22",color:"#16a34a"}}>C2: {c.usuarioC2||"—"}</UIBadge>
+                {c.usuarioC3&&<UIBadge className="border-transparent" style={{background:"#7c3aed22",color:"#7c3aed"}}>C3: {c.usuarioC3}</UIBadge>}
+                <UIBadge className="border-transparent" style={{background:(nDif>0?"#dc2626":"#16a34a")+"22",color:nDif>0?"#dc2626":"#16a34a"}}>{nDif} con diferencia</UIBadge>
+              </div>
+              <Input value={busqComp} onChange={e=>setBusqComp(e.target.value)} placeholder="Buscar por código o nombre…" className="border-purple-500"/>
+              <div className="max-h-[460px] overflow-y-auto rounded-lg border">
+                <table className="w-full text-xs">
+                  <thead><tr className="bg-slate-900 text-white sticky top-0">{["Código","Nombre","C1","C2","C3","Dif"].map(h=><th key={h} className={`px-2.5 py-2 font-semibold ${h==="Código"||h==="Nombre"?"text-left":"text-center"}`}>{h}</th>)}</tr></thead>
+                  <tbody>
+                    {lista.length===0?(<tr><td colSpan={6} className="p-5 text-center text-muted-foreground">{q?`No se encontró "${busqComp}"`:"Sin capturas"}</td></tr>):lista.map((f,i)=>(
+                      <tr key={i} className={`border-b last:border-0 ${f.difiere?"bg-red-50":"hover:bg-slate-50"}`}>
+                        <td className="px-2.5 py-1.5 font-mono text-primary font-bold">{f.codigo}</td>
+                        <td className="px-2.5 py-1.5 font-medium">{f.nombre}</td>
+                        <td className="px-2.5 py-1.5 text-center font-bold text-primary">{f.t1||"—"}</td>
+                        <td className="px-2.5 py-1.5 text-center font-bold text-green-600">{f.t2||"—"}</td>
+                        <td className="px-2.5 py-1.5 text-center font-bold text-purple-600">{f.t3||"—"}</td>
+                        <td className={`px-2.5 py-1.5 text-center font-extrabold ${f.difiere?"text-destructive":"text-green-600"}`}>{f.difiere?(f.t1-f.t2>0?"+":"")+(f.t1-f.t2):<CheckCircle size={14} className="inline"/>}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </DialogContent>
+          </Dialog>
         );
       })()}
     </Section>
@@ -1794,7 +1988,7 @@ function VProcesos({G,rerender,showToast,usuario}){
     const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${c.nombre}</title>
     <style>body{font-family:Arial,sans-serif;padding:22px;font-size:12px;color:#0f172a}h2{color:#1e40af;margin:0 0 4px}.meta{color:#475569;font-size:12px;margin-bottom:6px}.box{background:#f1f5f9;border-radius:8px;padding:8px 12px;display:inline-block;margin:4px 8px 12px 0;font-size:12px}table{width:100%;border-collapse:collapse;margin-top:8px}th{background:#0f172a;color:white;padding:7px;text-align:left;font-size:11px}td{padding:5px 7px;border-bottom:1px solid #e2e8f0}td.n{text-align:center}tr:nth-child(even) td{background:#f8fafc}@media print{button{display:none}}</style></head>
     <body>
-      <h2>📦 TOMFIC — Conteo por Ubicación</h2>
+      <h2 style={{display:"flex",alignItems:"center",gap:8,margin:0,fontSize:21,fontWeight:800,letterSpacing:-0.5}}><Package size={22}/> TOMFIC — Conteo por Ubicación</h2>
       <div class="meta"><b>Conteo:</b> ${c.nombre}</div>
       <div class="meta"><b>Ubicación:</b> ${c.locLabel||""}</div>
       <div class="meta"><b>Fecha:</b> ${TODAY()} &nbsp;·&nbsp; <b>Impreso por:</b> ${usuario.nombre}</div>
@@ -1843,39 +2037,36 @@ function VProcesos({G,rerender,showToast,usuario}){
     ):listaTotal;
     const cerrar=()=>{setBusqCaps("");setModalCaps(null);};
     return(
-      <Modal titulo={`${ronda} — ${nombre} (${lista.length}${q?" de "+listaTotal.length:""} productos)`} onClose={cerrar} wide>
-        <div style={{marginBottom:12}}>
-          <input value={busqCaps} onChange={e=>setBusqCaps(e.target.value)} placeholder="🔍 Buscar por código de barras o nombre…" autoFocus
-            style={{...inp,fontSize:14,border:"1.5px solid #2563eb"}}/>
-        </div>
-        <div style={{maxHeight:480,overflowY:"auto"}}>
-          <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-            <thead><tr style={{background:"#0f172a",color:"white",position:"sticky",top:0}}>
-              {["Código","Nombre","Referencia","Total","Estado","Obs","Usuario"].map(h=>(
-                <th key={h} style={{padding:"7px 10px",textAlign:"left",fontWeight:600}}>{h}</th>
-              ))}
-            </tr></thead>
-            <tbody>
-              {lista.length===0?(
-                <tr><td colSpan={7} style={{padding:20,textAlign:"center",color:"#64748b"}}>{q?`No se encontró "${busqCaps}"`:"Sin capturas registradas aún"}</td></tr>
-              ):lista.map((c,i)=>(
-                <tr key={i} style={{background:i%2?"#f8fafc":"white",borderBottom:"1px solid #f1f5f9"}}>
-                  <td style={{padding:"6px 10px",fontFamily:"monospace",color:"#2563eb",fontWeight:700}}>{c.codigo}</td>
-                  <td style={{padding:"6px 10px",fontWeight:500}}>{c.nombre}</td>
-                  <td style={{padding:"6px 10px",color:"#64748b",fontSize:11}}>{c.referencia}</td>
-                  <td style={{padding:"6px 10px",textAlign:"center",fontWeight:800,color:"#2563eb",fontSize:15}}>{c.total}</td>
-                  <td style={{padding:"6px 10px"}}><EstBadge e={c.estado}/></td>
-                  <td style={{padding:"6px 10px",color:"#64748b",fontSize:11}}>{c.obs||"—"}</td>
-                  <td style={{padding:"6px 10px",color:"#64748b"}}>{c.usuario}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <div style={{marginTop:14,display:"flex",justifyContent:"flex-end"}}>
-          <Btn c="#64748b" onClick={cerrar}>Cerrar</Btn>
-        </div>
-      </Modal>
+      <Dialog open onOpenChange={(v)=>!v&&cerrar()}>
+        <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>{`${ronda} — ${nombre} (${lista.length}${q?" de "+listaTotal.length:""} productos)`}</DialogTitle></DialogHeader>
+          <Input value={busqCaps} onChange={e=>setBusqCaps(e.target.value)} placeholder="Buscar por código de barras o nombre…" autoFocus className="border-primary"/>
+          <div className="max-h-[480px] overflow-y-auto rounded-lg border">
+            <table className="w-full text-xs">
+              <thead><tr className="bg-slate-900 text-white sticky top-0">
+                {["Código","Nombre","Referencia","Total","Estado","Obs","Usuario"].map(h=>(
+                  <th key={h} className="px-2.5 py-2 text-left font-semibold">{h}</th>
+                ))}
+              </tr></thead>
+              <tbody>
+                {lista.length===0?(
+                  <tr><td colSpan={7} className="p-5 text-center text-muted-foreground">{q?`No se encontró "${busqCaps}"`:"Sin capturas registradas aún"}</td></tr>
+                ):lista.map((c,i)=>(
+                  <tr key={i} className="border-b last:border-0 hover:bg-slate-50">
+                    <td className="px-2.5 py-1.5 font-mono text-primary font-bold">{c.codigo}</td>
+                    <td className="px-2.5 py-1.5 font-medium">{c.nombre}</td>
+                    <td className="px-2.5 py-1.5 text-muted-foreground text-[11px]">{c.referencia}</td>
+                    <td className="px-2.5 py-1.5 text-center font-extrabold text-primary text-[15px]">{c.total}</td>
+                    <td className="px-2.5 py-1.5"><EstBadge e={c.estado}/></td>
+                    <td className="px-2.5 py-1.5 text-muted-foreground text-[11px]">{c.obs||"—"}</td>
+                    <td className="px-2.5 py-1.5 text-muted-foreground">{c.usuario}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </DialogContent>
+      </Dialog>
     );
   };
 
@@ -1884,86 +2075,83 @@ function VProcesos({G,rerender,showToast,usuario}){
       <ModalCaps/>
 
       {/* Modal reabrir con selección de ronda */}
-      {modalReabrir&&(
-        <Modal titulo="¿Qué conteo deseas reabrir?" onClose={()=>setModalReabrir(null)}>
-          <div style={{fontSize:13,color:"#64748b",marginBottom:16}}>Selecciona la ronda que quieres reabrir para que el usuario pueda seguir capturando.</div>
-          <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            {["C1","C2","C3"].filter(r=>{
-              const c=modalReabrir;
-              if(r==="C1") return true;
-              if(r==="C2") return c.tipo==="2conteos"&&c.usuarioC2;
-              if(r==="C3") return c.usuarioC3;
-              return false;
-            }).map(r=>(
-              <button key={r} onClick={()=>reabrirRonda(modalReabrir,r)}
-                style={{padding:"12px 16px",background:r==="C1"?"#eff6ff":r==="C2"?"#f0fdf4":"#faf5ff",border:`1.5px solid ${r==="C1"?"#2563eb":r==="C2"?"#16a34a":"#7c3aed"}`,borderRadius:10,cursor:"pointer",textAlign:"left",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <div>
-                  <div style={{fontWeight:700,color:r==="C1"?"#2563eb":r==="C2"?"#16a34a":"#7c3aed",fontSize:14}}>Reabrir {r}</div>
-                  <div style={{fontSize:12,color:"#64748b",marginTop:2}}>
-                    {r==="C1"&&`Usuario: ${modalReabrir.usuarioC1}`}
-                    {r==="C2"&&`Usuario: ${modalReabrir.usuarioC2}`}
-                    {r==="C3"&&`Usuario: ${modalReabrir.usuarioC3}`}
-                  </div>
-                </div>
-                <span style={{fontSize:18}}>🔓</span>
-              </button>
-            ))}
-          </div>
-          <div style={{marginTop:14}}>
-            <Btn c="#64748b" onClick={()=>setModalReabrir(null)} full>Cancelar</Btn>
-          </div>
-        </Modal>
-      )}
+      <Dialog open={!!modalReabrir} onOpenChange={(v)=>!v&&setModalReabrir(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>¿Qué conteo deseas reabrir?</DialogTitle></DialogHeader>
+          {modalReabrir&&(<>
+            <div className="text-sm text-muted-foreground -mt-1">Selecciona la ronda que quieres reabrir para que el usuario pueda seguir capturando.</div>
+            <div className="flex flex-col gap-2.5">
+              {["C1","C2","C3"].filter(r=>{
+                const c=modalReabrir;
+                if(r==="C1") return true;
+                if(r==="C2") return c.tipo==="2conteos"&&c.usuarioC2;
+                if(r==="C3") return c.usuarioC3;
+                return false;
+              }).map(r=>{
+                const col={C1:"#2563eb",C2:"#16a34a",C3:"#7c3aed"}[r];
+                return(
+                  <button key={r} onClick={()=>reabrirRonda(modalReabrir,r)}
+                    className="flex items-center justify-between rounded-lg border-2 bg-white px-4 py-3.5 text-left transition-colors hover:bg-slate-50" style={{borderColor:col}}>
+                    <div>
+                      <div className="flex items-center gap-1.5 font-bold text-[15px]" style={{color:col}}><RefreshCw size={15}/> Reabrir {r}</div>
+                      <div className="text-xs text-muted-foreground mt-0.5">
+                        {r==="C1"&&`Usuario: ${modalReabrir.usuarioC1}`}
+                        {r==="C2"&&`Usuario: ${modalReabrir.usuarioC2}`}
+                        {r==="C3"&&`Usuario: ${modalReabrir.usuarioC3}`}
+                      </div>
+                    </div>
+                    <ChevronRight size={18} style={{color:col}}/>
+                  </button>
+                );
+              })}
+            </div>
+            <Button variant="outline" className="w-full" onClick={()=>setModalReabrir(null)}>Cancelar</Button>
+          </>)}
+        </DialogContent>
+      </Dialog>
 
-      {/* Header moderno */}
-      <div style={{background:"linear-gradient(135deg,#1e40af 0%,#0891b2 100%)",borderRadius:16,padding:"20px 24px",marginBottom:20,color:"white",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-        <div>
-          <div style={{fontSize:11,fontWeight:600,opacity:0.75,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>Panel de Control</div>
-          <h2 style={{margin:0,fontSize:22,fontWeight:800,letterSpacing:-0.5}}>Vista de Procesos</h2>
-          <div style={{fontSize:12,opacity:0.8,marginTop:4}}>{G.inventario?.nombre||"Inventario activo"}</div>
-        </div>
-        <div style={{textAlign:"right"}}>
-          <div style={{fontSize:28,fontWeight:900,letterSpacing:-1}}>{pct}%</div>
-          <div style={{fontSize:11,opacity:0.8}}>completado</div>
-        </div>
-      </div>
+      <PageHeader
+        label="Panel de Control"
+        title="Vista de Procesos"
+        icon={Radio}
+        subtitle={G.inventario?.nombre||"Inventario activo"}
+        right={<div className="text-right"><div className="text-3xl font-extrabold leading-none">{pct}%</div><div className="text-[11px] text-white/80 mt-1">completado</div></div>}
+      />
 
-      {/* Tarjetas KPI modernas */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:12,marginBottom:16}}>
+      {/* Tarjetas KPI */}
+      <div className="grid gap-3 mb-4" style={{gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))"}}>
         {[
-          {l:"Productos",v:total,c:"#2563eb",bg:"#eff6ff",icon:"📦"},
-          {l:"Total conteos",v:totalConteos,c:"#475569",bg:"#f8fafc",icon:"📋"},
-          {l:"Completados",v:conteosCompletos,c:"#16a34a",bg:"#f0fdf4",icon:"✅"},
-          {l:"En progreso",v:totalConteos-conteosCompletos,c:"#0891b2",bg:"#ecfeff",icon:"⚙️"},
-          {l:"Con diferencia",v:G.conteos.filter(c=>c.tipo==="2conteos"&&getDifsConteo(c).length>0).length,c:"#dc2626",bg:"#fef2f2",icon:"⚠️"},
-          {l:"Alertas",v:G.alertas.filter(a=>!a.leida).length,c:"#7c3aed",bg:"#faf5ff",icon:"🔔"},
+          {l:"Productos",v:total,c:"#2563eb",bg:"#eff6ff",icon:Package},
+          {l:"Total conteos",v:totalConteos,c:"#475569",bg:"#f8fafc",icon:ClipboardList},
+          {l:"Completados",v:conteosCompletos,c:"#16a34a",bg:"#f0fdf4",icon:CheckCircle},
+          {l:"En progreso",v:totalConteos-conteosCompletos,c:"#0891b2",bg:"#ecfeff",icon:Settings},
+          {l:"Con diferencia",v:G.conteos.filter(c=>c.tipo==="2conteos"&&getDifsConteo(c).length>0).length,c:"#dc2626",bg:"#fef2f2",icon:AlertTriangle},
+          {l:"Alertas",v:G.alertas.filter(a=>!a.leida).length,c:"#7c3aed",bg:"#faf5ff",icon:Bell},
         ].map(s=>(
-          <div key={s.l} style={{background:s.bg,borderRadius:14,padding:"14px 16px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",border:`1px solid ${s.c}22`}}>
-            <div style={{fontSize:20,marginBottom:6}}>{s.icon}</div>
-            <div style={{fontSize:26,fontWeight:900,color:s.c,lineHeight:1}}>{s.v}</div>
-            <div style={{fontSize:11,color:"#64748b",marginTop:4,fontWeight:600}}>{s.l}</div>
-          </div>
+          <Card key={s.l} className="p-4" style={{background:s.bg,borderColor:s.c+"22"}}>
+            <s.icon size={20} style={{color:s.c}} className="mb-1.5"/>
+            <div className="text-[26px] font-black leading-none" style={{color:s.c}}>{s.v}</div>
+            <div className="text-[11px] text-muted-foreground mt-1 font-semibold">{s.l}</div>
+          </Card>
         ))}
       </div>
 
-      {/* Barra avance moderna */}
-      <div style={{background:"white",borderRadius:14,padding:"18px 20px",marginBottom:16,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",border:"1px solid #e2e8f0"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+      {/* Barra de avance */}
+      <Card className="p-5 mb-4">
+        <div className="flex justify-between items-center mb-2.5">
           <div>
-            <div style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>Avance del inventario</div>
-            <div style={{fontSize:11,color:"#64748b",marginTop:1}}>{conteosCompletos} de {totalConteos} ubicaciones completadas</div>
+            <div className="text-[13px] font-bold text-slate-900">Avance del inventario</div>
+            <div className="text-[11px] text-muted-foreground mt-0.5">{conteosCompletos} de {totalConteos} ubicaciones completadas</div>
           </div>
-          <div style={{background:"linear-gradient(135deg,#1e40af,#0891b2)",borderRadius:10,padding:"6px 14px"}}>
-            <span style={{fontSize:18,fontWeight:900,color:"white"}}>{pct}%</span>
+          <div className="rounded-lg px-3.5 py-1.5" style={{background:"linear-gradient(135deg,#1e40af,#0891b2)"}}>
+            <span className="text-lg font-black text-white">{pct}%</span>
           </div>
         </div>
-        <div style={{background:"#e2e8f0",borderRadius:99,height:14,overflow:"hidden"}}>
-          <div style={{width:pct+"%",background:"linear-gradient(90deg,#2563eb,#0891b2,#16a34a)",borderRadius:99,height:"100%",transition:"width 0.6s ease",boxShadow:"0 2px 8px rgba(37,99,235,0.4)"}}/>
+        <div className="bg-slate-200 rounded-full h-3.5 overflow-hidden">
+          <div className="h-full rounded-full transition-all duration-700" style={{width:pct+"%",background:"linear-gradient(90deg,#2563eb,#0891b2,#16a34a)"}}/>
         </div>
-        <div style={{display:"flex",justifyContent:"space-between",marginTop:6,fontSize:10,color:"#94a3b8"}}>
-          <span>0%</span><span>50%</span><span>100%</span>
-        </div>
-      </div>
+        <div className="flex justify-between mt-1.5 text-[10px] text-slate-400"><span>0%</span><span>50%</span><span>100%</span></div>
+      </Card>
 
       {/* Panel: Pendientes por hacer */}
       {(()=>{
@@ -1980,58 +2168,58 @@ function VProcesos({G,rerender,showToast,usuario}){
         const locSinConteo=G.localizaciones.filter(l=>!locConConteo.has(l.id));
         const totalPend=conteosPend.length+locSinConteo.length;
         return(
-          <div style={{marginBottom:16,borderRadius:16,overflow:"hidden",boxShadow:"0 2px 12px rgba(0,0,0,0.08)",border:totalPend>0?"1.5px solid #fbbf24":"1.5px solid #86efac"}}>
+          <Card className={`overflow-hidden mb-4 ${totalPend>0?"border-amber-300":"border-green-300"}`}>
             {/* Header del panel */}
-            <div onClick={()=>setVerPendientes(v=>!v)} style={{cursor:"pointer",padding:"14px 20px",background:totalPend>0?"linear-gradient(135deg,#fffbeb,#fef3c7)":"linear-gradient(135deg,#f0fdf4,#dcfce7)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <div style={{display:"flex",alignItems:"center",gap:10}}>
-                <div style={{width:36,height:36,borderRadius:10,background:totalPend>0?"#f59e0b":"#16a34a",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>
-                  {totalPend>0?"⏳":"✅"}
+            <div onClick={()=>setVerPendientes(v=>!v)} className="cursor-pointer px-5 py-3.5 flex justify-between items-center" style={{background:totalPend>0?"linear-gradient(135deg,#fffbeb,#fef3c7)":"linear-gradient(135deg,#f0fdf4,#dcfce7)"}}>
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-lg flex items-center justify-center text-white" style={{background:totalPend>0?"#f59e0b":"#16a34a"}}>
+                  {totalPend>0?<Clock size={16}/>:<CheckCircle size={16}/>}
                 </div>
                 <div>
-                  <div style={{fontWeight:800,fontSize:14,color:totalPend>0?"#92400e":"#166534"}}>
+                  <div className="font-extrabold text-sm" style={{color:totalPend>0?"#92400e":"#166534"}}>
                     {totalPend>0?`Faltan ${totalPend} pendiente${totalPend>1?"s":""} por completar`:"Todo al día — sin pendientes"}
                   </div>
-                  {totalPend>0&&<div style={{fontSize:11,color:"#a16207",marginTop:1}}>{conteosPend.length} conteo{conteosPend.length!==1?"s":""} · {locSinConteo.length} ubicación{locSinConteo.length!==1?"es":""}</div>}
+                  {totalPend>0&&<div className="text-[11px] mt-0.5" style={{color:"#a16207"}}>{conteosPend.length} conteo{conteosPend.length!==1?"s":""} · {locSinConteo.length} ubicación{locSinConteo.length!==1?"es":""}</div>}
                 </div>
               </div>
-              <div style={{background:"white",borderRadius:8,padding:"4px 12px",fontSize:12,fontWeight:600,color:totalPend>0?"#92400e":"#166534",boxShadow:"0 1px 3px rgba(0,0,0,0.1)"}}>
-                {verPendientes?"▲ Ocultar":"▼ Ver detalle"}
+              <div className="flex items-center gap-1 rounded-lg bg-white px-3 py-1 text-xs font-semibold shadow-sm" style={{color:totalPend>0?"#92400e":"#166534"}}>
+                {verPendientes?<><ChevronUp size={14}/> Ocultar</>:<><ChevronDown size={14}/> Ver detalle</>}
               </div>
             </div>
 
             {verPendientes&&totalPend>0&&(
-              <div style={{background:"white",padding:16}}>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:14}}>
+              <div className="bg-white p-4">
+              <div className="grid gap-3.5" style={{gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))"}}>
                 <div>
-                  <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10}}>
-                    <div style={{width:6,height:6,borderRadius:99,background:"#f59e0b"}}/>
-                    <div style={{fontSize:11,fontWeight:800,color:"#374151",textTransform:"uppercase",letterSpacing:0.8}}>Conteos sin terminar ({conteosPend.length})</div>
+                  <div className="flex items-center gap-1.5 mb-2.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-amber-500"/>
+                    <div className="text-[11px] font-extrabold text-slate-700 uppercase tracking-wide">Conteos sin terminar ({conteosPend.length})</div>
                   </div>
-                  {conteosPend.length===0?<div style={{fontSize:12,color:"#16a34a",padding:"8px 12px",background:"#f0fdf4",borderRadius:8}}>✓ Todos los conteos están completos</div>:(
-                    <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                  {conteosPend.length===0?<div className="flex items-center gap-1.5 text-xs text-green-700 px-3 py-2 bg-green-50 rounded-lg"><CheckCircle size={13}/> Todos los conteos están completos</div>:(
+                    <div className="flex flex-col gap-2">
                       {conteosPend.map(({c,razon})=>{
                         const abierto=pendForm&&pendForm.id===c.id;
                         const faltaC2=c.tipo==="2conteos"&&!c.usuarioC2;
                         const faltaC3=c.estado==="diferencia"&&!c.usuarioC3;
                         const accionable=faltaC2||faltaC3;
                         return(
-                        <div key={c.id} style={{background:"#fffbeb",border:"1px solid #fde68a",borderRadius:10,padding:"10px 14px",fontSize:12,boxShadow:"0 1px 3px rgba(0,0,0,0.05)"}}>
-                          <div onClick={()=>accionable&&setPendForm(abierto?null:{id:c.id,tipo:faltaC2?"c2":"c3",val:""})} style={{cursor:accionable?"pointer":"default"}}>
-                            <div style={{fontWeight:700,color:"#0f172a",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                        <div key={c.id} className="rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-xs shadow-sm">
+                          <div onClick={()=>accionable&&setPendForm(abierto?null:{id:c.id,tipo:faltaC2?"c2":"c3",val:""})} className={accionable?"cursor-pointer":"cursor-default"}>
+                            <div className="font-bold text-slate-900 flex justify-between items-center gap-2">
                               <span>{c.nombre}</span>
-                              {accionable&&<span style={{background:"#2563eb",color:"white",borderRadius:6,padding:"2px 8px",fontSize:10,fontWeight:700}}>{abierto?"▲ cerrar":faltaC2?"Asignar C2":"Asignar C3"}</span>}
+                              {accionable&&<span className="rounded-md bg-primary text-white px-2 py-0.5 text-[10px] font-bold">{abierto?"cerrar":faltaC2?"Asignar C2":"Asignar C3"}</span>}
                             </div>
-                            <div style={{color:"#64748b",fontSize:11,marginTop:3}}>📍 {c.locLabel}</div>
-                            <div style={{display:"inline-block",background:"#fef3c7",color:"#92400e",borderRadius:5,padding:"2px 7px",fontSize:10,fontWeight:700,marginTop:4}}>{razon}</div>
+                            <div className="text-muted-foreground text-[11px] mt-0.5 flex items-center gap-1"><MapPin size={11}/> {c.locLabel}</div>
+                            <div className="inline-block rounded bg-amber-100 text-amber-800 px-1.5 py-0.5 text-[10px] font-bold mt-1">{razon}</div>
                           </div>
                           {abierto&&(
-                            <div style={{marginTop:10,display:"flex",gap:6,alignItems:"center",paddingTop:8,borderTop:"1px solid #fde68a"}}>
-                              <select value={pendForm.val} onChange={e=>setPendForm({...pendForm,val:e.target.value})} style={{...inp,fontSize:12,padding:"6px 8px",flex:1,borderRadius:8}}>
-                                <option value="">Selecciona usuario…</option>
-                                {usuariosActivos().map(u=><option key={u.id}>{u.nombre}</option>)}
-                              </select>
-                              <Btn c="#16a34a" small onClick={()=>pendForm.tipo==="c2"?asignarC2Rapido(c.id,pendForm.val):(pendForm.val&&asignarC3(c.id,pendForm.val),setPendForm(null))}>✓</Btn>
-                              <Btn c="#64748b" small onClick={()=>setPendForm(null)}>✕</Btn>
+                            <div className="mt-2.5 flex gap-1.5 items-center pt-2 border-t border-amber-200">
+                              <Select value={pendForm.val||undefined} onValueChange={v=>setPendForm({...pendForm,val:v})}>
+                                <SelectTrigger className="h-8 text-xs flex-1"><SelectValue placeholder="Selecciona usuario…"/></SelectTrigger>
+                                <SelectContent>{usuariosActivos().map(u=><SelectItem key={u.id} value={u.nombre}>{u.nombre}</SelectItem>)}</SelectContent>
+                              </Select>
+                              <Button size="sm" className="h-8 px-2.5" onClick={()=>pendForm.tipo==="c2"?asignarC2Rapido(c.id,pendForm.val):(pendForm.val&&asignarC3(c.id,pendForm.val),setPendForm(null))}><CheckCircle size={14}/></Button>
+                              <Button size="sm" variant="outline" className="h-8 px-2.5" onClick={()=>setPendForm(null)}><X size={14}/></Button>
                             </div>
                           )}
                         </div>
@@ -2041,40 +2229,40 @@ function VProcesos({G,rerender,showToast,usuario}){
                   )}
                 </div>
                 <div>
-                  <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10}}>
-                    <div style={{width:6,height:6,borderRadius:99,background:"#2563eb"}}/>
-                    <div style={{fontSize:11,fontWeight:800,color:"#374151",textTransform:"uppercase",letterSpacing:0.8}}>Ubicaciones sin conteo ({locSinConteo.length})</div>
+                  <div className="flex items-center gap-1.5 mb-2.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-primary"/>
+                    <div className="text-[11px] font-extrabold text-slate-700 uppercase tracking-wide">Ubicaciones sin conteo ({locSinConteo.length})</div>
                   </div>
-                  {locSinConteo.length===0?<div style={{fontSize:12,color:"#16a34a",padding:"8px 12px",background:"#f0fdf4",borderRadius:8}}>✓ Todas las ubicaciones tienen conteo</div>:(
-                    <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                  {locSinConteo.length===0?<div className="flex items-center gap-1.5 text-xs text-green-700 px-3 py-2 bg-green-50 rounded-lg"><CheckCircle size={13}/> Todas las ubicaciones tienen conteo</div>:(
+                    <div className="flex flex-col gap-2">
                       {locSinConteo.map(l=>{
                         const abierto=pendForm&&pendForm.locId===l.id;
                         return(
-                        <div key={l.id} style={{background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:10,padding:"10px 14px",fontSize:12,boxShadow:"0 1px 3px rgba(0,0,0,0.05)"}}>
-                          <div onClick={()=>setPendForm(abierto?null:{locId:l.id,tipo:"crear",nombre:`${l.localizacion} ${l.nro}`,c1:"",c2:""})} style={{cursor:"pointer"}}>
-                            <div style={{fontWeight:700,color:"#1e40af",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                        <div key={l.id} className="rounded-lg border border-blue-200 bg-blue-50 px-3.5 py-2.5 text-xs shadow-sm">
+                          <div onClick={()=>setPendForm(abierto?null:{locId:l.id,tipo:"crear",nombre:`${l.localizacion} ${l.nro}`,c1:"",c2:""})} className="cursor-pointer">
+                            <div className="font-bold text-blue-800 flex justify-between items-center gap-2">
                               <span>{l.ubicacion} › {l.localizacion} › {l.nro}</span>
-                              <span style={{background:"#2563eb",color:"white",borderRadius:6,padding:"2px 8px",fontSize:10,fontWeight:700}}>{abierto?"▲ cerrar":"+ Crear"}</span>
+                              <span className="rounded-md bg-primary text-white px-2 py-0.5 text-[10px] font-bold">{abierto?"cerrar":"+ Crear"}</span>
                             </div>
-                            {l.observacion&&<div style={{color:"#64748b",fontSize:11,marginTop:3}}>{l.observacion}</div>}
-                            {!abierto&&<div style={{display:"inline-block",background:"#dbeafe",color:"#1e40af",borderRadius:5,padding:"2px 7px",fontSize:10,fontWeight:700,marginTop:4}}>Sin conteo programado</div>}
+                            {l.observacion&&<div className="text-muted-foreground text-[11px] mt-0.5">{l.observacion}</div>}
+                            {!abierto&&<div className="inline-block rounded bg-blue-100 text-blue-800 px-1.5 py-0.5 text-[10px] font-bold mt-1">Sin conteo programado</div>}
                           </div>
                           {abierto&&(
-                            <div style={{marginTop:10,display:"flex",flexDirection:"column",gap:6,paddingTop:8,borderTop:"1px solid #bfdbfe"}}>
-                              <input value={pendForm.nombre} onChange={e=>setPendForm({...pendForm,nombre:e.target.value})} placeholder="Nombre del conteo" style={{...inp,fontSize:12,padding:"6px 8px",borderRadius:8}}/>
-                              <select value={pendForm.c1} onChange={e=>setPendForm({...pendForm,c1:e.target.value})} style={{...inp,fontSize:12,padding:"6px 8px",borderRadius:8}}>
-                                <option value="">Usuario Conteo 1…</option>
-                                {usuariosActivos().map(u=><option key={u.id}>{u.nombre}</option>)}
-                              </select>
+                            <div className="mt-2.5 flex flex-col gap-1.5 pt-2 border-t border-blue-200">
+                              <Input value={pendForm.nombre} onChange={e=>setPendForm({...pendForm,nombre:e.target.value})} placeholder="Nombre del conteo" className="h-8 text-xs"/>
+                              <Select value={pendForm.c1||undefined} onValueChange={v=>setPendForm({...pendForm,c1:v})}>
+                                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Usuario Conteo 1…"/></SelectTrigger>
+                                <SelectContent>{usuariosActivos().map(u=><SelectItem key={u.id} value={u.nombre}>{u.nombre}</SelectItem>)}</SelectContent>
+                              </Select>
                               {G.inventario.tipo==="2conteos"&&(
-                                <select value={pendForm.c2} onChange={e=>setPendForm({...pendForm,c2:e.target.value})} style={{...inp,fontSize:12,padding:"6px 8px",borderRadius:8}}>
-                                  <option value="">Usuario Conteo 2 (opcional)…</option>
-                                  {usuariosActivos().map(u=><option key={u.id}>{u.nombre}</option>)}
-                                </select>
+                                <Select value={pendForm.c2||undefined} onValueChange={v=>setPendForm({...pendForm,c2:v})}>
+                                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Usuario Conteo 2 (opcional)…"/></SelectTrigger>
+                                  <SelectContent>{usuariosActivos().map(u=><SelectItem key={u.id} value={u.nombre}>{u.nombre}</SelectItem>)}</SelectContent>
+                                </Select>
                               )}
-                              <div style={{display:"flex",gap:6}}>
-                                <Btn c="#16a34a" small onClick={()=>crearConteoRapido(l,pendForm.nombre,pendForm.c1,pendForm.c2)} full>✓ Crear conteo</Btn>
-                                <Btn c="#64748b" small onClick={()=>setPendForm(null)} full>Cancelar</Btn>
+                              <div className="flex gap-1.5">
+                                <Button size="sm" className="h-8 flex-1" onClick={()=>crearConteoRapido(l,pendForm.nombre,pendForm.c1,pendForm.c2)}><Plus size={14}/> Crear conteo</Button>
+                                <Button size="sm" variant="outline" className="h-8 flex-1" onClick={()=>setPendForm(null)}>Cancelar</Button>
                               </div>
                             </div>
                           )}
@@ -2087,34 +2275,34 @@ function VProcesos({G,rerender,showToast,usuario}){
               </div>
               </div>
             )}
-          </div>
+          </Card>
         );
       })()}
 
       {/* Alertas */}
       {G.alertas.filter(a=>!a.leida).length>0&&(
-        <div style={{...card,marginBottom:16,border:"2px solid #fde047",background:"#fffbeb"}}>
-          <div style={{fontWeight:700,fontSize:13,marginBottom:8,color:"#92400e"}}>🔔 Alertas pendientes</div>
+        <Card className="mb-4 border-amber-300 bg-amber-50 p-5">
+          <div className="flex items-center gap-1.5 font-bold text-[13px] text-amber-800 mb-2"><Bell size={14}/> Alertas pendientes</div>
           {G.alertas.filter(a=>!a.leida).map((a,i)=>(
-            <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 10px",background:"#fef9c3",borderRadius:8,marginBottom:6,fontSize:12}}>
+            <div key={i} className="flex justify-between items-center px-2.5 py-1.5 bg-amber-100 rounded-lg mb-1.5 text-xs">
               <span><b>{a.usuario}</b> terminó {a.ronda} del conteo <b>{a.conteoNombre}</b> · {a.hora}</span>
-              <Btn c="#d97706" small onClick={()=>{G.alertas=G.alertas.map(x=>x===a?{...x,leida:true}:x);rerender();}}>Visto</Btn>
+              <Button size="sm" className="h-7 px-2.5 bg-amber-600 hover:bg-amber-700" onClick={()=>{G.alertas=G.alertas.map(x=>x===a?{...x,leida:true}:x);rerender();}}>Visto</Button>
             </div>
           ))}
-        </div>
+        </Card>
       )}
 
       {/* TABLA CENTRAL */}
       {G.conteos.length===0?(
-        <div style={{...card,textAlign:"center",padding:36,color:"#64748b"}}>No hay conteos programados.</div>
+        <Card className="text-center p-9 text-muted-foreground">No hay conteos programados.</Card>
       ):(
-        <div style={{...card,padding:0,overflow:"hidden",marginBottom:16}}>
-          <div style={{overflowX:"auto"}}>
-            <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:1000}}>
+        <Card className="overflow-hidden mb-4">
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs min-w-[1000px]">
               <thead>
-                <tr style={{background:"#0f172a",color:"white"}}>
+                <tr className="bg-slate-900 text-white">
                   {["Ubicación","Localización","N° Local.","Observación","Usuarios","Conteo 1","Obs C1","Conteo 2","Obs C2","Diferencia","Obs Dif","C3","Validador","Acciones"].map(h=>(
-                    <th key={h} style={{padding:"9px 10px",textAlign:"left",fontWeight:600,whiteSpace:"nowrap",fontSize:11}}>{h}</th>
+                    <th key={h} className="px-2.5 py-2.5 text-left font-semibold whitespace-nowrap text-[11px]">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -2146,145 +2334,132 @@ function VProcesos({G,rerender,showToast,usuario}){
                     c.estado==="completado"&&!hayDifs?"#16a34a":
                     puedeAsignarC3?"#dc2626":"#94a3b8";
                   const validContent=
-                    c3Terminado?<span style={{color:"white",fontWeight:800,fontSize:13}}>🔒</span>:
+                    c3Terminado?<span style={{color:"white",fontWeight:800,fontSize:13,display:"flex",alignItems:"center",justifyContent:"center"}}><Settings size={11}/></span>:
                     c.estado==="completado"&&!hayDifs?<span style={{color:"white",fontWeight:800,fontSize:13}}>OK</span>:
                     puedeAsignarC3?<span style={{color:"white",fontWeight:800,fontSize:11}}>CLIC</span>:
                     <span style={{color:"white",fontWeight:800,fontSize:16}}>?</span>;
 
                   return(
-                    <tr key={c.id} style={{background:i%2?"#f8fafc":"white",borderBottom:"2px solid #e2e8f0",verticalAlign:"top"}}>
-                      <td style={{padding:"10px 10px",fontWeight:700,color:"#1e40af"}}>{c.ubicacion}</td>
-                      <td style={{padding:"10px 10px",color:"#64748b"}}>{c.localizacion}</td>
-                      <td style={{padding:"10px 10px",fontWeight:600}}>{c.nro}</td>
-                      <td style={{padding:"10px 10px",color:"#64748b",fontSize:11}}>{c.obs||"—"}</td>
+                    <tr key={c.id} className="border-b-2 border-slate-200 align-top hover:bg-slate-50">
+                      <td className="px-2.5 py-2.5 font-bold text-blue-800">{c.ubicacion}</td>
+                      <td className="px-2.5 py-2.5 text-muted-foreground">{c.localizacion}</td>
+                      <td className="px-2.5 py-2.5 font-semibold">{c.nro}</td>
+                      <td className="px-2.5 py-2.5 text-muted-foreground text-[11px]">{c.obs||"—"}</td>
 
                       {/* Usuarios */}
-                      <td style={{padding:"10px 10px",minWidth:120}}>
-                        <div style={{display:"flex",flexDirection:"column",gap:3}}>
+                      <td className="px-2.5 py-2.5 min-w-[120px]">
+                        <div className="flex flex-col gap-1 items-start">
                           {todosUsuarios.map(u=>(
-                            <div key={u} style={{display:"flex",alignItems:"center",gap:4}}>
-                              <span style={{background:"#eff6ff",color:"#2563eb",padding:"1px 7px",borderRadius:10,fontSize:10,fontWeight:700}}>{u}</span>
-                              {u!==c.usuarioC1&&<button onClick={()=>quitarUsuarioExtra(c.id,u)} style={{background:"transparent",border:"none",color:"#dc2626",cursor:"pointer",fontSize:10,padding:0}}>✕</button>}
+                            <div key={u} className="flex items-center gap-1">
+                              <span className="bg-blue-50 text-primary px-1.5 py-0.5 rounded-full text-[10px] font-bold">{u}</span>
+                              {u!==c.usuarioC1&&<button onClick={()=>quitarUsuarioExtra(c.id,u)} className="text-destructive"><X size={11}/></button>}
                             </div>
                           ))}
-                          {c.usuarioC2&&<span style={{background:"#f0fdf4",color:"#16a34a",padding:"1px 7px",borderRadius:10,fontSize:10,fontWeight:700}}>C2: {c.usuarioC2}</span>}
-                          {c.usuarioC3&&<span style={{background:"#faf5ff",color:"#7c3aed",padding:"1px 7px",borderRadius:10,fontSize:10,fontWeight:700}}>C3: {c.usuarioC3}</span>}
-                          <button onClick={()=>setModalAsignar({conteoId:c.id,tipo:"extra"})} style={{background:"#f1f5f9",border:"1px dashed #94a3b8",color:"#64748b",borderRadius:6,padding:"2px 8px",fontSize:10,cursor:"pointer",marginTop:2}}>+ Apoyo</button>
+                          {c.usuarioC2&&<span className="bg-green-50 text-green-600 px-1.5 py-0.5 rounded-full text-[10px] font-bold">C2: {c.usuarioC2}</span>}
+                          {c.usuarioC3&&<span className="bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded-full text-[10px] font-bold">C3: {c.usuarioC3}</span>}
+                          <button onClick={()=>setModalAsignar({conteoId:c.id,tipo:"extra"})} className="rounded-md border border-dashed border-slate-400 text-slate-500 px-2 py-0.5 text-[10px] mt-0.5 hover:bg-slate-50">+ Apoyo</button>
                         </div>
                       </td>
 
                       {/* Conteo 1 — clickeable */}
-                      <td style={{padding:"10px 10px",minWidth:120}}>
-                        <div style={{fontSize:11,fontWeight:600,color:"#2563eb",marginBottom:3}}>{c.usuarioC1||"—"}</div>
-                        <div style={{background:"#e2e8f0",borderRadius:99,height:5,marginBottom:3}}><div style={{width:p1+"%",background:"#2563eb",borderRadius:99,height:"100%"}}/></div>
-                        <div style={{fontSize:10,color:"#64748b",marginBottom:4}}>{new Set(c1s.map(x=>x.productoId)).size}/{total} · {p1}%</div>
+                      <td className="px-2.5 py-2.5 min-w-[120px]">
+                        <div className="text-[11px] font-semibold text-primary mb-1">{c.usuarioC1||"—"}</div>
+                        <div className="bg-slate-200 rounded-full h-[5px] mb-1"><div className="bg-primary rounded-full h-full" style={{width:p1+"%"}}/></div>
+                        <div className="text-[10px] text-muted-foreground mb-1">{new Set(c1s.map(x=>x.productoId)).size}/{total} · {p1}%</div>
                         <button onClick={()=>setModalCaps({conteoId:c.id,ronda:"C1",nombre:c.nombre})}
-                          style={{display:"inline-flex",alignItems:"center",justifyContent:"center",minWidth:40,height:22,borderRadius:6,background:c1Cerrado?"#16a34a":"#94a3b8",border:"none",cursor:"pointer",padding:"0 8px",gap:4}}>
-                          <span style={{color:"white",fontSize:10,fontWeight:800}}>{c1Cerrado?"OK ✓":"?"}</span>
+                          className={`inline-flex items-center justify-center gap-1 min-w-[40px] h-[22px] rounded-md px-2 text-[10px] font-extrabold text-white ${c1Cerrado?"bg-green-600 hover:bg-green-700":"bg-slate-400"}`}>
+                          {c1Cerrado?<>OK <Eye size={11}/></>:"?"}
                         </button>
                       </td>
-                      <td style={{padding:"10px 10px",fontSize:11}}>
+                      <td className="px-2.5 py-2.5 text-[11px]">
                         {(()=>{
-                          const usuarios=[c.usuarioC1,...(usuariosExtra[c.id]||[])].filter(Boolean);
                           const undTotal=c1s.reduce((a,x)=>a+(Number(x.cantidad)||0),0);
-                          return undTotal>0?<div style={{whiteSpace:"nowrap",fontWeight:700,color:"#2563eb"}}>{undTotal} und</div>:<span style={{color:"#d1d5db"}}>—</span>;
+                          return undTotal>0?<div className="whitespace-nowrap font-bold text-primary">{undTotal} und</div>:<span className="text-slate-300">—</span>;
                         })()}
                       </td>
 
                       {/* Conteo 2 — clickeable */}
-                      <td style={{padding:"10px 10px",minWidth:120}}>
+                      <td className="px-2.5 py-2.5 min-w-[120px]">
                         {c.tipo==="2conteos"?(
                           c.usuarioC2?(
                             <>
-                              <div style={{fontSize:11,fontWeight:600,color:"#16a34a",marginBottom:3}}>{c.usuarioC2}</div>
-                              <div style={{background:"#e2e8f0",borderRadius:99,height:5,marginBottom:3}}><div style={{width:p2+"%",background:"#16a34a",borderRadius:99,height:"100%"}}/></div>
-                              <div style={{fontSize:10,color:"#64748b",marginBottom:4}}>{new Set(c2s.map(x=>x.productoId)).size}/{total} · {p2}%</div>
+                              <div className="text-[11px] font-semibold text-green-600 mb-1">{c.usuarioC2}</div>
+                              <div className="bg-slate-200 rounded-full h-[5px] mb-1"><div className="bg-green-600 rounded-full h-full" style={{width:p2+"%"}}/></div>
+                              <div className="text-[10px] text-muted-foreground mb-1">{new Set(c2s.map(x=>x.productoId)).size}/{total} · {p2}%</div>
                               <button onClick={()=>setModalCaps({conteoId:c.id,ronda:"C2",nombre:c.nombre})}
-                                style={{display:"inline-flex",alignItems:"center",justifyContent:"center",minWidth:40,height:22,borderRadius:6,background:c2Cerrado?"#16a34a":"#94a3b8",border:"none",cursor:"pointer",padding:"0 8px",gap:4}}>
-                                <span style={{color:"white",fontSize:10,fontWeight:800}}>{c2Cerrado?"OK ✓":"?"}</span>
+                                className={`inline-flex items-center justify-center gap-1 min-w-[40px] h-[22px] rounded-md px-2 text-[10px] font-extrabold text-white ${c2Cerrado?"bg-green-600 hover:bg-green-700":"bg-slate-400"}`}>
+                                {c2Cerrado?<>OK <Eye size={11}/></>:"?"}
                               </button>
                             </>
                           ):(
-                            <button onClick={()=>setModalAsignar({conteoId:c.id,tipo:"C2"})}
-                              style={{background:"#fef9c3",border:"1px solid #fde047",color:"#92400e",borderRadius:8,padding:"5px 10px",fontSize:11,cursor:"pointer",fontWeight:700}}>
-                              + Asignar C2
-                            </button>
+                            <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs text-amber-700 border-amber-300 bg-amber-50 hover:bg-amber-100 hover:text-amber-700" onClick={()=>setModalAsignar({conteoId:c.id,tipo:"C2"})}><Plus size={12}/> Asignar C2</Button>
                           )
-                        ):<span style={{color:"#d1d5db",fontSize:11}}>N/A</span>}
+                        ):<span className="text-slate-300 text-[11px]">N/A</span>}
                       </td>
-                      <td style={{padding:"10px 10px",fontSize:11}}>
+                      <td className="px-2.5 py-2.5 text-[11px]">
                         {(()=>{
                           const undTotal=c2s.reduce((a,x)=>a+(Number(x.cantidad)||0),0);
-                          return undTotal>0?<div style={{whiteSpace:"nowrap",fontWeight:700,color:"#16a34a"}}>{undTotal} und</div>:<span style={{color:"#d1d5db"}}>—</span>;
+                          return undTotal>0?<div className="whitespace-nowrap font-bold text-green-600">{undTotal} und</div>:<span className="text-slate-300">—</span>;
                         })()}
                       </td>
 
                       {/* Diferencia — solo si ambos cerrados */}
-                      <td style={{padding:"10px 10px",minWidth:70,textAlign:"center"}}>
+                      <td className="px-2.5 py-2.5 min-w-[70px] text-center">
                         {c.tipo==="2conteos"&&c1Cerrado&&c2Cerrado?(
                           difs.length>0?(
                             <div>
-                              <div style={{fontSize:18,fontWeight:800,color:"#dc2626"}}>{difs.length}</div>
-                              <div style={{fontSize:9,color:"#dc2626"}}>productos</div>
+                              <div className="text-lg font-extrabold text-destructive">{difs.length}</div>
+                              <div className="text-[9px] text-destructive">productos</div>
                             </div>
                           ):(
-                            <div style={{fontSize:18,fontWeight:800,color:"#16a34a"}}>0</div>
+                            <div className="text-lg font-extrabold text-green-600">0</div>
                           )
-                        ):<span style={{color:"#d1d5db"}}>—</span>}
+                        ):<span className="text-slate-300">—</span>}
                       </td>
 
                       {/* Obs Dif — PDF solo si hay diferencia */}
-                      <td style={{padding:"10px 10px",fontSize:11,color:"#64748b"}}>
+                      <td className="px-2.5 py-2.5 text-[11px] text-muted-foreground">
                         {difs.length>0&&c1Cerrado&&c2Cerrado&&(
                           <button onClick={()=>expPDF(difs,c.nombre)}
-                            style={{background:"#fee2e2",border:"none",color:"#dc2626",borderRadius:6,padding:"4px 10px",fontSize:11,cursor:"pointer",fontWeight:700}}>
-                            🖨️ PDF
+                            className="inline-flex items-center gap-1 rounded-md bg-red-100 text-destructive px-2.5 py-1 text-[11px] font-bold hover:bg-red-200">
+                            <Printer size={11}/> PDF
                           </button>
                         )}
                       </td>
 
                       {/* C3 — solo si hay diferencia */}
-                      <td style={{padding:"10px 10px",minWidth:90}}>
+                      <td className="px-2.5 py-2.5 min-w-[90px]">
                         {c.estado==="diferencia"&&!c.usuarioC3?(
-                          <button onClick={()=>setModalAsignar({conteoId:c.id,tipo:"C3"})}
-                            style={{background:"#faf5ff",border:"1px solid #7c3aed",color:"#7c3aed",borderRadius:8,padding:"4px 10px",fontSize:11,cursor:"pointer",fontWeight:700}}>
-                            + Asignar C3
-                          </button>
+                          <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs text-purple-700 border-purple-300 bg-purple-50 hover:bg-purple-100 hover:text-purple-700" onClick={()=>setModalAsignar({conteoId:c.id,tipo:"C3"})}><Plus size={12}/> Asignar C3</Button>
                         ):c.usuarioC3?(
                           <div>
-                            <div style={{fontSize:10,color:"#7c3aed",fontWeight:700,marginBottom:2}}>{c.usuarioC3}</div>
-                            <div style={{fontSize:10,color:"#64748b",marginBottom:3}}>{c3s.length} reg</div>
+                            <div className="text-[10px] text-purple-600 font-bold mb-0.5">{c.usuarioC3}</div>
+                            <div className="text-[10px] text-muted-foreground mb-1">{c3s.length} reg</div>
                             <button onClick={()=>setModalCaps({conteoId:c.id,ronda:"C3",nombre:c.nombre})}
-                              style={{display:"inline-flex",alignItems:"center",justifyContent:"center",minWidth:40,height:22,borderRadius:6,background:c.estado==="completado"?"#16a34a":"#7c3aed",border:"none",cursor:"pointer",padding:"0 8px"}}>
-                              <span style={{color:"white",fontSize:10,fontWeight:800}}>{c.estado==="completado"?"OK ✓":"?"}</span>
+                              className={`inline-flex items-center justify-center gap-1 min-w-[40px] h-[22px] rounded-md px-2 text-[10px] font-extrabold text-white ${c.estado==="completado"?"bg-green-600 hover:bg-green-700":"bg-purple-600"}`}>
+                              {c.estado==="completado"?<>OK <Eye size={11}/></>:"?"}
                             </button>
                           </div>
-                        ):<span style={{color:"#d1d5db",fontSize:11}}>—</span>}
+                        ):<span className="text-slate-300 text-[11px]">—</span>}
                       </td>
 
                       {/* Validador */}
-                      <td style={{padding:"10px 10px",textAlign:"center",minWidth:80}}>
+                      <td className="px-2.5 py-2.5 text-center min-w-[80px]">
                         <div onClick={()=>puedeAsignarC3&&setModalAsignar({conteoId:c.id,tipo:"C3"})}
-                          style={{width:44,height:44,borderRadius:"50%",background:validColor,display:"flex",alignItems:"center",justifyContent:"center",cursor:puedeAsignarC3?"pointer":"default",boxShadow:"0 2px 8px rgba(0,0,0,0.18)",margin:"0 auto",opacity:c3Terminado?0.7:1}}>
+                          className="w-11 h-11 rounded-full flex items-center justify-center mx-auto shadow-md" style={{background:validColor,cursor:puedeAsignarC3?"pointer":"default",opacity:c3Terminado?0.7:1}}>
                           {validContent}
                         </div>
-                        <div style={{fontSize:9,color:"#64748b",marginTop:3,textAlign:"center"}}>
+                        <div className="text-[9px] text-muted-foreground mt-1 text-center">
                           {c3Terminado?"C3 validado":puedeAsignarC3?"→ C3":c.estado==="completado"?"Sin dif":"En proceso"}
                         </div>
                       </td>
 
                       {/* Acciones */}
-                      <td style={{padding:"10px 10px",whiteSpace:"nowrap"}}>
-                        <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                          <button onClick={()=>imprimirConteo(c)} title="Imprimir documento de esta ubicación"
-                            style={{background:"#eff6ff",border:"1px solid #bfdbfe",color:"#1e40af",borderRadius:6,padding:"4px 10px",fontSize:11,cursor:"pointer",fontWeight:700}}>
-                            🖨 Imprimir
-                          </button>
+                      <td className="px-2.5 py-2.5 whitespace-nowrap">
+                        <div className="flex gap-1.5 items-center">
+                          <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" title="Imprimir documento de esta ubicación" onClick={()=>imprimirConteo(c)}><Printer size={12}/> Imprimir</Button>
                           {["cerradoC1","cerradoC2","completado","diferencia","enC3"].includes(c.estado)&&(
-                            <button onClick={()=>setModalReabrir(c)}
-                              style={{background:"#fef9c3",border:"1px solid #fde047",color:"#92400e",borderRadius:6,padding:"4px 10px",fontSize:11,cursor:"pointer",fontWeight:700}}>
-                              🔓 Reabrir
-                            </button>
+                            <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs text-amber-700 border-amber-200 hover:bg-amber-50 hover:text-amber-700" onClick={()=>setModalReabrir(c)}><RefreshCw size={12}/> Reabrir</Button>
                           )}
                         </div>
                       </td>
@@ -2294,315 +2469,41 @@ function VProcesos({G,rerender,showToast,usuario}){
               </tbody>
             </table>
           </div>
-        </div>
+        </Card>
       )}
 
       {/* Modal asignar */}
-      {modalAsignar&&(
-        <Modal titulo={modalAsignar.tipo==="C2"?"Asignar Usuario C2":modalAsignar.tipo==="C3"?"Asignar Usuario C3 (desempate)":"Agregar usuario de apoyo"} onClose={()=>setModalAsignar(null)}>
-          <div style={{marginBottom:14,fontSize:13,color:"#64748b"}}>
-            {modalAsignar.tipo==="C2"&&"Este usuario hará el segundo conteo. Puede empezar en paralelo con C1."}
-            {modalAsignar.tipo==="C3"&&"Este usuario contará solo los productos con diferencia entre C1 y C2."}
-            {modalAsignar.tipo==="extra"&&"Este usuario ayudará pero no podrá cerrar el conteo."}
-          </div>
-          <Lbl>Seleccionar usuario</Lbl>
-          <Sel defaultValue="" onChange={e=>{
-            if(!e.target.value)return;
-            const u=e.target.value;
-            const{conteoId,tipo}=modalAsignar;
-            if(tipo==="C2")asignarC2(conteoId,u);
-            else if(tipo==="C3")asignarC3(conteoId,u);
-            else agregarUsuarioExtra(conteoId,u);
-            setModalAsignar(null);
-          }} style={{marginBottom:20}}>
-            <option value="">Seleccionar…</option>
-            {G.usuarios.filter(u=>u.activo).map(u=><option key={u.id}>{u.nombre}</option>)}
-          </Sel>
-          <Btn c="#64748b" onClick={()=>setModalAsignar(null)} full>Cancelar</Btn>
-        </Modal>
-      )}
-    </div>
-  );
-  return(
-    <div>
-      {/* Header moderno */}
-      <div style={{background:"linear-gradient(135deg,#1e40af 0%,#0891b2 100%)",borderRadius:16,padding:"20px 24px",marginBottom:20,color:"white",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-        <div>
-          <div style={{fontSize:11,fontWeight:600,opacity:0.75,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>Panel de Control</div>
-          <h2 style={{margin:0,fontSize:22,fontWeight:800,letterSpacing:-0.5}}>Vista de Procesos</h2>
-          <div style={{fontSize:12,opacity:0.8,marginTop:4}}>{G.inventario?.nombre||"Inventario activo"}</div>
-        </div>
-        <div style={{textAlign:"right"}}>
-          <div style={{fontSize:28,fontWeight:900,letterSpacing:-1}}>{pct}%</div>
-          <div style={{fontSize:11,opacity:0.8}}>completado</div>
-        </div>
-      </div>
-
-      {/* Tarjetas KPI modernas */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:12,marginBottom:16}}>
-        {[
-          {l:"Productos",v:total,c:"#2563eb",bg:"#eff6ff",icon:"📦"},
-          {l:"Total conteos",v:totalConteos,c:"#475569",bg:"#f8fafc",icon:"📋"},
-          {l:"Completados",v:conteosCompletos,c:"#16a34a",bg:"#f0fdf4",icon:"✅"},
-          {l:"En progreso",v:totalConteos-conteosCompletos,c:"#0891b2",bg:"#ecfeff",icon:"⚙️"},
-          {l:"Con diferencia",v:G.conteos.filter(c=>c.tipo==="2conteos"&&getDifsConteo(c).length>0).length,c:"#dc2626",bg:"#fef2f2",icon:"⚠️"},
-          {l:"Alertas",v:G.alertas.filter(a=>!a.leida).length,c:"#7c3aed",bg:"#faf5ff",icon:"🔔"},
-        ].map(s=>(
-          <div key={s.l} style={{background:s.bg,borderRadius:14,padding:"14px 16px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",border:`1px solid ${s.c}22`}}>
-            <div style={{fontSize:20,marginBottom:6}}>{s.icon}</div>
-            <div style={{fontSize:26,fontWeight:900,color:s.c,lineHeight:1}}>{s.v}</div>
-            <div style={{fontSize:11,color:"#64748b",marginTop:4,fontWeight:600}}>{s.l}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Barra avance moderna */}
-      <div style={{background:"white",borderRadius:14,padding:"18px 20px",marginBottom:16,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",border:"1px solid #e2e8f0"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-          <div>
-            <div style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>Avance del inventario</div>
-            <div style={{fontSize:11,color:"#64748b",marginTop:1}}>{conteosCompletos} de {totalConteos} ubicaciones completadas</div>
-          </div>
-          <div style={{background:"linear-gradient(135deg,#1e40af,#0891b2)",borderRadius:10,padding:"6px 14px"}}>
-            <span style={{fontSize:18,fontWeight:900,color:"white"}}>{pct}%</span>
-          </div>
-        </div>
-        <div style={{background:"#e2e8f0",borderRadius:99,height:14,overflow:"hidden"}}>
-          <div style={{width:pct+"%",background:"linear-gradient(90deg,#2563eb,#0891b2,#16a34a)",borderRadius:99,height:"100%",transition:"width 0.6s ease",boxShadow:"0 2px 8px rgba(37,99,235,0.4)"}}/>
-        </div>
-        <div style={{display:"flex",justifyContent:"space-between",marginTop:6,fontSize:10,color:"#94a3b8"}}>
-          <span>0%</span><span>50%</span><span>100%</span>
-        </div>
-      </div>
-
-      {/* Alertas */}
-      {G.alertas.filter(a=>!a.leida).length>0&&(
-        <div style={{...card,marginBottom:16,border:"2px solid #fde047",background:"#fffbeb"}}>
-          <div style={{fontWeight:700,fontSize:13,marginBottom:8,color:"#92400e"}}>🔔 Alertas pendientes</div>
-          {G.alertas.filter(a=>!a.leida).map((a,i)=>(
-            <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 10px",background:"#fef9c3",borderRadius:8,marginBottom:6,fontSize:12}}>
-              <span><b>{a.usuario}</b> terminó {a.ronda} del conteo <b>{a.conteoNombre}</b> · {a.hora}</span>
-              <Btn c="#d97706" small onClick={()=>{G.alertas=G.alertas.map(x=>x===a?{...x,leida:true}:x);rerender();}}>Visto</Btn>
+      <Dialog open={!!modalAsignar} onOpenChange={(v)=>!v&&setModalAsignar(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>{modalAsignar?.tipo==="C2"?"Asignar Usuario C2":modalAsignar?.tipo==="C3"?"Asignar Usuario C3 (desempate)":"Agregar usuario de apoyo"}</DialogTitle></DialogHeader>
+          {modalAsignar&&(
+          <div className="space-y-3.5">
+            <div className="text-sm text-muted-foreground">
+              {modalAsignar.tipo==="C2"&&"Este usuario hará el segundo conteo. Puede empezar en paralelo con C1."}
+              {modalAsignar.tipo==="C3"&&"Este usuario contará solo los productos con diferencia entre C1 y C2."}
+              {modalAsignar.tipo==="extra"&&"Este usuario ayudará pero no podrá cerrar el conteo."}
             </div>
-          ))}
-        </div>
-      )}
-
-      {/* TABLA CENTRAL */}
-      {G.conteos.length===0?(
-        <div style={{...card,textAlign:"center",padding:36,color:"#64748b"}}>No hay conteos programados.</div>
-      ):(
-        <div style={{...card,padding:0,overflow:"hidden",marginBottom:16}}>
-          <div style={{overflowX:"auto"}}>
-            <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:1000}}>
-              <thead>
-                <tr style={{background:"#0f172a",color:"white"}}>
-                  {["Ubicación","Localización","N° Local.","Observación","Usuarios","Conteo 1","Obs C1","Conteo 2","Obs C2","Diferencia","Obs Dif","C3","Validador","Acciones"].map(h=>(
-                    <th key={h} style={{padding:"9px 10px",textAlign:"left",fontWeight:600,whiteSpace:"nowrap",fontSize:11}}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {G.conteos.map((c,i)=>{
-                  const c1s=caps.filter(x=>x.conteoId===c.id&&x.ronda==="C1");
-                  const c2s=caps.filter(x=>x.conteoId===c.id&&x.ronda==="C2");
-                  const c3s=caps.filter(x=>x.conteoId===c.id&&x.ronda==="C3");
-                  const p1=total?Math.round(c1s.length/total*100):0;
-                  const p2=total?Math.round(c2s.length/total*100):0;
-                  const difs=getDifsConteo(c);
-                  const extras=usuariosExtra[c.id]||[];
-                  const todosUsuarios=[c.usuarioC1,...extras].filter(Boolean);
-                  const bgRow=i%2?"#f8fafc":"white";
-
-                  // Estado C1: ? en proceso, OK verde cerrado
-                  const c1Cerrado=["cerradoC1","cerradoC2","completado","diferencia","enC3"].includes(c.estado);
-                  const c2Cerrado=["cerradoC2","completado","diferencia","enC3"].includes(c.estado)||c.estado==="diferencia";
-                  const c2Completado=["completado","cerradoC2"].includes(c.estado);
-
-                  // Validador: ? gris=proceso, rojo=diferencia (clic→C3), verde=OK sin diferencia
-                  const hayDifs=difs.length>0&&c2Cerrado;
-                  const validColor=
-                    (c.estado==="completado"||c.estado==="cerradoC2")&&!hayDifs?"#16a34a":
-                    hayDifs||c.estado==="diferencia"?"#dc2626":
-                    "#94a3b8";
-                  const validContent=
-                    (c.estado==="completado"||c.estado==="cerradoC2")&&!hayDifs?
-                      <span style={{color:"white",fontWeight:800,fontSize:13}}>OK</span>:
-                    hayDifs||c.estado==="diferencia"?
-                      <span style={{color:"white",fontWeight:800,fontSize:11}}>CLIC</span>:
-                      <span style={{color:"white",fontWeight:800,fontSize:16}}>?</span>;
-
-                  return(
-                    <tr key={c.id} style={{background:bgRow,borderBottom:"2px solid #e2e8f0",verticalAlign:"top"}}>
-                      <td style={{padding:"10px 10px",fontWeight:700,color:"#1e40af"}}>{c.ubicacion}</td>
-                      <td style={{padding:"10px 10px",color:"#64748b"}}>{c.localizacion}</td>
-                      <td style={{padding:"10px 10px",fontWeight:600}}>{c.nro}</td>
-                      <td style={{padding:"10px 10px",color:"#64748b",fontSize:11}}>{c.obs||"—"}</td>
-
-                      {/* Usuarios */}
-                      <td style={{padding:"10px 10px",minWidth:130}}>
-                        <div style={{display:"flex",flexDirection:"column",gap:4}}>
-                          <div style={{fontSize:10,color:"#94a3b8",fontWeight:700}}>C1:</div>
-                          <div style={{display:"flex",alignItems:"center",gap:4,flexWrap:"wrap"}}>
-                            <span style={{background:"#eff6ff",color:"#2563eb",padding:"1px 7px",borderRadius:10,fontSize:10,fontWeight:700}}>{c.usuarioC1}</span>
-                            {(usuariosExtra[c.id+"_C1"]||[]).map(u=>(
-                              <div key={u} style={{display:"flex",alignItems:"center",gap:2}}>
-                                <span style={{background:"#dbeafe",color:"#2563eb",padding:"1px 6px",borderRadius:10,fontSize:9}}>{u}</span>
-                                <button onClick={()=>quitarUsuarioExtra(c.id+"_C1",u)} style={{background:"transparent",border:"none",color:"#dc2626",cursor:"pointer",fontSize:9,padding:0}}>✕</button>
-                              </div>
-                            ))}
-                            <button onClick={()=>setModalAsignar({conteoId:c.id+"_C1",tipo:"extra"})} style={{background:"#f1f5f9",border:"1px dashed #94a3b8",color:"#64748b",borderRadius:5,padding:"1px 6px",fontSize:9,cursor:"pointer"}}>+ Apoyo</button>
-                          </div>
-                          {c.tipo==="2conteos"&&c.usuarioC2&&<>
-                            <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,marginTop:4}}>C2:</div>
-                            <div style={{display:"flex",alignItems:"center",gap:4,flexWrap:"wrap"}}>
-                              <span style={{background:"#f0fdf4",color:"#16a34a",padding:"1px 7px",borderRadius:10,fontSize:10,fontWeight:700}}>{c.usuarioC2}</span>
-                              {(usuariosExtra[c.id+"_C2"]||[]).map(u=>(
-                                <div key={u} style={{display:"flex",alignItems:"center",gap:2}}>
-                                  <span style={{background:"#dcfce7",color:"#16a34a",padding:"1px 6px",borderRadius:10,fontSize:9}}>{u}</span>
-                                  <button onClick={()=>quitarUsuarioExtra(c.id+"_C2",u)} style={{background:"transparent",border:"none",color:"#dc2626",cursor:"pointer",fontSize:9,padding:0}}>✕</button>
-                                </div>
-                              ))}
-                              <button onClick={()=>setModalAsignar({conteoId:c.id+"_C2",tipo:"extra"})} style={{background:"#f1f5f9",border:"1px dashed #94a3b8",color:"#64748b",borderRadius:5,padding:"1px 6px",fontSize:9,cursor:"pointer"}}>+ Apoyo</button>
-                            </div>
-                          </>}
-                          {c.usuarioC3&&<>
-                            <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,marginTop:4}}>C3:</div>
-                            <span style={{background:"#faf5ff",color:"#7c3aed",padding:"1px 7px",borderRadius:10,fontSize:10,fontWeight:700}}>{c.usuarioC3}</span>
-                          </>}
-                        </div>
-                      </td>
-
-                      {/* Conteo 1 */}
-                      <td style={{padding:"10px 10px",minWidth:110}}>
-                        <div style={{fontSize:11,fontWeight:600,color:"#2563eb",marginBottom:3}}>{c.usuarioC1||"—"}</div>
-                        <div style={{background:"#e2e8f0",borderRadius:99,height:5,marginBottom:3}}><div style={{width:p1+"%",background:"#2563eb",borderRadius:99,height:"100%"}}/></div>
-                        <div style={{fontSize:10,color:"#64748b",marginBottom:4}}>{c1s.length}/{total} · {p1}%</div>
-                        <div style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:32,height:20,borderRadius:6,background:c1Cerrado?"#16a34a":"#94a3b8",cursor:"default"}}>
-                          <span style={{color:"white",fontSize:10,fontWeight:800}}>{c1Cerrado?"OK":"?"}</span>
-                        </div>
-                      </td>
-                      <td style={{padding:"10px 10px",fontSize:11}}>
-                        {(()=>{
-                          const undTotal=c1s.reduce((a,x)=>a+(Number(x.cantidad)||0),0);
-                          return undTotal>0?<div style={{whiteSpace:"nowrap",fontWeight:700,color:"#2563eb"}}>{undTotal} und</div>:<span style={{color:"#d1d5db"}}>—</span>;
-                        })()}
-                      </td>
-
-                      {/* Conteo 2 */}
-                      <td style={{padding:"10px 10px",minWidth:110}}>
-                        {c.tipo==="2conteos"?(
-                          c.usuarioC2?(
-                            <>
-                              <div style={{fontSize:11,fontWeight:600,color:"#16a34a",marginBottom:3}}>{c.usuarioC2}</div>
-                              <div style={{background:"#e2e8f0",borderRadius:99,height:5,marginBottom:3}}><div style={{width:p2+"%",background:"#16a34a",borderRadius:99,height:"100%"}}/></div>
-                              <div style={{fontSize:10,color:"#64748b",marginBottom:4}}>{c2s.length}/{total} · {p2}%</div>
-                              <div style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:32,height:20,borderRadius:6,background:c2Cerrado?"#16a34a":"#94a3b8"}}>
-                                <span style={{color:"white",fontSize:10,fontWeight:800}}>{c2Cerrado?"OK":"?"}</span>
-                              </div>
-                            </>
-                          ):(
-                            <button onClick={()=>setModalAsignar({conteoId:c.id,tipo:"C2"})} style={{background:"#fef9c3",border:"1px solid #fde047",color:"#92400e",borderRadius:8,padding:"5px 10px",fontSize:11,cursor:"pointer",fontWeight:700}}>
-                              + Asignar C2
-                            </button>
-                          )
-                        ):<span style={{color:"#d1d5db",fontSize:11}}>N/A</span>}
-                      </td>
-                      <td style={{padding:"10px 10px",fontSize:11}}>
-                        {(()=>{
-                          const undTotal=c2s.reduce((a,x)=>a+(Number(x.cantidad)||0),0);
-                          return undTotal>0?<div style={{whiteSpace:"nowrap",fontWeight:700,color:"#16a34a"}}>{undTotal} und</div>:<span style={{color:"#d1d5db"}}>—</span>;
-                        })()}
-                      </td>
-
-                      {/* Diferencia — solo por este conteo */}
-                      <td style={{padding:"10px 10px",minWidth:70,textAlign:"center"}}>
-                        {c.tipo==="2conteos"&&c2Cerrado?(
-                          difs.length>0?(
-                            <div>
-                              <div style={{fontSize:18,fontWeight:800,color:"#dc2626"}}>{difs.length}</div>
-                              <div style={{fontSize:9,color:"#dc2626"}}>productos</div>
-                            </div>
-                          ):(
-                            <div style={{fontSize:18,fontWeight:800,color:"#16a34a"}}>0</div>
-                          )
-                        ):<span style={{color:"#d1d5db"}}>—</span>}
-                      </td>
-                      <td style={{padding:"10px 10px",fontSize:11,color:"#64748b"}}>
-                        {difs.length>0&&c2Cerrado&&(
-                          <button onClick={()=>expXLSX(difs.map(d=>[d.codigo,d.ean,d.nombre,d.referencia,d.c1,d.c2,d.dif,d.u1,d.u2]),["CODIGO","EAN","NOMBRE","REFERENCIA","C1","C2","DIFERENCIA","U_C1","U_C2"],`difs_${c.nro}.xlsx`,`DIFERENCIAS ${c.nombre}`)}
-                            style={{background:"#fee2e2",border:"none",color:"#dc2626",borderRadius:6,padding:"3px 9px",fontSize:10,cursor:"pointer",fontWeight:700}}>⬇ Excel</button>
-                        )}
-                      </td>
-
-                      {/* C3 */}
-                      <td style={{padding:"10px 10px",minWidth:80}}>
-                        {c.estado==="enC3"||c.estado==="completado"?(
-                          <div>
-                            <div style={{fontSize:10,color:"#7c3aed",fontWeight:700,marginBottom:2}}>{c.usuarioC3}</div>
-                            <div style={{fontSize:10,color:"#64748b"}}>{c3s.length} caps</div>
-                            <div style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:32,height:20,borderRadius:6,background:c.estado==="completado"?"#16a34a":"#7c3aed",marginTop:3}}>
-                              <span style={{color:"white",fontSize:10,fontWeight:800}}>{c.estado==="completado"?"OK":"?"}</span>
-                            </div>
-                          </div>
-                        ):<span style={{color:"#d1d5db",fontSize:11}}>—</span>}
-                      </td>
-
-                      {/* Validador */}
-                      <td style={{padding:"10px 10px",textAlign:"center",minWidth:80}}>
-                        <div
-                          onClick={()=>(hayDifs||c.estado==="diferencia")&&setModalAsignar({conteoId:c.id,tipo:"C3"})}
-                          title={(hayDifs||c.estado==="diferencia")?"Clic para asignar C3 y generar reporte":""}
-                          style={{width:44,height:44,borderRadius:"50%",background:validColor,display:"flex",alignItems:"center",justifyContent:"center",cursor:(hayDifs||c.estado==="diferencia")?"pointer":"default",boxShadow:"0 2px 8px rgba(0,0,0,0.18)",margin:"0 auto",transition:"transform 0.15s"}}
-                          onMouseEnter={e=>{if(hayDifs||c.estado==="diferencia")e.currentTarget.style.transform="scale(1.12)";}}
-                          onMouseLeave={e=>{e.currentTarget.style.transform="scale(1)";}}
-                        >
-                          {validContent}
-                        </div>
-                        <div style={{fontSize:9,color:"#64748b",marginTop:3,textAlign:"center"}}>
-                          {(hayDifs||c.estado==="diferencia")?"→ Asignar C3":validColor==="#16a34a"?"Sin diferencias":"En proceso"}
-                        </div>
-                      </td>
-
-                      {/* Acciones */}
-                      <td style={{padding:"10px 10px",whiteSpace:"nowrap"}}>
-                        {["cerradoC1","cerradoC2","completado","diferencia","enC3"].includes(c.estado)&&(
-                          <button onClick={()=>reabrir(c.id)} style={{background:"#fef9c3",border:"1px solid #fde047",color:"#92400e",borderRadius:6,padding:"4px 10px",fontSize:11,cursor:"pointer",fontWeight:700}}>🔓 Reabrir</button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <div className="space-y-1.5">
+              <Label>Seleccionar usuario</Label>
+              <Select onValueChange={u=>{
+                if(!u)return;
+                const{conteoId,tipo}=modalAsignar;
+                if(tipo==="C2")asignarC2(conteoId,u);
+                else if(tipo==="C3")asignarC3(conteoId,u);
+                else agregarUsuarioExtra(conteoId,u);
+                setModalAsignar(null);
+              }}>
+                <SelectTrigger><SelectValue placeholder="Seleccionar…"/></SelectTrigger>
+                <SelectContent>
+                  {G.usuarios.filter(u=>u.activo).map(u=><SelectItem key={u.id} value={u.nombre}>{u.nombre}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button variant="outline" className="w-full" onClick={()=>setModalAsignar(null)}>Cancelar</Button>
           </div>
-        </div>
-      )}
-
-      {/* Modal asignar */}
-      {modalAsignar&&(
-        <Modal titulo={modalAsignar.tipo==="C2"?"Asignar Usuario C2":modalAsignar.tipo==="C3"?"Asignar Usuario C3 (desempate)":"Agregar usuario de apoyo"} onClose={()=>setModalAsignar(null)}>
-          <div style={{marginBottom:14,fontSize:13,color:"#64748b"}}>
-            {modalAsignar.tipo==="C2"&&"Este usuario hará el segundo conteo completo."}
-            {modalAsignar.tipo==="C3"&&"Este usuario contará solo los productos con diferencia entre C1 y C2."}
-            {modalAsignar.tipo==="extra"&&"Este usuario ayudará pero no podrá cerrar el conteo."}
-          </div>
-          <Lbl>Seleccionar usuario</Lbl>
-          <Sel defaultValue="" onChange={e=>{
-            if(!e.target.value)return;
-            const u=e.target.value;
-            const{conteoId,tipo}=modalAsignar;
-            if(tipo==="C2")asignarC2(conteoId,u);
-            else if(tipo==="C3")asignarC3(conteoId,u);
-            else agregarUsuarioExtra(conteoId,u);
-            setModalAsignar(null);
-          }} style={{marginBottom:20}}>
-            <option value="">Seleccionar…</option>
-            {G.usuarios.filter(u=>u.activo).map(u=><option key={u.id}>{u.nombre}</option>)}
-          </Sel>
-          <Btn c="#64748b" onClick={()=>setModalAsignar(null)} full>Cancelar</Btn>
-        </Modal>
-      )}
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -2707,69 +2608,76 @@ function VReportes({G,showToast,usuario}){
   });
   // Diferencia sobre toda la base: cualquier producto cuyo físico != saldo sistema
   const difBase=baseCompleta.filter(c=>c.diferencia!==0);
+
+  // Exporta el comprobante de ajuste en el formato de importación de Siigo.
+  // TODA la base con diferencia ≠ 0 (contados o no; un producto no contado con saldo
+  // en sistema sale como Disminuye por su saldo). diferencia>0 ⇒ Aumenta, <0 ⇒ Disminuye.
+  const expSiigo=()=>{
+    const rows=difBase
+      .map(c=>[c.codigo,c.nombre,c.referencia||"",c.diferencia>0?"Aumenta":"Disminuye",Math.abs(c.diferencia),c.costo||0]);
+    if(!rows.length)return showToast("No hay diferencias para ajustar","warn");
+    exportSheet(rows,SIIGO_AJUSTE_COLS,`ajuste_siigo_${TODAY().replace(/\//g,"-")}.xlsx`,"Datos");
+    showToast(`Ajuste Siigo generado (${rows.length} productos) ✓`);
+  };
   const valorAjusteTotal=baseCompleta.reduce((s,c)=>s+c.valDif,0);
 
   return(
     <Section>
-      {/* Header estilo procesos */}
-      <div style={{background:"linear-gradient(135deg,#7c3aed 0%,#2563eb 100%)",borderRadius:16,padding:"20px 24px",marginBottom:20,color:"white",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-        <div>
-          <div style={{fontSize:11,fontWeight:600,opacity:0.75,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>Análisis</div>
-          <div style={{fontSize:22,fontWeight:800,letterSpacing:-0.5}}>Reportes</div>
-          <div style={{fontSize:12,opacity:0.8,marginTop:4}}>{G.inventario?.nombre||"Inventario activo"}</div>
-        </div>
-        <div style={{textAlign:"right"}}>
-          <div style={{fontSize:28,fontWeight:900,letterSpacing:-1}}>{G.productos.length}</div>
-          <div style={{fontSize:11,opacity:0.8}}>productos base</div>
-        </div>
-      </div>
+      <PageHeader
+        label="Análisis"
+        title="Reportes"
+        icon={BarChart2}
+        subtitle={G.inventario?.nombre||"Inventario activo"}
+        count={G.productos.length}
+        countLabel="productos base"
+      />
 
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:16}}>
+      <div className="grid gap-4" style={{gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))"}}>
 
         {/* Diferencias de Conteos — expandible */}
-        <div style={{...card,border:"1px solid #fecaca"}}>
-          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
-            <div style={{width:40,height:40,background:"#fef2f2",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>🔄</div>
+        <Card className="p-5" style={{borderColor:"#fecaca"}}>
+          <div className="flex items-center gap-2.5 mb-3">
+            <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{background:"#fef2f2"}}><RefreshCw size={20} style={{color:"#dc2626"}}/></div>
             <div>
-              <div style={{fontWeight:700,fontSize:14,color:"#0f172a"}}>Diferencias de Conteos</div>
-              <div style={{fontSize:11,color:"#64748b"}}>C1 ≠ C2 — por conteo</div>
+              <div className="font-bold text-sm text-slate-900">Diferencias de Conteos</div>
+              <div className="text-[11px] text-muted-foreground">C1 ≠ C2 — por conteo</div>
             </div>
           </div>
-          <div style={{background:"#fef2f2",borderRadius:10,padding:"10px",fontSize:28,fontWeight:900,color:"#dc2626",textAlign:"center",marginBottom:12}}>{totalDifs}</div>
-          <Btn c="#dc2626" onClick={()=>setVerDifs(v=>!v)} full>{verDifs?"Ocultar diferencias":"Ver diferencias"}</Btn>
+          <div className="rounded-lg py-2.5 text-[28px] font-black text-center mb-3" style={{background:"#fef2f2",color:"#dc2626"}}>{totalDifs}</div>
+          <Button className="w-full" style={{background:"#dc2626"}} onClick={()=>setVerDifs(v=>!v)}>{verDifs?"Ocultar diferencias":"Ver diferencias"}</Button>
           {verDifs&&(
-            <div style={{marginTop:12}}>
+            <div className="mt-3">
               {conteosDifs.length===0?(
-                <div style={{background:"#f0fdf4",borderRadius:8,padding:"10px 14px",fontSize:13,color:"#166534",fontWeight:600}}>✅ Ningún conteo presentó diferencias</div>
+                <div className="flex items-center gap-1.5 rounded-lg bg-green-50 px-3.5 py-2.5 text-[13px] font-semibold text-green-700"><CheckCircle size={14}/> Ningún conteo presentó diferencias</div>
               ):conteosDifs.map(({conteo:c,difs},i)=>(
-                <div key={i} style={{background:"#fef2f2",border:"1px solid #fecaca",borderRadius:8,padding:"10px 14px",marginBottom:10}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                <div key={i} className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 mb-2.5">
+                  <div className="flex justify-between items-center mb-2 gap-2">
                     <div>
-                      <div style={{fontWeight:700,fontSize:13,color:"#dc2626"}}>{c.nombre}</div>
-                      <div style={{fontSize:11,color:"#64748b"}}>📍 {c.locLabel} · {difs.length} productos</div>
+                      <div className="font-bold text-[13px] text-destructive">{c.nombre}</div>
+                      <div className="text-[11px] text-muted-foreground flex items-center gap-1"><MapPin size={11}/> {c.locLabel} · {difs.length} productos</div>
                     </div>
-                    <div style={{display:"flex",gap:6}}>
+                    <div className="flex gap-1.5">
                       <button onClick={()=>expPDF(difs,c.nombre)}
-                        style={{background:"#dc2626",color:"white",border:"none",borderRadius:6,padding:"4px 10px",fontSize:11,cursor:"pointer",fontWeight:700}}>🖨️ PDF</button>
+                        className="inline-flex items-center gap-1 rounded-md bg-red-600 text-white px-2.5 py-1 text-[11px] font-bold hover:bg-red-700"><Printer size={11}/> PDF</button>
                       <button onClick={()=>expXLSX(difs.map(d=>[d.codigo,d.ean||"",d.nombre,d.referencia,d.c1,d.c2,d.dif,d.u1,d.u2]),["CODIGO","EAN","NOMBRE","REFERENCIA","C1","C2","DIFERENCIA","USUARIO_C1","USUARIO_C2"],`difs_${c.nombre?.replace(/ /g,"_")}.xlsx`,`DIFERENCIAS ${c.nombre}`)}
-                        style={{background:"#1e40af",color:"white",border:"none",borderRadius:6,padding:"4px 10px",fontSize:11,cursor:"pointer",fontWeight:700}}>⬇ Excel</button>
+                        className="inline-flex items-center gap-1 rounded-md bg-blue-800 text-white px-2.5 py-1 text-[11px] font-bold hover:bg-blue-900"><Download size={10}/> Excel</button>
                     </div>
                   </div>
-                  <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                    <thead><tr style={{background:"#fecaca"}}>
-                      {["Código","EAN","Nombre","C1","C2","Dif","U.C1","U.C2"].map(h=><th key={h} style={{padding:"4px 8px",textAlign:"left",fontWeight:700}}>{h}</th>)}
+                  <table className="w-full text-[11px]">
+                    <thead><tr className="bg-red-200">
+                      {["Código","EAN","Nombre","C1","C2","Dif","U.C1","U.C2"].map(h=><th key={h} className="px-2 py-1 text-left font-bold">{h}</th>)}
                     </tr></thead>
                     <tbody>
                       {difs.map((d,j)=>(
-                        <tr key={j} style={{borderBottom:"1px solid #fee2e2",background:j%2?"#fff5f5":"white"}}>
-                          <td style={{padding:"4px 8px",fontFamily:"monospace"}}>{d.codigo}</td>
-                          <td style={{padding:"4px 8px",fontSize:10,color:"#64748b"}}>{d.ean||"—"}</td>
-                          <td style={{padding:"4px 8px",fontWeight:500}}>{d.nombre.substring(0,25)}</td>
-                          <td style={{padding:"4px 8px",textAlign:"center",fontWeight:700}}>{d.c1}</td>
-                          <td style={{padding:"4px 8px",textAlign:"center",fontWeight:700}}>{d.c2}</td>
-                          <td style={{padding:"4px 8px",textAlign:"center",fontWeight:700,color:"#dc2626"}}>{d.dif>0?"+"+d.dif:d.dif}</td>
-                          <td style={{padding:"4px 8px",color:"#64748b"}}>{d.u1}</td>
-                          <td style={{padding:"4px 8px",color:"#64748b"}}>{d.u2}</td>
+                        <tr key={j} className="border-b border-red-100">
+                          <td className="px-2 py-1 font-mono">{d.codigo}</td>
+                          <td className="px-2 py-1 text-[10px] text-muted-foreground">{d.ean||"—"}</td>
+                          <td className="px-2 py-1 font-medium">{d.nombre.substring(0,25)}</td>
+                          <td className="px-2 py-1 text-center font-bold">{d.c1}</td>
+                          <td className="px-2 py-1 text-center font-bold">{d.c2}</td>
+                          <td className="px-2 py-1 text-center font-bold text-destructive">{d.dif>0?"+"+d.dif:d.dif}</td>
+                          <td className="px-2 py-1 text-muted-foreground">{d.u1}</td>
+                          <td className="px-2 py-1 text-muted-foreground">{d.u2}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -2778,51 +2686,52 @@ function VReportes({G,showToast,usuario}){
               ))}
             </div>
           )}
-        </div>
+        </Card>
 
         {/* Sin Conteo */}
-        <div style={{...card,border:"1px solid #fed7aa"}}>
-          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
-            <div style={{width:40,height:40,background:"#fffbeb",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>⚪</div>
-            <div><div style={{fontWeight:700,fontSize:14,color:"#0f172a"}}>Sin Conteo</div><div style={{fontSize:11,color:"#64748b"}}>Productos no inventariados</div></div>
+        <Card className="p-5" style={{borderColor:"#fed7aa"}}>
+          <div className="flex items-center gap-2.5 mb-3">
+            <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{background:"#fffbeb"}}><Circle size={20} style={{color:"#d97706"}}/></div>
+            <div><div className="font-bold text-sm text-slate-900">Sin Conteo</div><div className="text-[11px] text-muted-foreground">Productos no inventariados</div></div>
           </div>
-          <div style={{background:"#fffbeb",borderRadius:10,padding:"10px",fontSize:28,fontWeight:900,color:"#d97706",textAlign:"center",marginBottom:12}}>{sinConteo.length}</div>
-          <Btn c="#d97706" onClick={()=>expXLSX(sinConteo.map(p=>[p.codigo,p.nombre,p.referencia,p.categoria,p.subcategoria,p.subgrupo,p.saldo,p.costo,p.nit,p.proveedor]),["CODIGO","NOMBRE","REFERENCIA","CATEGORIA","SUBCATEGORIA","SUBGRUPO","SALDO","COSTO","NIT","PROVEEDOR"],"sin_conteo.xlsx","REPORTE SIN CONTEOS")} full>⬇ Exportar Excel</Btn>
-        </div>
+          <div className="rounded-lg py-2.5 text-[28px] font-black text-center mb-3" style={{background:"#fffbeb",color:"#d97706"}}>{sinConteo.length}</div>
+          <Button className="w-full" style={{background:"#d97706"}} onClick={()=>expXLSX(sinConteo.map(p=>[p.codigo,p.nombre,p.referencia,p.categoria,p.subcategoria,p.subgrupo,p.saldo,p.costo,p.nit,p.proveedor]),["CODIGO","NOMBRE","REFERENCIA","CATEGORIA","SUBCATEGORIA","SUBGRUPO","SALDO","COSTO","NIT","PROVEEDOR"],"sin_conteo.xlsx","REPORTE SIN CONTEOS")}><Download size={15}/> Exportar Excel</Button>
+        </Card>
 
         {/* Diferencia Inventario */}
-        <div style={{...card,border:"1px solid #bfdbfe"}}>
-          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
-            <div style={{width:40,height:40,background:"#eff6ff",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>⚖️</div>
-            <div><div style={{fontWeight:700,fontSize:14,color:"#0f172a"}}>Diferencia Inventario</div><div style={{fontSize:11,color:"#64748b"}}>Físico vs Sistema · base completa</div></div>
+        <Card className="p-5" style={{borderColor:"#bfdbfe"}}>
+          <div className="flex items-center gap-2.5 mb-3">
+            <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{background:"#eff6ff"}}><Scale size={20} style={{color:"#2563eb"}}/></div>
+            <div><div className="font-bold text-sm text-slate-900">Diferencia Inventario</div><div className="text-[11px] text-muted-foreground">Físico vs Sistema · base completa</div></div>
           </div>
-          <div style={{background:"#eff6ff",borderRadius:10,padding:"10px",fontSize:28,fontWeight:900,color:"#2563eb",textAlign:"center",marginBottom:12}}>{baseCompleta.length}</div>
-          <Btn c="#2563eb" onClick={()=>expXLSX(baseCompleta.map(c=>[c.codigo,c.nombre,c.referencia,c.costo||0,c.saldo,c.cantFinal,c.diferencia,Math.round(c.valDif),c.estado||"",c.categoria||"",c.subcategoria||"",c.subgrupo||"",c.nit||"",c.proveedor||""]),["CODIGO","NOMBRE","REFERENCIA","COSTO","SALDO","CANTIDAD","DIFERENCIA","VALOR_DIF","ESTADO","CATEGORIA","SUBCATEGORIA","SUBGRUPO","NIT","PROVEEDOR"],"diferencia_inventario.xlsx","DIFERENCIA INVENTARIOS")} disabled={baseCompleta.length===0} full>⬇ Exportar Excel</Btn>
-        </div>
+          <div className="rounded-lg py-2.5 text-[28px] font-black text-center mb-3" style={{background:"#eff6ff",color:"#2563eb"}}>{baseCompleta.length}</div>
+          <Button className="w-full" onClick={()=>expXLSX(baseCompleta.map(c=>[c.codigo,c.nombre,c.referencia,c.costo||0,c.saldo,c.cantFinal,c.diferencia,Math.round(c.valDif),c.estado||"",c.categoria||"",c.subcategoria||"",c.subgrupo||"",c.nit||"",c.proveedor||""]),["CODIGO","NOMBRE","REFERENCIA","COSTO","SALDO","CANTIDAD","DIFERENCIA","VALOR_DIF","ESTADO","CATEGORIA","SUBCATEGORIA","SUBGRUPO","NIT","PROVEEDOR"],"diferencia_inventario.xlsx","DIFERENCIA INVENTARIOS")} disabled={baseCompleta.length===0}><Download size={15}/> Exportar Excel</Button>
+        </Card>
 
         {/* Ajuste */}
-        <div style={{...card,border:"1px solid #bbf7d0"}}>
-          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
-            <div style={{width:40,height:40,background:"#f0fdf4",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>🔧</div>
-            <div><div style={{fontWeight:700,fontSize:14,color:"#0f172a"}}>Ajuste de Inventario</div><div style={{fontSize:11,color:"#64748b"}}>Código · Cantidad · Fecha · base completa</div></div>
+        <Card className="p-5" style={{borderColor:"#bbf7d0"}}>
+          <div className="flex items-center gap-2.5 mb-3">
+            <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{background:"#f0fdf4"}}><Wrench size={20} style={{color:"#16a34a"}}/></div>
+            <div><div className="font-bold text-sm text-slate-900">Ajuste de Inventario</div><div className="text-[11px] text-muted-foreground">Código · Cantidad · Fecha · base completa</div></div>
           </div>
-          <div style={{background:"#f0fdf4",borderRadius:10,padding:"10px",fontSize:28,fontWeight:900,color:"#16a34a",textAlign:"center",marginBottom:12}}>{baseCompleta.length}</div>
-          <Btn c="#16a34a" onClick={()=>expXLSX(baseCompleta.map(c=>[c.codigo,c.cantFinal,c.saldo,c.diferencia,TODAY(),c.ubicacion||"BODEGA"]),["CODIGO","CANTIDAD","SALDO","DIFERENCIA","FECH_CORTE","BODEGA"],"ajuste_inventario.xlsx","AJUSTE INVENTARIO")} disabled={baseCompleta.length===0} full>⬇ Exportar Excel</Btn>
-        </div>
+          <div className="rounded-lg py-2.5 text-[28px] font-black text-center mb-3" style={{background:"#f0fdf4",color:"#16a34a"}}>{baseCompleta.length}</div>
+          <Button className="w-full" style={{background:"#16a34a"}} onClick={()=>expXLSX(baseCompleta.map(c=>[c.codigo,c.cantFinal,c.saldo,c.diferencia,TODAY(),c.ubicacion||"BODEGA"]),["CODIGO","CANTIDAD","SALDO","DIFERENCIA","FECH_CORTE","BODEGA"],"ajuste_inventario.xlsx","AJUSTE INVENTARIO")} disabled={baseCompleta.length===0}><Download size={15}/> Exportar Excel</Button>
+          <Button className="w-full mt-2" variant="outline" onClick={expSiigo} disabled={baseCompleta.length===0}><Download size={15}/> Formato Siigo</Button>
+        </Card>
 
         {/* Reporte de Captura */}
-        <div style={{...card,border:"1px solid #ddd6fe"}}>
-          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
-            <div style={{width:40,height:40,background:"#faf5ff",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>📄</div>
-            <div><div style={{fontWeight:700,fontSize:14,color:"#0f172a"}}>Reporte de Captura</div><div style={{fontSize:11,color:"#64748b"}}>C1·C2·C3 en columnas · con ubicación</div></div>
+        <Card className="p-5" style={{borderColor:"#ddd6fe"}}>
+          <div className="flex items-center gap-2.5 mb-3">
+            <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{background:"#faf5ff"}}><FileText size={20} style={{color:"#7c3aed"}}/></div>
+            <div><div className="font-bold text-sm text-slate-900">Reporte de Captura</div><div className="text-[11px] text-muted-foreground">C1·C2·C3 en columnas · con ubicación</div></div>
           </div>
-          <div style={{background:"#faf5ff",borderRadius:10,padding:"10px",fontSize:28,fontWeight:900,color:"#7c3aed",textAlign:"center",marginBottom:12}}>{capFinal.length}</div>
-          <Btn c="#7c3aed" onClick={()=>expXLSX(
+          <div className="rounded-lg py-2.5 text-[28px] font-black text-center mb-3" style={{background:"#faf5ff",color:"#7c3aed"}}>{capFinal.length}</div>
+          <Button className="w-full" style={{background:"#7c3aed"}} onClick={()=>expXLSX(
             capFinal.map(c=>[c.ean,c.codigo,c.nombre,c.referencia,c.categoria,c.subcategoria,c.subgrupo,c.ubicacion,c.localizacion,c.nro,c.c1||"",c.c2||"",c.c3||"",c.cantFinal,c.costo,c.fecha||TODAY(),c.estado,c.obs||"",c.usuario,c.nit,c.proveedor]),
             ["EAN","CODIGO","NOMBRE","REFERENCIA","CATEGORIA","SUBCATEGORIA","SUBGRUPO","UBICACION","LOCALIZACION","N_LOCAL","CONTEO_1","CONTEO_2","CONTEO_3","CANTIDAD_FINAL","COSTO","FECHA","ESTADO","OBS","USUARIO","NIT","PROVEEDOR"],
             "captura_inventario.xlsx","CAPTURA INVENTARIO"
-          )} disabled={capFinal.length===0} full>⬇ Exportar Excel</Btn>
-        </div>
+          )} disabled={capFinal.length===0}><Download size={15}/> Exportar Excel</Button>
+        </Card>
 
       </div>
     </Section>
@@ -2830,13 +2739,14 @@ function VReportes({G,showToast,usuario}){
 }
 
 // ── USUARIOS ──
-function VUsuarios({G,rerender,showToast}){
+function VUsuarios({usuario,G,rerender,showToast}){
   const [modal,setModal]=useState(false);
   const [modalImport,setModalImport]=useState(false);
   const [modalConfirmDel,setModalConfirmDel]=useState(null);
   const [form,setForm]=useState({nombre:"",pass:"",rol:"capturador",correo:"",telefono:"",editId:null});
   const [previewUsuarios,setPreviewUsuarios]=useState(null);
-  const URL_APP="http://localhost:5173";
+  const [credCreada,setCredCreada]=useState(null); // credencial recién creada/reseteada para compartir
+  const [busy,setBusy]=useState(false);
 
   // Generar contraseña automática: primeras 3 letras del nombre + últimos 4 del teléfono
   const generarPass=(nombre,telefono)=>{
@@ -2846,31 +2756,60 @@ function VUsuarios({G,rerender,showToast}){
     return n+nums;
   };
 
-  const guardar=()=>{
-    if(!form.nombre.trim()||!form.pass.trim())return showToast("Completa nombre y contraseña","err");
-    if(form.editId){
-      G.usuarios=G.usuarios.map(u=>u.id===form.editId?{...u,...form,nombre:form.nombre.toUpperCase(),id:u.id}:u);
-    } else {
-      if(G.usuarios.find(u=>u.nombre===form.nombre.toUpperCase()))return showToast("Ya existe ese usuario","err");
-      G.usuarios.push({id:ID(),nombre:form.nombre.toUpperCase(),pass:form.pass,rol:form.rol,correo:form.correo,telefono:form.telefono,activo:true,creado:TODAY()});
-    }
-    setModal(false);setForm({nombre:"",pass:"",rol:"capturador",correo:"",telefono:"",editId:null});
-    rerender();showToast(form.editId?"Actualizado ✓":"Usuario creado ✓");
+  // Recargar la lista de usuarios de esta empresa desde la nube.
+  const refresh=async()=>{try{const {data}=await SB.loadUsuarios(G.tenantId);if(data)G.usuarios=data;}catch(e){}};
+
+  // Mensaje de acceso para compartir por WhatsApp (sin URL hardcoded; incluye el slug de la empresa).
+  const buildShareMsg=(u)=>{
+    const origin=(typeof window!=="undefined"&&window.location.origin)||"";
+    const slug=((u.email||"").split("@")[1]||"").replace(".tomfic.app","");
+    return `Hola ${u.nombre}! Tus datos para TOMFIC:\n🔗 ${origin}\n🏢 Empresa: ${slug}\n👤 Usuario: ${u.nombre}\n🔑 Clave: ${u.pass}\n\nIngresa en la pestaña «Equipo».`;
+  };
+
+  const guardar=async()=>{
+    if(!form.nombre.trim()||(!form.editId&&!form.pass.trim()))return showToast("Completa nombre y contraseña","err");
+    setBusy(true);
+    try{
+      if(form.editId){
+        const {error}=await SB.updateUsuario(form.editId,{rol:form.rol,correo:form.correo||null,telefono:form.telefono||null});
+        if(error)throw error;
+        await refresh();showToast("Actualizado ✓");
+      }else{
+        const {data,error}=await SB.createMember(form.nombre.toUpperCase().trim(),form.pass,form.rol,form.correo,form.telefono);
+        if(error)throw error;
+        await refresh();
+        setCredCreada({nombre:data.nombre||form.nombre.toUpperCase().trim(),pass:data.pass||form.pass,email:data.email});
+        showToast("Usuario creado ✓");
+      }
+      setModal(false);setForm({nombre:"",pass:"",rol:"capturador",correo:"",telefono:"",editId:null});
+      rerender();
+    }catch(e){console.warn(e);showToast(e.message||"No se pudo guardar","err");}
+    setBusy(false);
   };
 
   const copiarAcceso=(u)=>{
-    const msg=`Hola ${u.nombre}! Aquí tus datos para el sistema TOMFIC:\n🔗 Link: ${URL_APP}\n👤 Usuario: ${u.nombre}\n🔑 Contraseña: ${u.pass}\n\nIngresa con estos datos para hacer el inventario.`;
-    navigator.clipboard?.writeText(msg).then(()=>showToast("Copiado al portapapeles ✓")).catch(()=>showToast("No se pudo copiar","err"));
+    navigator.clipboard?.writeText(buildShareMsg(u)).then(()=>showToast("Copiado al portapapeles ✓")).catch(()=>showToast("No se pudo copiar","err"));
   };
 
-  const eliminar=(u)=>{
-    // Verificar si tiene conteos activos
+  const resetClave=async(u)=>{
+    const nueva=generarPass(u.nombre,u.telefono);
+    try{const {error}=await SB.resetMemberPassword(u.id,nueva);if(error)throw error;await refresh();rerender();setCredCreada({nombre:u.nombre,pass:nueva,email:u.email});showToast("Clave restablecida ✓");}
+    catch(e){showToast(e.message||"No se pudo restablecer","err");}
+  };
+
+  const toggleActivo=async(u)=>{
+    try{const {error}=await SB.updateUsuario(u.id,{activo:!u.activo});if(error)throw error;await refresh();rerender();}
+    catch(e){showToast(e.message||"No se pudo actualizar","err");}
+  };
+
+  const eliminar=async(u)=>{
     const tieneConteos=G.conteos.some(c=>
       (c.usuarioC1===u.nombre||c.usuarioC2===u.nombre||c.usuarioC3===u.nombre)&&
       !["completado"].includes(c.estado)
     );
     if(tieneConteos)return showToast("Este usuario tiene conteos activos. Reasígnalos antes de eliminar.","err");
-    G.usuarios=G.usuarios.filter(x=>x.id!==u.id);
+    try{const {error}=await SB.deleteMember(u.id);if(error)throw error;await refresh();}
+    catch(e){return showToast(e.message||"No se pudo eliminar","err");}
     setModalConfirmDel(null);rerender();showToast("Usuario eliminado ✓","warn");
   };
 
@@ -2902,15 +2841,17 @@ function VUsuarios({G,rerender,showToast}){
     e.target.value="";
   };
 
-  const confirmarImportUsuarios=()=>{
-    let creados=0,duplicados=0;
-    previewUsuarios.forEach(u=>{
-      if(G.usuarios.find(x=>x.nombre===u.nombre)){duplicados++;return;}
-      G.usuarios.push({id:ID(),nombre:u.nombre,pass:u.pass,rol:u.rol,correo:u.correo,telefono:u.telefono,activo:true,creado:TODAY()});
-      creados++;
-    });
+  const confirmarImportUsuarios=async()=>{
+    setBusy(true);
+    let creados=0,fallidos=0;
+    for(const u of previewUsuarios){
+      try{const {error}=await SB.createMember(u.nombre,u.pass,u.rol,u.correo,u.telefono);if(error)throw error;creados++;}
+      catch(e){fallidos++;}
+    }
+    await refresh();
+    setBusy(false);
     setPreviewUsuarios(null);setModalImport(false);rerender();
-    showToast(`✓ ${creados} usuarios creados${duplicados>0?` · ${duplicados} duplicados omitidos`:""}`);
+    showToast(`✓ ${creados} usuarios creados${fallidos>0?` · ${fallidos} omitidos`:""}`);
   };
 
   // Descargar plantilla Excel
@@ -2931,182 +2872,224 @@ function VUsuarios({G,rerender,showToast}){
   const activos=G.usuarios.filter(u=>u.activo);
   return(
     <Section>
-      {/* Header estilo procesos */}
-      <div style={{background:"linear-gradient(135deg,#7c3aed 0%,#4f46e5 100%)",borderRadius:16,padding:"20px 24px",marginBottom:20,color:"white",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-        <div>
-          <div style={{fontSize:11,fontWeight:600,opacity:0.75,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>Accesos</div>
-          <div style={{fontSize:22,fontWeight:800,letterSpacing:-0.5}}>Gestión de Usuarios</div>
-          <div style={{fontSize:12,opacity:0.8,marginTop:4}}>{activos.length} activos · {admins.length} admin · {caps.length} capturadores</div>
-        </div>
-        <div style={{textAlign:"right"}}>
-          <div style={{fontSize:28,fontWeight:900,letterSpacing:-1}}>{G.usuarios.length}</div>
-          <div style={{fontSize:11,opacity:0.8}}>usuarios</div>
-        </div>
-      </div>
-      <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap"}}>
-        <Btn c="#16a34a" onClick={()=>{setForm({nombre:"",pass:"",rol:"capturador",correo:"",telefono:"",editId:null});setModal(true);}}>+ Crear Usuario</Btn>
-        <Btn c="#2563eb" onClick={()=>setModalImport(true)}>⬆ Importar desde Excel</Btn>
+      {/* Header */}
+      <PageHeader
+        label="Accesos"
+        title="Gestión de Usuarios"
+        icon={Users}
+        subtitle={`${activos.length} activos · ${admins.length} admin · ${caps.length} capturadores`}
+        count={G.usuarios.length}
+        countLabel="usuarios"
+      />
+      <div className="flex gap-2.5 mb-4 flex-wrap">
+        <Button onClick={()=>{setForm({nombre:"",pass:"",rol:"capturador",correo:"",telefono:"",editId:null});setModal(true);}}><UserPlus size={16}/> Crear Usuario</Button>
+        <Button variant="outline" onClick={()=>setModalImport(true)}><Upload size={15}/> Importar desde Excel</Button>
       </div>
 
-      <div style={{...card,padding:0,overflow:"hidden"}}>
-        <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
-          <thead><tr style={{background:"#0f172a",color:"white"}}>
-            {["Usuario","Contraseña","Contacto","Rol","Creado","Estado","Acciones"].map(h=>(
-              <th key={h} style={{padding:"10px 14px",textAlign:"left",fontWeight:600}}>{h}</th>
-            ))}
-          </tr></thead>
-          <tbody>
-            {G.usuarios.map((u,i)=>(
-              <tr key={u.id} style={{background:i%2?"#f8fafc":"white",borderBottom:"1px solid #f1f5f9"}}>
-                <td style={{padding:"9px 14px"}}>
-                  <div style={{display:"flex",alignItems:"center",gap:8}}>
-                    <div style={{width:30,height:30,background:u.rol==="admin"?"#1e40af":"#16a34a",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",color:"white",fontSize:12,fontWeight:800}}>{u.nombre[0]}</div>
-                    <b>{u.nombre}</b>
-                  </div>
-                </td>
-                <td style={{padding:"9px 14px",fontFamily:"monospace",fontSize:12,color:"#64748b"}}>{u.pass}</td>
-                <td style={{padding:"9px 14px",fontSize:12,color:"#64748b"}}>
-                  {u.correo&&<div>✉️ {u.correo}</div>}
-                  {u.telefono&&<div>📱 {u.telefono}</div>}
-                  {!u.correo&&!u.telefono&&<span style={{color:"#d1d5db"}}>—</span>}
-                </td>
-                <td style={{padding:"9px 14px"}}><Badge color={u.rol==="admin"?"#2563eb":u.rol==="gerente"?"#7c3aed":"#16a34a"}>{u.rol==="admin"?"ADMIN":u.rol==="gerente"?"GERENTE":"CAPTURADOR"}</Badge></td>
-                <td style={{padding:"9px 14px",color:"#64748b"}}>{u.creado}</td>
-                <td style={{padding:"9px 14px"}}><Badge color={u.activo?"#16a34a":"#dc2626"}>{u.activo?"ACTIVO":"INACTIVO"}</Badge></td>
-                <td style={{padding:"9px 14px"}}>
-                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                    <Btn c="#2563eb" small onClick={()=>{setForm({nombre:u.nombre,pass:u.pass,rol:u.rol,correo:u.correo||"",telefono:u.telefono||"",editId:u.id});setModal(true);}}>Editar</Btn>
-                    <button onClick={()=>copiarAcceso(u)} style={{background:"#25d366",color:"white",border:"none",borderRadius:6,padding:"4px 10px",cursor:"pointer",fontWeight:700,fontSize:11}}>📋 Copiar</button>
-                    {u.nombre!=="ADMIN"&&<Btn c={u.activo?"#d97706":"#16a34a"} small onClick={()=>{G.usuarios=G.usuarios.map(x=>x.id===u.id?{...x,activo:!x.activo}:x);rerender();}}>{u.activo?"Desactivar":"Activar"}</Btn>}
-                    {u.nombre!=="ADMIN"&&<button onClick={()=>setModalConfirmDel(u)} style={{background:"#fef2f2",color:"#dc2626",border:"1px solid #fecaca",borderRadius:6,padding:"4px 10px",cursor:"pointer",fontWeight:700,fontSize:11}}>Eliminar</button>}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <Card className="overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead><tr className="bg-slate-900 text-white">
+              {["Usuario","Contraseña","Contacto","Rol","Creado","Estado","Acciones"].map(h=>(
+                <th key={h} className="px-3.5 py-2.5 text-left font-semibold whitespace-nowrap">{h}</th>
+              ))}
+            </tr></thead>
+            <tbody>
+              {G.usuarios.map((u)=>(
+                <tr key={u.id} className="border-b last:border-0 hover:bg-slate-50 transition-colors">
+                  <td className="px-3.5 py-2.5">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-extrabold shrink-0 ${u.rol==="admin"?"bg-blue-700":u.rol==="gerente"?"bg-purple-600":"bg-green-600"}`}>{u.nombre[0]}</div>
+                      <b>{u.nombre}</b>
+                    </div>
+                  </td>
+                  <td className="px-3.5 py-2.5 font-mono text-xs text-muted-foreground">{u.pass||"—"}</td>
+                  <td className="px-3.5 py-2.5 text-xs text-muted-foreground">
+                    {u.correo&&<div className="flex items-center gap-1"><Mail size={11}/> {u.correo}</div>}
+                    {u.telefono&&<div className="flex items-center gap-1"><Smartphone size={11}/> {u.telefono}</div>}
+                    {!u.correo&&!u.telefono&&<span className="text-slate-300">—</span>}
+                  </td>
+                  <td className="px-3.5 py-2.5"><UIBadge variant="secondary" className={u.rol==="admin"?"bg-blue-100 text-blue-700":u.rol==="gerente"?"bg-purple-100 text-purple-700":"bg-green-100 text-green-700"}>{u.rol==="admin"?"ADMIN":u.rol==="gerente"?"GERENTE":"CAPTURADOR"}</UIBadge></td>
+                  <td className="px-3.5 py-2.5 text-muted-foreground whitespace-nowrap">{u.creado}</td>
+                  <td className="px-3.5 py-2.5"><UIBadge variant={u.activo?"success":"destructive"}>{u.activo?"ACTIVO":"INACTIVO"}</UIBadge></td>
+                  <td className="px-3.5 py-2.5">
+                    <div className="flex gap-1.5 flex-wrap">
+                      <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" onClick={()=>{setForm({nombre:u.nombre,pass:"",rol:u.rol,correo:u.correo||"",telefono:u.telefono||"",editId:u.id});setModal(true);}}>Editar</Button>
+                      <Button size="sm" className="h-7 px-2.5 text-xs bg-[#25d366] hover:bg-[#1da851]" onClick={()=>copiarAcceso(u)}><ClipboardList size={11}/> Copiar</Button>
+                      <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" onClick={()=>resetClave(u)}><Key size={11}/> Clave</Button>
+                      {u.id!==usuario.id&&<Button variant="outline" size="sm" className={`h-7 px-2.5 text-xs ${u.activo?"text-amber-600 border-amber-200 hover:bg-amber-50 hover:text-amber-700":"text-green-600 border-green-200 hover:bg-green-50 hover:text-green-700"}`} onClick={()=>toggleActivo(u)}>{u.activo?"Desactivar":"Activar"}</Button>}
+                      {u.id!==usuario.id&&<Button variant="outline" size="sm" className="h-7 px-2.5 text-xs text-destructive border-red-200 hover:bg-red-50 hover:text-destructive" onClick={()=>setModalConfirmDel(u)}>Eliminar</Button>}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
 
       {/* Modal crear/editar */}
-      {modal&&(
-        <Modal titulo={form.editId?"Editar Usuario":"Crear Usuario"} onClose={()=>setModal(false)}>
-          <Lbl>Nombre de usuario</Lbl>
-          <Inp value={form.nombre} onChange={e=>{
-            const n=e.target.value.toUpperCase();
-            const autoPass=generarPass(n,form.telefono);
-            setForm(p=>({...p,nombre:n,...(!p.editId?{pass:autoPass}:{})}));
-          }} disabled={!!form.editId} placeholder="Ej: JUAN" style={{marginBottom:14}}/>
-          <Lbl>Contraseña (auto-generada, puedes cambiarla)</Lbl>
-          <Inp value={form.pass} onChange={e=>setForm(p=>({...p,pass:e.target.value}))} placeholder="••••••" style={{marginBottom:14}}/>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
-            <div>
-              <Lbl>Correo electrónico</Lbl>
-              <Inp value={form.correo} onChange={e=>setForm(p=>({...p,correo:e.target.value}))} placeholder="correo@ejemplo.com"/>
+      <Dialog open={modal} onOpenChange={setModal}>
+        <DialogContent className="max-w-lg max-h-[92vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{form.editId?"Editar Usuario":"Crear Usuario"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3.5">
+            <div className="space-y-1.5">
+              <Label>Nombre de usuario</Label>
+              <Input value={form.nombre} onChange={e=>{
+                const n=e.target.value.toUpperCase();
+                const autoPass=generarPass(n,form.telefono);
+                setForm(p=>({...p,nombre:n,...(!p.editId?{pass:autoPass}:{})}));
+              }} disabled={!!form.editId} placeholder="Ej: JUAN"/>
             </div>
-            <div>
-              <Lbl>Teléfono / WhatsApp</Lbl>
-              <Inp value={form.telefono} onChange={e=>{
-                const t=e.target.value;
-                const autoPass=generarPass(form.nombre,t);
-                setForm(p=>({...p,telefono:t,...(!p.editId?{pass:autoPass}:{})}));
-              }} placeholder="3001234567"/>
-            </div>
-          </div>
-          <div style={{background:"#eff6ff",borderRadius:8,padding:"8px 12px",marginBottom:14,fontSize:12,color:"#2563eb"}}>
-            🔑 Contraseña auto-generada: <b>{generarPass(form.nombre,form.telefono)}</b> · Puedes cambiarla manualmente arriba.
-          </div>
-          <Lbl>Rol</Lbl>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
-            {[["capturador","Capturador","Solo captura"],["admin","Administrador","Acceso total"],["gerente","Gerente","Solo lectura"]].map(([v,t,s])=>(
-              <div key={v} onClick={()=>setForm(p=>({...p,rol:v}))} style={{border:`2px solid ${form.rol===v?"#2563eb":"#e2e8f0"}`,borderRadius:10,padding:12,cursor:"pointer",background:form.rol===v?"#eff6ff":"white"}}>
-                <div style={{fontWeight:700,color:form.rol===v?"#2563eb":"#0f172a",fontSize:13}}>{t}</div>
-                <div style={{fontSize:11,color:"#64748b",marginTop:2}}>{s}</div>
+            {!form.editId?(
+              <div className="space-y-1.5">
+                <Label>Contraseña (auto-generada, puedes cambiarla)</Label>
+                <Input value={form.pass} onChange={e=>setForm(p=>({...p,pass:e.target.value}))} placeholder="••••••"/>
               </div>
-            ))}
+            ):(
+              <div className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                <Key size={14} className="shrink-0"/><span>Para cambiar la clave usa <b>Clave</b> en la fila del usuario.</span>
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Correo electrónico</Label>
+                <Input value={form.correo} onChange={e=>setForm(p=>({...p,correo:e.target.value}))} placeholder="correo@ejemplo.com"/>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Teléfono / WhatsApp</Label>
+                <Input value={form.telefono} onChange={e=>{
+                  const t=e.target.value;
+                  const autoPass=generarPass(form.nombre,t);
+                  setForm(p=>({...p,telefono:t,...(!p.editId?{pass:autoPass}:{})}));
+                }} placeholder="3001234567"/>
+              </div>
+            </div>
+            {!form.editId&&(
+              <div className="flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700">
+                <Key size={14} className="shrink-0"/><span>Contraseña auto-generada: <b>{generarPass(form.nombre,form.telefono)}</b> · Puedes cambiarla manualmente arriba.</span>
+              </div>
+            )}
+            <div className="space-y-1.5">
+              <Label>Rol</Label>
+              <div className="grid grid-cols-2 gap-2.5">
+                {[["capturador","Capturador","Solo captura"],["admin","Administrador","Acceso total"],["gerente","Gerente","Solo lectura"]].map(([v,t,s])=>(
+                  <div key={v} onClick={()=>setForm(p=>({...p,rol:v}))} className={`rounded-lg border-2 p-3 cursor-pointer transition-colors ${form.rol===v?"border-primary bg-blue-50":"border-slate-200 hover:border-slate-300"}`}>
+                    <div className={`font-bold text-sm ${form.rol===v?"text-primary":"text-slate-900"}`}>{t}</div>
+                    <div className="text-[11px] text-muted-foreground mt-0.5">{s}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="flex items-start gap-2 rounded-lg bg-green-50 px-3 py-2.5 text-xs text-green-800">
+              <ClipboardList size={14} className="shrink-0 mt-0.5"/><span>Después de crear el usuario usa el botón <b>Copiar</b> para enviarle los datos por WhatsApp.</span>
+            </div>
+            <Button className="w-full" onClick={guardar} disabled={busy}>{busy?"Guardando…":form.editId?"Actualizar":"Crear Usuario"}</Button>
           </div>
-          <div style={{background:"#f0fdf4",borderRadius:8,padding:"10px 14px",marginBottom:16,fontSize:12,color:"#166534"}}>
-            📋 Después de crear el usuario usa el botón <b>Copiar</b> para enviarle los datos por WhatsApp.
-          </div>
-          <Btn c="#2563eb" onClick={guardar} full>{form.editId?"Actualizar":"Crear Usuario"}</Btn>
-        </Modal>
-      )}
+        </DialogContent>
+      </Dialog>
 
       {/* Modal importar */}
-      {modalImport&&(
-        <Modal titulo="Importar Usuarios desde Excel" onClose={()=>{setModalImport(false);setPreviewUsuarios(null);}} wide>
+      <Dialog open={modalImport} onOpenChange={(v)=>{setModalImport(v);if(!v)setPreviewUsuarios(null);}}>
+        <DialogContent className="max-w-2xl max-h-[92vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Importar Usuarios desde Excel</DialogTitle>
+          </DialogHeader>
           {!previewUsuarios?(
-            <>
-              <div style={{background:"#eff6ff",borderRadius:10,padding:14,marginBottom:16,fontSize:13,color:"#1e40af"}}>
+            <div className="space-y-4">
+              <div className="rounded-lg bg-blue-50 p-3.5 text-sm text-blue-800">
                 <b>Columnas requeridas en el Excel:</b><br/>
-                <span style={{fontFamily:"monospace"}}>NOMBRE · CORREO · TELEFONO · ROL</span><br/>
-                <span style={{fontSize:12,color:"#64748b",marginTop:4,display:"block"}}>
+                <span className="font-mono">NOMBRE · CORREO · TELEFONO · ROL</span><br/>
+                <span className="text-xs text-muted-foreground mt-1 block">
                   La contraseña se genera automáticamente: primeras 3 letras del nombre + últimos 4 dígitos del teléfono.<br/>
-                  Ejemplo: JUAN con tel. 3001234567 → contraseña: <b style={{fontFamily:"monospace"}}>JUA4567</b>
+                  Ejemplo: JUAN con tel. 3001234567 → contraseña: <b className="font-mono">JUA4567</b>
                 </span>
               </div>
-              <div style={{display:"flex",gap:10,marginBottom:16}}>
-                <label style={{padding:"9px 18px",background:"#2563eb",color:"white",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:13,flex:1,textAlign:"center"}}>
-                  📂 Seleccionar archivo Excel
-                  <input type="file" accept=".xlsx,.xls" onChange={importarExcel} style={{display:"none"}}/>
-                </label>
-                <button onClick={descargarPlantilla} style={{padding:"9px 18px",background:"#f8fafc",border:"1.5px solid #e2e8f0",color:"#374151",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:13}}>
-                  ⬇ Plantilla
-                </button>
+              <div className="flex gap-2.5">
+                <Button asChild className="flex-1">
+                  <label className="cursor-pointer">
+                    <FolderOpen size={15}/> Seleccionar archivo Excel
+                    <input type="file" accept=".xlsx,.xls" onChange={importarExcel} className="hidden"/>
+                  </label>
+                </Button>
+                <Button variant="outline" onClick={descargarPlantilla}><Download size={15}/> Plantilla</Button>
               </div>
-              <div style={{background:"#fef9c3",borderRadius:8,padding:"8px 12px",fontSize:12,color:"#92400e"}}>
-                💡 Descarga la plantilla de ejemplo para ver el formato correcto.
+              <div className="flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                <Lightbulb size={14} className="shrink-0"/> Descarga la plantilla de ejemplo para ver el formato correcto.
               </div>
-            </>
+            </div>
           ):(
-            <>
-              <div style={{fontWeight:700,fontSize:14,color:"#0f172a",marginBottom:12}}>
+            <div>
+              <div className="font-bold text-sm text-slate-900 mb-3">
                 Vista previa — {previewUsuarios.length} usuarios detectados
               </div>
-              <div style={{maxHeight:320,overflowY:"auto",marginBottom:16}}>
-                <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-                  <thead><tr style={{background:"#0f172a",color:"white",position:"sticky",top:0}}>
+              <div className="max-h-[320px] overflow-y-auto mb-4 rounded-lg border">
+                <table className="w-full text-xs">
+                  <thead><tr className="bg-slate-900 text-white sticky top-0">
                     {["Nombre","Contraseña","Correo","Teléfono","Rol"].map(h=>(
-                      <th key={h} style={{padding:"7px 10px",textAlign:"left",fontWeight:600}}>{h}</th>
+                      <th key={h} className="px-2.5 py-2 text-left font-semibold">{h}</th>
                     ))}
                   </tr></thead>
                   <tbody>
                     {previewUsuarios.map((u,i)=>{
                       const duplicado=G.usuarios.find(x=>x.nombre===u.nombre);
                       return(
-                        <tr key={i} style={{background:duplicado?"#fef9c3":i%2?"#f8fafc":"white",borderBottom:"1px solid #f1f5f9"}}>
-                          <td style={{padding:"6px 10px",fontWeight:700}}>{u.nombre}{duplicado&&<span style={{fontSize:10,color:"#d97706",marginLeft:6}}>⚠️ Duplicado</span>}</td>
-                          <td style={{padding:"6px 10px",fontFamily:"monospace",color:"#2563eb"}}>{u.pass}</td>
-                          <td style={{padding:"6px 10px",color:"#64748b"}}>{u.correo||"—"}</td>
-                          <td style={{padding:"6px 10px",color:"#64748b"}}>{u.telefono||"—"}</td>
-                          <td style={{padding:"6px 10px"}}><Badge color={u.rol==="admin"?"#2563eb":"#16a34a"} small>{u.rol==="admin"?"ADMIN":"CAPTURADOR"}</Badge></td>
+                        <tr key={i} className={`border-b last:border-0 ${duplicado?"bg-amber-50":""}`}>
+                          <td className="px-2.5 py-1.5 font-bold">{u.nombre}{duplicado&&<span className="text-[10px] text-amber-600 ml-1.5 inline-flex items-center gap-0.5"><AlertTriangle size={10}/> Duplicado</span>}</td>
+                          <td className="px-2.5 py-1.5 font-mono text-primary">{u.pass}</td>
+                          <td className="px-2.5 py-1.5 text-muted-foreground">{u.correo||"—"}</td>
+                          <td className="px-2.5 py-1.5 text-muted-foreground">{u.telefono||"—"}</td>
+                          <td className="px-2.5 py-1.5"><UIBadge variant="secondary" className={u.rol==="admin"?"bg-blue-100 text-blue-700":"bg-green-100 text-green-700"}>{u.rol==="admin"?"ADMIN":"CAPTURADOR"}</UIBadge></td>
                         </tr>
                       );
                     })}
                   </tbody>
                 </table>
               </div>
-              <div style={{display:"flex",gap:10}}>
-                <Btn c="#16a34a" onClick={confirmarImportUsuarios} full>✓ Confirmar importación</Btn>
-                <Btn c="#dc2626" outline onClick={()=>setPreviewUsuarios(null)} full>← Volver</Btn>
+              <div className="flex gap-2.5">
+                <Button className="flex-1" onClick={confirmarImportUsuarios} disabled={busy}>{busy?"Creando…":<><CheckCircle size={15}/> Confirmar importación</>}</Button>
+                <Button variant="outline" className="flex-1" onClick={()=>setPreviewUsuarios(null)} disabled={busy}>← Volver</Button>
               </div>
-            </>
+            </div>
           )}
-        </Modal>
-      )}
+        </DialogContent>
+      </Dialog>
 
       {/* Modal confirmar eliminación */}
-      {modalConfirmDel&&(
-        <Modal titulo="Eliminar Usuario" onClose={()=>setModalConfirmDel(null)}>
-          <div style={{background:"#fef2f2",border:"1px solid #fecaca",borderRadius:10,padding:16,marginBottom:20,fontSize:14,color:"#dc2626"}}>
-            ¿Estás seguro de que deseas eliminar al usuario <b>{modalConfirmDel.nombre}</b>?<br/>
-            <span style={{fontSize:12,marginTop:4,display:"block"}}>Esta acción no se puede deshacer.</span>
-          </div>
-          <div style={{display:"flex",gap:10}}>
-            <Btn c="#dc2626" onClick={()=>eliminar(modalConfirmDel)} full>Sí, eliminar</Btn>
-            <Btn c="#64748b" onClick={()=>setModalConfirmDel(null)} full>Cancelar</Btn>
-          </div>
-        </Modal>
-      )}
+      <ConfirmDialog
+        open={!!modalConfirmDel}
+        onOpenChange={(v)=>!v&&setModalConfirmDel(null)}
+        icon={Trash2}
+        title="Eliminar Usuario"
+        description={<>¿Estás seguro de que deseas eliminar al usuario <b>{modalConfirmDel?.nombre}</b>? Esta acción no se puede deshacer.</>}
+        confirmText="Sí, eliminar"
+        onConfirm={()=>eliminar(modalConfirmDel)}
+      />
+
+      {/* Modal credencial creada / reseteada — mostrar y compartir */}
+      <Dialog open={!!credCreada} onOpenChange={(v)=>!v&&setCredCreada(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Acceso de {credCreada?.nombre}</DialogTitle></DialogHeader>
+          {credCreada&&(
+            <div className="space-y-3">
+              <div className="rounded-lg bg-slate-50 border p-3 text-sm space-y-1">
+                <div><span className="text-slate-500">Empresa:</span> <b className="font-mono">{((credCreada.email||"").split("@")[1]||"").replace(".tomfic.app","")}</b></div>
+                <div><span className="text-slate-500">Usuario:</span> <b>{credCreada.nombre}</b></div>
+                <div><span className="text-slate-500">Clave:</span> <b className="font-mono">{credCreada.pass}</b></div>
+              </div>
+              <div className="flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                <AlertTriangle size={14} className="shrink-0"/> Comparte esta clave ahora: por seguridad podría no estar visible después.
+              </div>
+              <div className="flex gap-2">
+                <Button className="flex-1 bg-[#25d366] hover:bg-[#1da851]" onClick={()=>copiarAcceso(credCreada)}><ClipboardList size={15}/> Copiar acceso</Button>
+                <Button variant="outline" className="flex-1" onClick={()=>setCredCreada(null)}>Cerrar</Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </Section>
   );
 }
@@ -3156,29 +3139,29 @@ function VHistorial({G,showToast,usuario}){
   // Modal detalle de tarjeta
   if(cardDetalle){
     return(
-      <div style={{minHeight:"100vh",background:"#f1f5f9",fontFamily:"system-ui,sans-serif",padding:20}}>
-        <div style={{display:"flex",gap:12,alignItems:"center",marginBottom:16}}>
-          <button onClick={()=>setCardDetalle(null)} style={{background:"#f1f5f9",border:"none",borderRadius:8,padding:"7px 14px",cursor:"pointer",fontWeight:600,fontSize:13}}>← Volver</button>
-          <h2 style={{margin:0,fontSize:18,fontWeight:700}}>{cardDetalle.titulo}</h2>
+      <div>
+        <div className="flex gap-3 items-center mb-4">
+          <Button variant="outline" size="sm" onClick={()=>setCardDetalle(null)}><ChevronLeft size={15}/> Volver</Button>
+          <h2 className="text-lg font-bold">{cardDetalle.titulo}</h2>
         </div>
-        <div style={{...card,overflow:"hidden"}}>
-          <div style={{overflowX:"auto"}}>
-            <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-              <thead><tr style={{background:"#0f172a",color:"white"}}>
-                {cardDetalle.cols.map(h=><th key={h} style={{padding:"8px 12px",textAlign:"left",fontWeight:600}}>{h}</th>)}
+        <Card className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead><tr className="bg-slate-900 text-white">
+                {cardDetalle.cols.map(h=><th key={h} className="px-3 py-2 text-left font-semibold">{h}</th>)}
               </tr></thead>
               <tbody>
                 {cardDetalle.lista.length===0?(
-                  <tr><td colSpan={cardDetalle.cols.length} style={{padding:20,textAlign:"center",color:"#64748b"}}>Sin registros</td></tr>
+                  <tr><td colSpan={cardDetalle.cols.length} className="p-5 text-center text-muted-foreground">Sin registros</td></tr>
                 ):cardDetalle.lista.map((row,i)=>(
-                  <tr key={i} style={{background:i%2?"#f8fafc":"white",borderBottom:"1px solid #f1f5f9"}}>
-                    {row.map((cell,j)=><td key={j} style={{padding:"6px 12px",color:"#374151"}}>{cell}</td>)}
+                  <tr key={i} className="border-b last:border-0 hover:bg-slate-50">
+                    {row.map((cell,j)=><td key={j} className="px-3 py-1.5 text-slate-700">{cell}</td>)}
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        </div>
+        </Card>
       </div>
     );
   }
@@ -3188,60 +3171,58 @@ function VHistorial({G,showToast,usuario}){
     const inv=invSel;
     const st=getSt(inv);
     const stCards=[
-      {l:"💰 Valor físico total",v:fmt(st.totalFisico),c:"#16a34a",
+      {l:"Valor físico total",v:fmt(st.totalFisico),c:"#16a34a",
        lista:st.resumen.map(r=>[r.codigo,r.nombre,r.referencia,r.cantFinal,r.costo>0?fmt(r.cantFinal*r.costo):"—"]),
        cols:["Código","Nombre","Referencia","Cantidad","Valor"]},
-      {l:"📊 Valor sistema",v:fmt(st.totalSistema),c:"#2563eb",
+      {l:"Valor sistema",v:fmt(st.totalSistema),c:"#2563eb",
        lista:st.resumen.map(r=>{const p=(inv.productos||[]).find(x=>x.id===r.productoId);return[r.codigo,r.nombre,r.referencia,p?.saldo||0,p?.costo>0?fmt((p?.saldo||0)*p.costo):"—"];}),
        cols:["Código","Nombre","Referencia","Saldo Sistema","Valor Sistema"]},
-      {l:"⚖️ Valor ajuste",v:(st.ajuste>=0?"+":"")+fmt(st.ajuste),c:st.ajuste>=0?"#16a34a":"#dc2626",
+      {l:"Valor ajuste",v:(st.ajuste>=0?"+":"")+fmt(st.ajuste),c:st.ajuste>=0?"#16a34a":"#dc2626",
        lista:st.conDif.map(r=>{const p=(inv.productos||[]).find(x=>x.id===r.productoId);const dif=r.cantFinal-(p?.saldo||0);return[r.codigo,r.nombre,p?.saldo||0,r.cantFinal,dif>0?"+"+dif:dif,fmt(dif*(p?.costo||0))];}),
        cols:["Código","Nombre","Saldo","Físico","Diferencia","Valor Dif"]},
-      {l:"📦 Productos contados",v:`${st.contados}/${st.totalProductos}`,c:"#0891b2",
+      {l:"Productos contados",v:`${st.contados}/${st.totalProductos}`,c:"#0891b2",
        lista:st.resumen.map(r=>[r.codigo,r.nombre,r.referencia,r.cantFinal,r.estado||""]),
        cols:["Código","Nombre","Referencia","Cantidad","Estado"]},
-      {l:"✅ Productos buenos",v:st.buenos.length,c:"#16a34a",
+      {l:"Productos buenos",v:st.buenos.length,c:"#16a34a",
        lista:st.buenos.map(r=>[r.codigo,r.nombre,r.referencia,r.cantFinal]),
        cols:["Código","Nombre","Referencia","Cantidad"]},
-      {l:"🔴 Vencidos",v:st.vencidos.length,c:"#dc2626",
+      {l:"Vencidos",v:st.vencidos.length,c:"#dc2626",
        lista:st.vencidos.map(r=>[r.codigo,r.nombre,r.referencia,r.cantFinal]),
        cols:["Código","Nombre","Referencia","Cantidad"]},
-      {l:"🟡 Averiados/No aptos",v:st.averiados.length,c:"#d97706",
+      {l:"Averiados/No aptos",v:st.averiados.length,c:"#d97706",
        lista:st.averiados.map(r=>[r.codigo,r.nombre,r.referencia,r.cantFinal]),
        cols:["Código","Nombre","Referencia","Cantidad"]},
-      {l:"⚠️ Con diferencia",v:st.conDif.length,c:"#ef4444",
+      {l:"Con diferencia",v:st.conDif.length,c:"#ef4444",
        lista:st.conDif.map(r=>{const p=(inv.productos||[]).find(x=>x.id===r.productoId);const dif=r.cantFinal-(p?.saldo||0);return[r.codigo,r.nombre,p?.saldo||0,r.cantFinal,dif>0?"+"+dif:dif];}),
        cols:["Código","Nombre","Saldo","Físico","Diferencia"]},
     ];
     return(
       <div>
-        <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
-          <button onClick={()=>setInvSel(null)} style={{background:"#f1f5f9",border:"none",borderRadius:8,padding:"7px 14px",cursor:"pointer",fontWeight:600,fontSize:13}}>← Historial</button>
-          <h2 style={{margin:0,fontSize:20,fontWeight:700}}>{inv.nombre}</h2>
-          <Badge color={inv.tipo==="2conteos"?"#2563eb":"#16a34a"}>{inv.tipo==="2conteos"?"2 CONTEOS":"1 CONTEO"}</Badge>
+        <div className="flex items-center gap-3 mb-4 flex-wrap">
+          <Button variant="outline" size="sm" onClick={()=>setInvSel(null)}><ChevronLeft size={15}/> Historial</Button>
+          <h2 className="text-xl font-bold">{inv.nombre}</h2>
+          <UIBadge className="border-transparent" style={{background:(inv.tipo==="2conteos"?"#2563eb":"#16a34a")+"22",color:inv.tipo==="2conteos"?"#2563eb":"#16a34a"}}>{inv.tipo==="2conteos"?"2 CONTEOS":"1 CONTEO"}</UIBadge>
         </div>
-        <div style={{fontSize:12,color:"#64748b",marginBottom:16}}>📅 {inv.apertura} {inv.horaApertura} → {inv.cierre} {inv.horaCierre} · Por: {inv.usuarioApertura}</div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12,marginBottom:20}}>
+        <div className="text-xs text-muted-foreground mb-4 flex items-center gap-1"><Calendar size={12}/> {inv.apertura} {inv.horaApertura} → {inv.cierre} {inv.horaCierre} · Por: {inv.usuarioApertura}</div>
+        <div className="grid gap-3 mb-5" style={{gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))"}}>
           {stCards.map((s,i)=>(
-            <div key={i} onClick={()=>setCardDetalle({titulo:s.l,lista:s.lista,cols:s.cols})}
-              style={{...card,borderTop:`3px solid ${s.c}`,padding:"12px 16px",cursor:"pointer",transition:"box-shadow 0.15s"}}
-              onMouseEnter={e=>e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.12)"}
-              onMouseLeave={e=>e.currentTarget.style.boxShadow="0 1px 4px rgba(0,0,0,0.07)"}>
-              <div style={{fontSize:typeof s.v==="string"&&s.v.length>8?14:20,fontWeight:800,color:s.c}}>{s.v}</div>
-              <div style={{fontSize:11,color:"#64748b",marginTop:3}}>{s.l}</div>
-              <div style={{fontSize:10,color:"#94a3b8",marginTop:4}}>Clic para ver detalle →</div>
-            </div>
+            <Card key={i} onClick={()=>setCardDetalle({titulo:s.l,lista:s.lista,cols:s.cols})}
+              className="px-4 py-3 cursor-pointer hover:shadow-md transition-shadow" style={{borderTop:`3px solid ${s.c}`}}>
+              <div className="font-extrabold" style={{color:s.c,fontSize:typeof s.v==="string"&&s.v.length>8?14:20}}>{s.v}</div>
+              <div className="text-[11px] text-muted-foreground mt-0.5">{s.l}</div>
+              <div className="text-[10px] text-slate-400 mt-1 flex items-center gap-0.5">Clic para ver detalle <ChevronRight size={10}/></div>
+            </Card>
           ))}
         </div>
-        <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
-          <Btn c="#2563eb" onClick={()=>expXLSX(
+        <div className="flex gap-2.5 flex-wrap">
+          <Button onClick={()=>expXLSX(
             st.resumen.map(r=>{const p=(inv.productos||[]).find(x=>x.id===r.productoId);return[r.ean||"",r.codigo,r.nombre,r.referencia,r.totalC1||"",r.totalC2||"",r.totalC3||"",r.cantFinal,r.estado||"",p?.saldo||0,r.costo>0?fmt(r.cantFinal*r.costo):"—",r.usuario];}),
             ["EAN","CODIGO","NOMBRE","REFERENCIA","C1","C2","C3","CANTIDAD_FINAL","ESTADO","SALDO_SISTEMA","VALOR","USUARIO"],
-            `captura_${inv.nombre?.replace(/ /g,"_")}.xlsx`,`CAPTURA INVENTARIO ${inv.nombre}`)}>⬇ Excel capturas</Btn>
-          <Btn c="#16a34a" onClick={()=>expXLSX(
+            `captura_${inv.nombre?.replace(/ /g,"_")}.xlsx`,`CAPTURA INVENTARIO ${inv.nombre}`)}><Download size={15}/> Excel capturas</Button>
+          <Button style={{background:"#16a34a"}} onClick={()=>expXLSX(
             st.conDif.map(r=>{const p=(inv.productos||[]).find(x=>x.id===r.productoId);const dif=r.cantFinal-(p?.saldo||0);return[r.codigo,r.nombre,r.referencia,r.estado||"",p?.saldo||0,r.cantFinal,dif,Math.round(dif*(p?.costo||0)),p?.costo||0];}),
             ["CODIGO","NOMBRE","REFERENCIA","ESTADO","SALDO","FISICO","DIFERENCIA","VALOR_DIF","COSTO"],
-            `ajuste_${inv.nombre?.replace(/ /g,"_")}.xlsx`,`AJUSTE ${inv.nombre}`)}>⬇ Excel ajuste</Btn>
+            `ajuste_${inv.nombre?.replace(/ /g,"_")}.xlsx`,`AJUSTE ${inv.nombre}`)}><Download size={15}/> Excel ajuste</Button>
         </div>
       </div>
     );
@@ -3250,99 +3231,88 @@ function VHistorial({G,showToast,usuario}){
   // Vista global
   return(
     <div>
-      {/* Header estilo procesos */}
-      <div style={{background:"linear-gradient(135deg,#1e293b 0%,#0f172a 100%)",borderRadius:16,padding:"20px 24px",marginBottom:20,color:"white",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-        <div>
-          <div style={{fontSize:11,fontWeight:600,opacity:0.75,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>Inventarios</div>
-          <div style={{fontSize:22,fontWeight:800,letterSpacing:-0.5}}>Historial</div>
-          <div style={{fontSize:12,opacity:0.8,marginTop:4}}>{G.historial[0]?.nombre||"Sin inventarios cerrados"}</div>
-        </div>
-        <div style={{textAlign:"right"}}>
-          <div style={{fontSize:28,fontWeight:900,letterSpacing:-1}}>{G.historial.length}</div>
-          <div style={{fontSize:11,opacity:0.8}}>inventarios</div>
-        </div>
-      </div>
+      <PageHeader
+        label="Inventarios"
+        title="Historial"
+        icon={Landmark}
+        subtitle={G.historial[0]?.nombre||"Sin inventarios cerrados"}
+        count={G.historial.length}
+        countLabel="inventarios"
+      />
       {G.historial.length===0?(
-        <div style={{textAlign:"center",padding:"48px 20px",background:"white",borderRadius:14,border:"2px dashed #e2e8f0",color:"#64748b"}}>
-          <div style={{fontSize:48,marginBottom:12}}>🏛️</div>
-          <div style={{fontSize:15,fontWeight:700,marginBottom:6}}>Sin historial</div>
-          <div style={{fontSize:13}}>Los inventarios cerrados aparecerán aquí.</div>
+        <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-200 bg-white py-12 px-5 text-center text-muted-foreground">
+          <Landmark size={48} className="text-slate-400 mb-3"/>
+          <div className="text-base font-bold text-slate-900 mb-1.5">Sin historial</div>
+          <div className="text-sm">Los inventarios cerrados aparecerán aquí.</div>
         </div>
       ):G.historial.length===1?(
         (()=>{const inv=G.historial[0];const st=getSt(inv);return(
           <div>
-            <div style={{...card,marginBottom:16,borderLeft:"4px solid #2563eb"}}>
-              <div style={{fontWeight:700,fontSize:16}}>{inv.nombre}</div>
-              <div style={{fontSize:12,color:"#64748b",marginTop:3}}>{inv.apertura} → {inv.cierre} · Por: {inv.usuarioApertura}</div>
-            </div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:12}}>
+            <Card className="p-5 mb-4 border-l-4 border-l-primary">
+              <div className="font-bold text-base">{inv.nombre}</div>
+              <div className="text-xs text-muted-foreground mt-0.5">{inv.apertura} → {inv.cierre} · Por: {inv.usuarioApertura}</div>
+            </Card>
+            <div className="grid gap-3" style={{gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))"}}>
               {[
-                {l:"Valor físico",v:fmt(st.totalFisico),c:"#16a34a",bg:"#f0fdf4",icon:"💰"},
-                {l:"Valor sistema",v:fmt(st.totalSistema),c:"#2563eb",bg:"#eff6ff",icon:"📊"},
-                {l:"Ajuste",v:(st.ajuste>=0?"+":"")+fmt(st.ajuste),c:st.ajuste>=0?"#16a34a":"#dc2626",bg:st.ajuste>=0?"#f0fdf4":"#fef2f2",icon:"⚖️"},
-                {l:"Contados",v:`${st.contados}/${st.totalProductos}`,c:"#0891b2",bg:"#ecfeff",icon:"📦"},
-                {l:"Buenos",v:st.buenos.length,c:"#16a34a",bg:"#f0fdf4",icon:"✅"},
-                {l:"Vencidos",v:st.vencidos.length,c:"#dc2626",bg:"#fef2f2",icon:"🔴"},
-                {l:"Averiados",v:st.averiados.length,c:"#d97706",bg:"#fffbeb",icon:"🟡"},
-                {l:"Con diferencia",v:st.conDif.length,c:"#ef4444",bg:"#fef2f2",icon:"⚠️"},
+                {l:"Valor físico",v:fmt(st.totalFisico),c:"#16a34a",bg:"#f0fdf4",icon:DollarSign},
+                {l:"Valor sistema",v:fmt(st.totalSistema),c:"#2563eb",bg:"#eff6ff",icon:BarChart2},
+                {l:"Ajuste",v:(st.ajuste>=0?"+":"")+fmt(st.ajuste),c:st.ajuste>=0?"#16a34a":"#dc2626",bg:st.ajuste>=0?"#f0fdf4":"#fef2f2",icon:Scale},
+                {l:"Contados",v:`${st.contados}/${st.totalProductos}`,c:"#0891b2",bg:"#ecfeff",icon:Package},
+                {l:"Buenos",v:st.buenos.length,c:"#16a34a",bg:"#f0fdf4",icon:CheckCircle},
+                {l:"Vencidos",v:st.vencidos.length,c:"#dc2626",bg:"#fef2f2",icon:XCircle},
+                {l:"Averiados",v:st.averiados.length,c:"#d97706",bg:"#fffbeb",icon:AlertCircle},
+                {l:"Con diferencia",v:st.conDif.length,c:"#ef4444",bg:"#fef2f2",icon:AlertTriangle},
               ].map((s,i)=>(
-                <div key={i} onClick={()=>setInvSel(inv)}
-                  style={{background:s.bg,borderRadius:14,padding:"14px 16px",cursor:"pointer",border:`1px solid ${s.c}22`,boxShadow:"0 1px 4px rgba(0,0,0,0.05)",transition:"box-shadow 0.15s"}}
-                  onMouseEnter={e=>e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.12)"}
-                  onMouseLeave={e=>e.currentTarget.style.boxShadow="0 1px 4px rgba(0,0,0,0.05)"}>
-                  <div style={{fontSize:18,marginBottom:4}}>{s.icon}</div>
-                  <div style={{fontSize:typeof s.v==="string"&&s.v.length>8?13:22,fontWeight:900,color:s.c,lineHeight:1}}>{s.v}</div>
-                  <div style={{fontSize:11,color:"#64748b",marginTop:4,fontWeight:600}}>{s.l}</div>
-                </div>
+                <Card key={i} onClick={()=>setInvSel(inv)}
+                  className="px-4 py-3.5 cursor-pointer hover:shadow-md transition-shadow" style={{background:s.bg,borderColor:s.c+"22"}}>
+                  <s.icon size={18} style={{color:s.c}} className="mb-1"/>
+                  <div className="font-black leading-none" style={{color:s.c,fontSize:typeof s.v==="string"&&s.v.length>8?13:22}}>{s.v}</div>
+                  <div className="text-[11px] text-muted-foreground mt-1 font-semibold">{s.l}</div>
+                </Card>
               ))}
             </div>
           </div>
         );})()
       ):(
         <>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:12,marginBottom:20}}>
+          <div className="grid gap-3 mb-5" style={{gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))"}}>
             {[
-              {l:"Total",v:G.historial.length,c:"#2563eb",bg:"#eff6ff",icon:"🏛️"},
-              {l:"Último",v:G.historial[0]?.nombre?.substring(0,14)||"—",c:"#16a34a",bg:"#f0fdf4",icon:"📋"},
-              {l:"Fecha cierre",v:G.historial[0]?.cierre||"—",c:"#0891b2",bg:"#ecfeff",icon:"📅"},
+              {l:"Total",v:G.historial.length,c:"#2563eb",bg:"#eff6ff",icon:Landmark},
+              {l:"Último",v:G.historial[0]?.nombre?.substring(0,14)||"—",c:"#16a34a",bg:"#f0fdf4",icon:ClipboardList},
+              {l:"Fecha cierre",v:G.historial[0]?.cierre||"—",c:"#0891b2",bg:"#ecfeff",icon:Calendar},
             ].map(s=>(
-              <div key={s.l} style={{background:s.bg,borderRadius:14,padding:"14px 16px",border:`1px solid ${s.c}22`,boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
-                <div style={{fontSize:22,marginBottom:6}}>{s.icon}</div>
-                <div style={{fontSize:s.v.toString().length>12?12:22,fontWeight:900,color:s.c,lineHeight:1}}>{s.v}</div>
-                <div style={{fontSize:11,color:"#64748b",marginTop:4,fontWeight:600}}>{s.l}</div>
-              </div>
+              <Card key={s.l} className="px-4 py-3.5" style={{background:s.bg,borderColor:s.c+"22"}}>
+                <s.icon size={22} style={{color:s.c}} className="mb-1.5"/>
+                <div className="font-black leading-none" style={{color:s.c,fontSize:s.v.toString().length>12?12:22}}>{s.v}</div>
+                <div className="text-[11px] text-muted-foreground mt-1 font-semibold">{s.l}</div>
+              </Card>
             ))}
           </div>
-          <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          <div className="flex flex-col gap-3">
             {G.historial.map((h,i)=>{
               const st=getSt(h);
               return(
-                <div key={i} style={{...card,borderLeft:"4px solid #2563eb",transition:"box-shadow 0.15s",position:"relative"}}
-                  onMouseEnter={e=>e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.12)"}
-                  onMouseLeave={e=>e.currentTarget.style.boxShadow="0 1px 4px rgba(0,0,0,0.07)"}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-                    <div style={{flex:1,cursor:"pointer"}} onClick={()=>setInvSel(h)}>
-                      <div style={{fontWeight:700,fontSize:15,color:"#0f172a"}}>{h.nombre}</div>
-                      <div style={{fontSize:12,color:"#64748b",marginTop:3}}>
-                        <Badge color={h.tipo==="2conteos"?"#2563eb":"#16a34a"} small>{h.tipo==="2conteos"?"2 CONTEOS":"1 CONTEO"}</Badge>
-                        {" "}{h.apertura} → {h.cierre} · Por: {h.usuarioApertura}
+                <Card key={i} className="p-5 border-l-4 border-l-primary hover:shadow-md transition-shadow">
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1 cursor-pointer" onClick={()=>setInvSel(h)}>
+                      <div className="font-bold text-[15px] text-slate-900">{h.nombre}</div>
+                      <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1.5 flex-wrap">
+                        <UIBadge className="border-transparent" style={{background:(h.tipo==="2conteos"?"#2563eb":"#16a34a")+"22",color:h.tipo==="2conteos"?"#2563eb":"#16a34a"}}>{h.tipo==="2conteos"?"2 CONTEOS":"1 CONTEO"}</UIBadge>
+                        {h.apertura} → {h.cierre} · Por: {h.usuarioApertura}
                       </div>
-                      <div style={{display:"flex",gap:16,marginTop:8}}>
-                        <span style={{fontSize:12,color:"#16a34a",fontWeight:700}}>💰 {fmt(st.totalFisico)}</span>
-                        <span style={{fontSize:12,color:st.ajuste>=0?"#16a34a":"#dc2626",fontWeight:700}}>⚖️ {(st.ajuste>=0?"+":"")+fmt(st.ajuste)}</span>
-                        <span style={{fontSize:12,color:"#64748b"}}>{st.contados}/{st.totalProductos} productos</span>
-                        {st.conDif.length>0&&<span style={{fontSize:12,color:"#dc2626",fontWeight:700}}>⚠️ {st.conDif.length} difs</span>}
+                      <div className="flex gap-4 mt-2 flex-wrap">
+                        <span className="text-xs text-green-600 font-bold inline-flex items-center gap-1"><DollarSign size={11}/> {fmt(st.totalFisico)}</span>
+                        <span className="text-xs font-bold inline-flex items-center gap-1" style={{color:st.ajuste>=0?"#16a34a":"#dc2626"}}><Scale size={11}/> {(st.ajuste>=0?"+":"")+fmt(st.ajuste)}</span>
+                        <span className="text-xs text-muted-foreground">{st.contados}/{st.totalProductos} productos</span>
+                        {st.conDif.length>0&&<span className="text-xs text-destructive font-bold inline-flex items-center gap-1"><AlertTriangle size={11}/> {st.conDif.length} difs</span>}
                       </div>
                     </div>
-                    <div style={{display:"flex",alignItems:"center",gap:10,flexShrink:0,marginLeft:12}}>
-                      <div style={{fontSize:12,color:"#2563eb",fontWeight:600,cursor:"pointer"}} onClick={()=>setInvSel(h)}>Ver detalle →</div>
-                      <button onClick={e=>{e.stopPropagation();setConfirmElim(i);}}
-                        style={{background:"#fef2f2",color:"#dc2626",border:"1px solid #fecaca",borderRadius:7,padding:"4px 10px",cursor:"pointer",fontWeight:700,fontSize:12}}>
-                        🗑
-                      </button>
+                    <div className="flex items-center gap-2.5 shrink-0 ml-3">
+                      <div className="text-xs text-primary font-semibold cursor-pointer inline-flex items-center gap-0.5" onClick={()=>setInvSel(h)}>Ver detalle <ChevronRight size={13}/></div>
+                      <Button variant="outline" size="sm" className="h-8 px-2.5 text-destructive border-red-200 hover:bg-red-50 hover:text-destructive" onClick={e=>{e.stopPropagation();setConfirmElim(i);}}><Trash2 size={14}/></Button>
                     </div>
                   </div>
-                </div>
+                </Card>
               );
             })}
           </div>
@@ -3350,41 +3320,296 @@ function VHistorial({G,showToast,usuario}){
       )}
 
       {/* Modal confirmar eliminación historial */}
-      {confirmElim!==null&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center"}}>
-          <div style={{background:"white",borderRadius:16,padding:28,width:400,maxWidth:"95vw",boxShadow:"0 25px 60px rgba(0,0,0,0.3)"}}>
-            <div style={{fontSize:32,textAlign:"center",marginBottom:12}}>🗑️</div>
-            <h3 style={{margin:"0 0 8px",fontSize:17,fontWeight:700,textAlign:"center"}}>Eliminar inventario</h3>
-            <p style={{fontSize:14,color:"#374151",textAlign:"center",marginBottom:24}}>
-              ¿Estás seguro de eliminar <strong>{G.historial[confirmElim]?.nombre}</strong> del historial? Esta acción no se puede deshacer.
-            </p>
-            <div style={{display:"flex",gap:10}}>
-              <button onClick={async()=>{
-                const inv=G.historial[confirmElim];
-                if(inv){
-                  // Eliminar en Supabase primero
-                  try{await SB.deleteInventario(inv.id);}catch(e){console.warn("Error al eliminar en Supabase:",e);}
-                  // Eliminar del snap para que doSync no lo restaure
-                  delete _snap.hist[inv.id];
-                }
-                G.historial=G.historial.filter((_,idx)=>idx!==confirmElim);
-                setConfirmElim(null);
-                showToast("Inventario eliminado ✓","warn");
-              }} style={{flex:1,padding:"10px 0",background:"#dc2626",color:"white",border:"none",borderRadius:8,fontWeight:700,cursor:"pointer",fontSize:14}}>
-                Sí, eliminar
-              </button>
-              <button onClick={()=>setConfirmElim(null)}
-                style={{flex:1,padding:"10px 0",background:"#f1f5f9",color:"#374151",border:"none",borderRadius:8,fontWeight:700,cursor:"pointer",fontSize:14}}>
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={confirmElim!==null}
+        onOpenChange={(v)=>!v&&setConfirmElim(null)}
+        icon={Trash2}
+        title="Eliminar inventario"
+        description={<>¿Estás seguro de eliminar <strong>{G.historial[confirmElim]?.nombre}</strong> del historial? Esta acción no se puede deshacer.</>}
+        confirmText="Sí, eliminar"
+        onConfirm={async()=>{
+          const inv=G.historial[confirmElim];
+          if(inv){
+            // Eliminar en Supabase primero
+            try{await SB.deleteInventario(inv.id);}catch(e){console.warn("Error al eliminar en Supabase:",e);}
+            // Eliminar del snap para que doSync no lo restaure
+            delete _snap.hist[inv.id];
+          }
+          G.historial=G.historial.filter((_,idx)=>idx!==confirmElim);
+          setConfirmElim(null);
+          showToast("Inventario eliminado ✓","warn");
+        }}
+      />
     </div>
   );
 }
 
+// ── EDITOR DE LA PÁGINA WEB (solo dueño) ──
+function Ta({value,onChange,rows=2,placeholder}){
+  return <textarea value={value} onChange={onChange} rows={rows} placeholder={placeholder}
+    className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-y"/>;
+}
+function VPaginaWeb({G,rerender,showToast}){
+  const [form,setForm]=useState(()=>mergeLanding(G.landingContent));
+  const [saving,setSaving]=useState(false);
+
+  const setHero=(k,v)=>setForm(f=>({...f,hero:{...f.hero,[k]:v}}));
+  const setAbout=(k,v)=>setForm(f=>({...f,about:{...f.about,[k]:v}}));
+  const setContacto=(k,v)=>setForm(f=>({...f,contacto:{...f.contacto,[k]:v}}));
+  const setFeature=(i,k,v)=>setForm(f=>({...f,features:f.features.map((x,j)=>j===i?{...x,[k]:v}:x)}));
+  const setStep=(i,k,v)=>setForm(f=>({...f,steps:f.steps.map((x,j)=>j===i?{...x,[k]:v}:x)}));
+  const setPlan=(i,k,v)=>setForm(f=>({...f,planes:f.planes.map((x,j)=>j===i?{...x,[k]:v}:x)}));
+
+  const guardar=async()=>{
+    setSaving(true);
+    const clean={...form,planes:form.planes.map(p=>({...p,items:(p.items||[]).map(x=>x.trim()).filter(Boolean)}))};
+    try{
+      const {error}=await SB.setConfig("landing",clean);
+      if(error)throw error;
+      G.landingContent=clean;rerender();
+      showToast("Página web actualizada y publicada ✓");
+    }catch(e){
+      console.warn("Error guardando landing:",e);
+      showToast("No se pudo guardar. Verifica que exista la tabla 'app_config' en Supabase.","err");
+    }
+    setSaving(false);
+  };
+
+  const BtnGuardar=({className=""})=>(
+    <Button onClick={guardar} disabled={saving} className={className}>
+      {saving?"Guardando…":<><CheckCircle size={16}/> Guardar y publicar</>}
+    </Button>
+  );
+
+  return(
+    <Section>
+      <PageHeader
+        label="Web pública"
+        title="Editor de la página"
+        icon={Globe}
+        subtitle="Edita el contenido de la landing. Los cambios se publican al guardar."
+        right={<BtnGuardar className="bg-white text-blue-700 hover:bg-blue-50"/>}
+      />
+
+      <div className="flex items-center gap-2 mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+        <Globe size={16} className="shrink-0"/> Lo que cambies acá se ve en la página pública apenas guardes. Los iconos e imágenes no se editan desde aquí.
+      </div>
+
+      {/* HERO */}
+      <Card className="p-5 mb-4">
+        <div className="font-bold text-sm text-slate-900 mb-3">Encabezado principal (Hero)</div>
+        <div className="space-y-3">
+          <div className="space-y-1.5"><Label>Etiqueta superior</Label><Input value={form.hero.badge} onChange={e=>setHero("badge",e.target.value)}/></div>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5"><Label>Título</Label><Input value={form.hero.title} onChange={e=>setHero("title",e.target.value)}/></div>
+            <div className="space-y-1.5"><Label>Título (palabra resaltada)</Label><Input value={form.hero.titleHighlight} onChange={e=>setHero("titleHighlight",e.target.value)}/></div>
+          </div>
+          <div className="space-y-1.5"><Label>Subtítulo</Label><Ta value={form.hero.subtitle} onChange={e=>setHero("subtitle",e.target.value)} rows={2}/></div>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5"><Label>Texto botón principal</Label><Input value={form.hero.ctaPrimary} onChange={e=>setHero("ctaPrimary",e.target.value)}/></div>
+            <div className="space-y-1.5"><Label>Texto botón secundario</Label><Input value={form.hero.ctaSecondary} onChange={e=>setHero("ctaSecondary",e.target.value)}/></div>
+          </div>
+        </div>
+      </Card>
+
+      {/* QUIÉNES SOMOS */}
+      <Card className="p-5 mb-4">
+        <div className="font-bold text-sm text-slate-900 mb-3">Quiénes somos</div>
+        <div className="space-y-3">
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5"><Label>Etiqueta</Label><Input value={form.about.label} onChange={e=>setAbout("label",e.target.value)}/></div>
+            <div className="space-y-1.5"><Label>Título</Label><Input value={form.about.title} onChange={e=>setAbout("title",e.target.value)}/></div>
+          </div>
+          <div className="space-y-1.5"><Label>Párrafo 1</Label><Ta value={form.about.p1} onChange={e=>setAbout("p1",e.target.value)} rows={3}/></div>
+          <div className="space-y-1.5"><Label>Párrafo 2</Label><Ta value={form.about.p2} onChange={e=>setAbout("p2",e.target.value)} rows={2}/></div>
+        </div>
+      </Card>
+
+      {/* CARACTERÍSTICAS */}
+      <Card className="p-5 mb-4">
+        <div className="font-bold text-sm text-slate-900 mb-3">Características (6)</div>
+        <div className="space-y-4">
+          {form.features.map((f,i)=>(
+            <div key={i} className="grid sm:grid-cols-[200px_1fr] gap-3 items-start border-b last:border-0 pb-4 last:pb-0">
+              <div className="space-y-1.5"><Label>Título {i+1}</Label><Input value={f.title} onChange={e=>setFeature(i,"title",e.target.value)}/></div>
+              <div className="space-y-1.5"><Label>Descripción</Label><Ta value={f.desc} onChange={e=>setFeature(i,"desc",e.target.value)} rows={2}/></div>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      {/* CÓMO FUNCIONA */}
+      <Card className="p-5 mb-4">
+        <div className="font-bold text-sm text-slate-900 mb-3">Cómo funciona (3 pasos)</div>
+        <div className="space-y-4">
+          {form.steps.map((s,i)=>(
+            <div key={i} className="grid sm:grid-cols-[200px_1fr] gap-3 items-start border-b last:border-0 pb-4 last:pb-0">
+              <div className="space-y-1.5"><Label>Paso {i+1}</Label><Input value={s.title} onChange={e=>setStep(i,"title",e.target.value)}/></div>
+              <div className="space-y-1.5"><Label>Descripción</Label><Ta value={s.desc} onChange={e=>setStep(i,"desc",e.target.value)} rows={2}/></div>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      {/* PRECIOS */}
+      <Card className="p-5 mb-4">
+        <div className="font-bold text-sm text-slate-900 mb-3">Precios (3 planes)</div>
+        <div className="grid md:grid-cols-3 gap-4">
+          {form.planes.map((p,i)=>(
+            <div key={i} className="rounded-xl border border-slate-200 p-4 space-y-3">
+              <div className="space-y-1.5"><Label>Nombre del plan</Label><Input value={p.nombre} onChange={e=>setPlan(i,"nombre",e.target.value)}/></div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1.5"><Label>Precio</Label><Input value={p.precio} onChange={e=>setPlan(i,"precio",e.target.value)}/></div>
+                <div className="space-y-1.5"><Label>Periodo</Label><Input value={p.periodo} onChange={e=>setPlan(i,"periodo",e.target.value)} placeholder="/mes"/></div>
+              </div>
+              <div className="space-y-1.5"><Label>Descripción</Label><Ta value={p.desc} onChange={e=>setPlan(i,"desc",e.target.value)} rows={2}/></div>
+              <div className="space-y-1.5"><Label>Beneficios (uno por línea)</Label><Ta value={(p.items||[]).join("\n")} onChange={e=>setPlan(i,"items",e.target.value.split("\n"))} rows={5}/></div>
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-700 cursor-pointer">
+                <input type="checkbox" checked={!!p.destacado} onChange={e=>setPlan(i,"destacado",e.target.checked)} className="h-4 w-4 accent-blue-600"/>
+                Marcar como "Más popular"
+              </label>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      {/* CONTACTO */}
+      <Card className="p-5 mb-4">
+        <div className="font-bold text-sm text-slate-900 mb-3">Contacto (footer)</div>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <div className="space-y-1.5"><Label>Email</Label><Input value={form.contacto.email} onChange={e=>setContacto("email",e.target.value)}/></div>
+          <div className="space-y-1.5"><Label>WhatsApp</Label><Input value={form.contacto.whatsapp} onChange={e=>setContacto("whatsapp",e.target.value)}/></div>
+        </div>
+      </Card>
+
+      <div className="flex justify-end gap-2 mb-2">
+        <Button variant="outline" onClick={()=>setForm(mergeLanding(null))}>Restaurar por defecto</Button>
+        <BtnGuardar/>
+      </div>
+    </Section>
+  );
+}
+
+// ── PANEL DEL DUEÑO (super-admin, separado del inventario de clientes) ──
+function VClientes({G,rerender,recargar,showToast}){
+  const [modal,setModal]=useState(false);
+  const [form,setForm]=useState({nombre:"",nit:"",slug:"",adminNombre:"",adminEmail:"",adminPass:""});
+  const [saving,setSaving]=useState(false);
+
+  const crear=async()=>{
+    if(!form.nombre.trim()||!form.nit.trim()||!form.adminEmail.trim()||!form.adminPass.trim())return showToast("Completa empresa, NIT, email y clave","err");
+    if(form.adminPass.length<6)return showToast("La clave debe tener al menos 6 caracteres","err");
+    setSaving(true);
+    const slug=slugify(form.nit); // el identificador (slug) sale del NIT
+    try{
+      const {data,error}=await SB.registerTenant(form.nombre.trim(),slug,form.adminEmail.trim(),form.adminPass,form.adminNombre.trim(),form.nit.trim());
+      if(error)throw error;
+      // El dueño la crea a propósito → la dejamos activa de una vez.
+      if(data?.tenant_id){const {error:e2}=await SB.setTenantActive(data.tenant_id,true);if(e2)throw e2;}
+      await loadTenants();rerender();
+      setModal(false);setForm({nombre:"",nit:"",slug:"",adminNombre:"",adminEmail:"",adminPass:""});
+      showToast("Empresa creada y activada ✓");
+    }catch(e){console.warn("Error creando empresa:",e);showToast(e.message||"No se pudo crear la empresa","err");}
+    setSaving(false);
+  };
+  const toggleActivo=async(t)=>{
+    try{const {error}=await SB.setTenantActive(t.id,!t.activo);if(error)throw error;await loadTenants();rerender();showToast(t.activo?"Empresa desactivada":"Empresa activada","warn");}catch(e){showToast(e.message||"Error al actualizar","err");}
+  };
+
+  const tenants=G.tenants||[];
+  return(
+    <Section>
+      <PageHeader label="Empresas" title="Clientes" icon={Users} count={tenants.length} countLabel="empresas"
+        right={<Button onClick={()=>setModal(true)} className="bg-white text-indigo-700 hover:bg-indigo-50"><Plus size={16}/> Crear empresa</Button>}/>
+      {tenants.length===0?(
+        <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-200 bg-white py-12 px-5 text-center text-muted-foreground">
+          <Users size={48} className="text-slate-400 mb-3"/>
+          <div className="text-base font-bold text-slate-900 mb-1.5">Sin empresas todavía</div>
+          <div className="text-sm">Crea la primera empresa-cliente.</div>
+        </div>
+      ):(
+        <Card className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead><tr className="bg-slate-900 text-white">{["Empresa","NIT","Slug","Plan","Estado","Creada","Acciones"].map(h=><th key={h} className="px-3 py-2.5 text-left font-semibold whitespace-nowrap text-xs">{h}</th>)}</tr></thead>
+              <tbody>
+                {tenants.map(t=>(
+                  <tr key={t.id} className="border-b last:border-0 hover:bg-slate-50">
+                    <td className="px-3 py-2.5 font-bold text-slate-900">{t.nombre}</td>
+                    <td className="px-3 py-2.5 text-xs text-muted-foreground">{t.nit||"—"}</td>
+                    <td className="px-3 py-2.5 font-mono text-xs text-muted-foreground">{t.slug||"—"}</td>
+                    <td className="px-3 py-2.5"><UIBadge variant="secondary">{t.plan||"basico"}</UIBadge></td>
+                    <td className="px-3 py-2.5">{t.activo?<UIBadge variant="success">Activa</UIBadge>:<UIBadge variant="destructive">Inactiva</UIBadge>}</td>
+                    <td className="px-3 py-2.5 text-xs text-muted-foreground">{(t.created_at||"").slice(0,10)}</td>
+                    <td className="px-3 py-2.5"><Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" onClick={()=>toggleActivo(t)}>{t.activo?"Desactivar":"Activar"}</Button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+      <Dialog open={modal} onOpenChange={setModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Crear empresa-cliente</DialogTitle></DialogHeader>
+          <div className="space-y-3.5">
+            <div className="space-y-1.5"><Label>Nombre de la empresa</Label><Input value={form.nombre} onChange={e=>setForm(p=>({...p,nombre:e.target.value}))} placeholder="Ej: Supermercado La 14"/></div>
+            <div className="space-y-1.5"><Label>NIT</Label><Input value={form.nit} onChange={e=>setForm(p=>({...p,nit:e.target.value}))} placeholder="900.123.456-7"/>{form.nit.trim()&&<p className="text-xs text-slate-400">Identificador del equipo: <span className="font-mono text-slate-600">{slugify(form.nit)}</span></p>}</div>
+            <div className="rounded-lg bg-indigo-50 px-3 py-2.5 text-xs text-indigo-800">Se crea la cuenta de <b>administrador</b> de esta empresa (entra con <b>email + clave</b> en la pestaña «Administrador»). La empresa queda activa de inmediato.</div>
+            <div className="space-y-1.5"><Label>Nombre del admin <span className="text-slate-400 font-normal">(opcional)</span></Label><Input value={form.adminNombre} onChange={e=>setForm(p=>({...p,adminNombre:e.target.value}))} placeholder="Ej: Juan Pérez"/></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5"><Label>Email del admin</Label><Input type="email" value={form.adminEmail} onChange={e=>setForm(p=>({...p,adminEmail:e.target.value}))} placeholder="admin@empresa.com"/></div>
+              <div className="space-y-1.5"><Label>Clave admin</Label><Input value={form.adminPass} onChange={e=>setForm(p=>({...p,adminPass:e.target.value}))} placeholder="mín. 6 caracteres"/></div>
+            </div>
+            <Button className="w-full" onClick={crear} disabled={saving}>{saving?"Creando…":<><Plus size={16}/> Crear empresa</>}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </Section>
+  );
+}
+
+function PanelDueno({usuario,setUsuario,logout,G,rerender,recargar,showToast}){
+  const [view,setView]=useState("web");
+  const [modalSalir,setModalSalir]=useState(false);
+  const nav=[
+    {id:"web",icon:Globe,label:"Página web"},
+    {id:"clientes",icon:Users,label:"Clientes"},
+  ];
+  return(
+    <div className="min-h-screen bg-slate-100 font-sans">
+      {/* Topbar — distinto del inventario (morado/dueño) */}
+      <div className="sticky top-0 z-50 h-14 px-5 flex items-center justify-between bg-gradient-to-r from-slate-900 to-indigo-900 text-white shadow-lg">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center"><Package size={18}/></div>
+          <div>
+            <div className="font-extrabold text-sm leading-none">TOMFIC</div>
+            <div className="text-[9px] uppercase tracking-[0.2em] text-indigo-300">Panel del Dueño</div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={async()=>{await recargar();showToast("Actualizado ✓");}} className="inline-flex items-center gap-1.5 rounded-md bg-white/10 px-3 py-1.5 text-xs hover:bg-white/15"><RefreshCw size={13}/> Sync</button>
+          <span className="text-xs text-indigo-200 hidden sm:inline">{usuario.nombre}</span>
+          <button onClick={()=>setModalSalir(true)} className="rounded-md bg-red-500/20 border border-red-400/30 px-3 py-1.5 text-xs font-bold text-red-200 hover:bg-red-500/30">Salir</button>
+        </div>
+      </div>
+      <div className="flex" style={{height:"calc(100vh - 56px)",overflow:"hidden"}}>
+        <div className="w-48 shrink-0 bg-gradient-to-b from-indigo-950 to-slate-900 p-3 flex flex-col gap-1.5 overflow-y-auto">
+          {nav.map(n=>{const active=view===n.id;return(
+            <button key={n.id} onClick={()=>setView(n.id)} className={`flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm text-left transition-colors ${active?"bg-indigo-600 text-white font-semibold":"text-indigo-200/70 hover:bg-white/5"}`}>
+              <n.icon size={17}/> {n.label}
+            </button>
+          );})}
+        </div>
+        <div className="flex-1 p-6 overflow-y-auto">
+          {view==="web"&&<VPaginaWeb G={G} rerender={rerender} showToast={showToast}/>}
+          {view==="clientes"&&<VClientes G={G} rerender={rerender} recargar={recargar} showToast={showToast}/>}
+        </div>
+      </div>
+      <ConfirmDialog open={modalSalir} onOpenChange={setModalSalir} icon={LogOut} title="¿Cerrar sesión?" description="Vas a salir del Panel del Dueño." confirmText="Sí, salir" confirmVariant="default" onConfirm={logout}/>
+    </div>
+  );
+}
 
 // ─────────────────────────────────────────
 // MÓDULO CAPTURADOR
@@ -3393,7 +3618,7 @@ function VHistorial({G,showToast,usuario}){
 // ─────────────────────────────────────────
 // MÓDULO CAPTURADOR — v6
 // ─────────────────────────────────────────
-function ModCapturador({usuario,setUsuario,G,rerender,recargar,showToast}){
+function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,showToast}){
   const [conteoActivo,setConteoActivo]=useState(null);
   const [rondaActiva,setRondaActiva]=useState(null); // ronda elegida cuando el usuario tiene varias
   const [scanInput,setScanInput]=useState("");
@@ -3626,18 +3851,17 @@ function ModCapturador({usuario,setUsuario,G,rerender,recargar,showToast}){
   const rcol={C1:"#2563eb",C2:"#16a34a",C3:"#7c3aed"};
   const rlbl={C1:"CONTEO 1",C2:"CONTEO 2",C3:"CONTEO 3"};
 
-  const modalSalirJSX=modalSalir?(
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
-      <div style={{background:"white",borderRadius:16,padding:28,width:360,maxWidth:"96vw",boxShadow:"0 25px 60px rgba(0,0,0,0.3)"}}>
-        <h3 style={{margin:"0 0 12px",fontSize:18,fontWeight:700,color:"#0f172a"}}>¿Cerrar sesión?</h3>
-        <p style={{fontSize:14,color:"#374151",marginBottom:22,lineHeight:1.5}}>Vas a salir de TOMFIC. Tus capturas ya están guardadas en la nube.</p>
-        <div style={{display:"flex",gap:10}}>
-          <Btn c="#dc2626" onClick={()=>setUsuario(null)} full>Sí, salir</Btn>
-          <Btn c="#64748b" onClick={()=>setModalSalir(false)} full outline>Cancelar</Btn>
-        </div>
-      </div>
-    </div>
-  ):null;
+  const modalSalirJSX=(
+    <ConfirmDialog
+      open={modalSalir}
+      onOpenChange={setModalSalir}
+      icon={LogOut}
+      title="¿Cerrar sesión?"
+      description="Vas a salir de TOMFIC. Tus capturas ya están guardadas en la nube."
+      confirmText="Sí, salir"
+      onConfirm={logout}
+    />
+  );
 
   // ── VISTA LISTA COMPACTA ──
   if(!conteoActivo||!miConteo){
@@ -3655,14 +3879,14 @@ function ModCapturador({usuario,setUsuario,G,rerender,recargar,showToast}){
       <div style={{minHeight:"100vh",background:"#f1f5f9",fontFamily:"system-ui,sans-serif"}}>
         <div style={{background:"#0f172a",color:"white",padding:"0 16px",display:"flex",alignItems:"center",justifyContent:"space-between",height:52,position:"sticky",top:0,zIndex:100}}>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
-            <span style={{fontSize:20}}>📦</span>
+            <Package size={20} color="white"/>
             <span style={{fontWeight:800,fontSize:15}}>TOMFIC</span>
             {G.inventario&&<span style={{background:"#16a34a",fontSize:10,padding:"2px 10px",borderRadius:20,fontWeight:700}}>● {G.inventario.nombre}</span>}
           </div>
           <div style={{display:"flex",gap:10,alignItems:"center"}}>
-            <button onClick={async()=>{await recargar();showToast("Actualizado ✓");}} style={{background:"transparent",border:"1px solid #334155",color:"#94a3b8",padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer"}}>🔄</button>
-            <span style={{fontSize:11,color:"#94a3b8"}}>👤 {usuario.nombre}</span>
-            <button onClick={()=>setModalSalir(true)} style={{background:"#dc2626",border:"none",color:"white",padding:"6px 16px",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer"}}>⎋ Salir</button>
+            <button onClick={async()=>{await recargar();showToast("Actualizado ✓");}} style={{background:"transparent",border:"1px solid #334155",color:"#94a3b8",padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer",display:"flex",alignItems:"center"}}><RefreshCw size={13}/></button>
+            <span style={{fontSize:11,color:"#94a3b8",display:"flex",alignItems:"center",gap:4}}><Users size={11}/> {usuario.nombre}</span>
+            <button onClick={()=>setModalSalir(true)} style={{background:"#dc2626",border:"none",color:"white",padding:"6px 16px",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:4}}><LogOut size={13}/> Salir</button>
           </div>
         </div>
         <div style={{maxWidth:700,margin:"0 auto",padding:"20px 14px"}}>
@@ -3673,7 +3897,7 @@ function ModCapturador({usuario,setUsuario,G,rerender,recargar,showToast}){
             <div style={{fontSize:11,fontWeight:700,color:"#374151",textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>Activos / Pendientes</div>
             {activos.length===0?(
               <div style={{...card,padding:"20px 18px",color:"#64748b",textAlign:"center"}}>
-                <div style={{fontSize:32,marginBottom:8}}>📭</div>
+                <div style={{marginBottom:8,display:"flex",justifyContent:"center"}}><FolderOpen size={32} color="#94a3b8"/></div>
                 <div style={{fontSize:14,fontWeight:600,marginBottom:4}}>No tienes conteos asignados</div>
                 <div style={{fontSize:12}}>El administrador te asignará uno cuando sea necesario.</div>
               </div>
@@ -3693,11 +3917,11 @@ function ModCapturador({usuario,setUsuario,G,rerender,recargar,showToast}){
                     <div key={c.id+"_"+r} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 16px",borderBottom:i<activos.length-1?"1px solid #f1f5f9":"none",background:"white",gap:12}}>
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{fontWeight:700,fontSize:14,color:"#0f172a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nombre}</div>
-                        <div style={{fontSize:11,color:"#64748b",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>📍 {c.locLabel}</div>
+                        <div style={{fontSize:11,color:"#64748b",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}><MapPin size={11} style={{display:"inline",marginRight:2}}/> {c.locLabel}</div>
                         <div style={{display:"flex",gap:6,marginTop:6,flexWrap:"wrap"}}>
-                          <Badge color={rcol[r]} small>{rlbl[r]}</Badge>
-                          {caps.length>0&&<Badge color="#64748b" small>{new Set(caps.map(x=>x.productoId)).size} capturados</Badge>}
-                          {!puedeIniciar&&<Badge color="#94a3b8" small>No disponible aún</Badge>}
+                          <UIBadge className="border-transparent text-[10px] px-2 py-0.5" style={{background:rcol[r]+"22",color:rcol[r]}}>{rlbl[r]}</UIBadge>
+                          {caps.length>0&&<UIBadge className="border-transparent text-[10px] px-2 py-0.5" style={{background:"#64748b22",color:"#64748b"}}>{new Set(caps.map(x=>x.productoId)).size} capturados</UIBadge>}
+                          {!puedeIniciar&&<UIBadge className="border-transparent text-[10px] px-2 py-0.5" style={{background:"#94a3b822",color:"#94a3b8"}}>No disponible aún</UIBadge>}
                         </div>
                       </div>
                       <button onClick={abrir}
@@ -3723,11 +3947,11 @@ function ModCapturador({usuario,setUsuario,G,rerender,recargar,showToast}){
                     <div key={c.id+"_"+r} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 16px",borderBottom:i<cerrados.length-1?"1px solid #f1f5f9":"none",opacity:0.7}}>
                       <div style={{flex:1}}>
                         <div style={{fontWeight:600,fontSize:13,color:"#64748b"}}>{c.nombre}</div>
-                        <div style={{fontSize:11,color:"#94a3b8",marginTop:1}}>📍 {c.locLabel}</div>
+                        <div style={{fontSize:11,color:"#94a3b8",marginTop:1}}><MapPin size={11} style={{display:"inline",marginRight:2}}/> {c.locLabel}</div>
                         <div style={{display:"flex",gap:6,marginTop:4}}>
-                          <Badge color="#64748b" small>{rlbl[r]}</Badge>
-                          <Badge color="#16a34a" small>🔒 Cerrado</Badge>
-                          <Badge color="#64748b" small>{new Set(caps.map(x=>x.productoId)).size} productos</Badge>
+                          <UIBadge className="border-transparent text-[10px] px-2 py-0.5" style={{background:"#64748b22",color:"#64748b"}}>{rlbl[r]}</UIBadge>
+                          <UIBadge className="border-transparent text-[10px] px-2 py-0.5 gap-1" style={{background:"#16a34a22",color:"#16a34a"}}><Settings size={9}/> Cerrado</UIBadge>
+                          <UIBadge className="border-transparent text-[10px] px-2 py-0.5" style={{background:"#64748b22",color:"#64748b"}}>{new Set(caps.map(x=>x.productoId)).size} productos</UIBadge>
                         </div>
                       </div>
                     </div>
@@ -3749,15 +3973,15 @@ function ModCapturador({usuario,setUsuario,G,rerender,recargar,showToast}){
       <div style={{background:"#0f172a",color:"white",padding:"0 16px",display:"flex",alignItems:"center",justifyContent:"space-between",height:52,position:"sticky",top:0,zIndex:100}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <button onClick={()=>{setConteoActivo(null);setRondaActiva(null);setProductoActivo(null);setScanInput("");setBusqueda("");}}
-            style={{background:"transparent",border:"1px solid #334155",color:"#94a3b8",padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer"}}>← Mis conteos</button>
+            style={{background:"transparent",border:"1px solid #334155",color:"#94a3b8",padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:3}}><ChevronLeft size={13}/> Mis conteos</button>
           <span style={{fontWeight:800,fontSize:15,color:"white"}}>TOMFIC</span>
           <span style={{background:rcol[miRonda],fontSize:10,padding:"2px 10px",borderRadius:20,fontWeight:700}}>{rlbl[miRonda]}</span>
         </div>
         <div style={{display:"flex",gap:10,alignItems:"center"}}>
-          <button onClick={async()=>{await recargar();showToast("Actualizado ✓");}} title="Traer lo último de la nube" style={{background:"transparent",border:"1px solid #334155",color:"#94a3b8",padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer"}}>🔄</button>
-          <span style={{fontSize:11,color:"#94a3b8"}}>👤 {usuario.nombre}</span>
+          <button onClick={async()=>{await recargar();showToast("Actualizado ✓");}} title="Traer lo último de la nube" style={{background:"transparent",border:"1px solid #334155",color:"#94a3b8",padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer",display:"flex",alignItems:"center"}}><RefreshCw size={13}/></button>
+          <span style={{fontSize:11,color:"#94a3b8",display:"flex",alignItems:"center",gap:4}}><Users size={11}/> {usuario.nombre}</span>
           {soyPrincipal(miConteo)&&<button onClick={()=>setModalCerrar(true)} style={{background:"#dc2626",color:"white",border:"none",padding:"6px 14px",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:700}}>Terminar conteo</button>}
-          <button onClick={()=>setModalSalir(true)} style={{background:"#dc2626",border:"none",color:"white",padding:"6px 16px",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer"}}>⎋ Salir</button>
+          <button onClick={()=>setModalSalir(true)} style={{background:"#dc2626",border:"none",color:"white",padding:"6px 16px",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:4}}><LogOut size={13}/> Salir</button>
         </div>
       </div>
 
@@ -3767,7 +3991,7 @@ function ModCapturador({usuario,setUsuario,G,rerender,recargar,showToast}){
           <div style={{display:"grid",gridTemplateColumns:"1fr auto",gap:12,alignItems:"center"}}>
             <div>
               <div style={{fontWeight:700,fontSize:14,color:"#0f172a"}}>{miConteo.nombre}</div>
-              <div style={{fontSize:12,color:"#64748b",marginTop:2}}>📍 {miConteo.locLabel}</div>
+              <div style={{fontSize:12,color:"#64748b",marginTop:2,display:"flex",alignItems:"center",gap:4}}><MapPin size={11}/> {miConteo.locLabel}</div>
               {miRonda==="C3"&&<div style={{marginTop:6,background:"#faf5ff",borderRadius:6,padding:"4px 10px",fontSize:12,color:"#7c3aed",fontWeight:600,display:"inline-block"}}>Solo productos con diferencia entre C1 y C2 — {prodsC3.length} productos</div>}
             </div>
             <div style={{textAlign:"right",maxWidth:200}}>
@@ -3778,7 +4002,7 @@ function ModCapturador({usuario,setUsuario,G,rerender,recargar,showToast}){
                   <div key={i} style={{fontSize:11,background:"#f8fafc",borderRadius:6,padding:"3px 8px",marginBottom:3,textAlign:"left",display:"flex",gap:6,alignItems:"center"}}>
                     <span style={{background:est==="cerrado"?"#e2e8f0":rcol[r],color:"white",borderRadius:4,padding:"0 4px",fontSize:9,fontWeight:700}}>{rlbl[r]}</span>
                     <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:est==="cerrado"?"#94a3b8":"#374151",fontSize:11}}>{c.nombre}</span>
-                    {est==="cerrado"&&<span style={{color:"#16a34a",fontSize:10}}>🔒</span>}
+                    {est==="cerrado"&&<span style={{color:"#16a34a",fontSize:10,display:"flex",alignItems:"center"}}><Settings size={9}/></span>}
                   </div>
                 );
               })}
@@ -3853,10 +4077,10 @@ function ModCapturador({usuario,setUsuario,G,rerender,recargar,showToast}){
                 <input ref={scanRef} value={scanInput} onChange={e=>setScanInput(e.target.value)} onKeyDown={handleScan}
                   placeholder="Escanee o escriba y presione Enter…"
                   style={{...inp,flex:1,border:`2px solid ${rcol[miRonda]}`}} autoFocus/>
-                <button onClick={()=>handleScan({key:"Enter"})} style={{padding:"9px 14px",background:rcol[miRonda],color:"white",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:15}}>↵</button>
-                <button onClick={()=>setShowCam(true)} title="Escanear con cámara" style={{padding:"9px 14px",background:"white",color:rcol[miRonda],border:`2px solid ${rcol[miRonda]}`,borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:15}}>📷</button>
+                <button onClick={()=>handleScan({key:"Enter"})} style={{padding:"9px 14px",background:rcol[miRonda],color:"white",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:15,display:"inline-flex",alignItems:"center"}}><CornerDownLeft size={16}/></button>
+                <button onClick={()=>setShowCam(true)} title="Escanear con cámara" style={{padding:"9px 14px",background:"white",color:rcol[miRonda],border:`2px solid ${rcol[miRonda]}`,borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:15,display:"inline-flex",alignItems:"center"}}><Camera size={16}/></button>
               </div>
-              {notFound&&<div style={{marginTop:6,color:"#dc2626",fontSize:12,fontWeight:600}}>⚠️ Código no encontrado</div>}
+              {notFound&&<div style={{marginTop:6,color:"#dc2626",fontSize:12,fontWeight:600,display:"flex",alignItems:"center",gap:4}}><AlertTriangle size={12}/> Código no encontrado</div>}
             </div>
             <div style={{position:"relative"}}>
               <div style={{fontSize:11,fontWeight:700,color:"#374151",marginBottom:5}}>BUSCAR EN LA LISTA</div>
@@ -4039,7 +4263,7 @@ function ModCapturador({usuario,setUsuario,G,rerender,recargar,showToast}){
                         }
                         setTimeout(()=>unidadesRef.current?.focus(),80);
                       }}
-                        style={{background:"#fef9c3",color:"#92400e",border:"1px solid #fde047",borderRadius:6,padding:"3px 10px",cursor:"pointer",fontWeight:700,fontSize:11,marginRight:4}}>✏ Editar</button>
+                        style={{background:"#fef9c3",color:"#92400e",border:"1px solid #fde047",borderRadius:6,padding:"3px 10px",cursor:"pointer",fontWeight:700,fontSize:11,marginRight:4,display:"inline-flex",alignItems:"center",gap:3}}><Pencil size={10}/> Editar</button>
                       <button onClick={()=>{caps.forEach(c=>{const k=Object.keys(G.capturas).find(k=>G.capturas[k]===c);if(k)delete G.capturas[k];});rerender();showToast("Eliminado","warn");}}
                         style={{background:"#fef2f2",color:"#dc2626",border:"1px solid #fecaca",borderRadius:6,padding:"3px 10px",cursor:"pointer",fontWeight:700,fontSize:11}}>Borrar</button>
                     </td>
@@ -4055,25 +4279,25 @@ function ModCapturador({usuario,setUsuario,G,rerender,recargar,showToast}){
 
         {capturasRealizadas.length===0&&!productoActivo&&miRonda!=="C3"&&(
           <div style={{...card,textAlign:"center",padding:36,color:"#64748b"}}>
-            <div style={{fontSize:36,marginBottom:8}}>📷</div>
+            <div style={{marginBottom:8,display:"flex",justifyContent:"center"}}><Camera size={36} color="#94a3b8"/></div>
             <div style={{fontSize:14,fontWeight:600}}>Escanea o busca un producto para comenzar</div>
             <div style={{fontSize:12,marginTop:4}}>{prods.length} productos disponibles</div>
           </div>
         )}
       </div>
 
-      {modalCerrar&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center"}}>
-          <div style={{background:"white",borderRadius:16,padding:28,width:380,maxWidth:"96vw",boxShadow:"0 25px 60px rgba(0,0,0,0.3)"}}>
-            <h3 style={{margin:"0 0 16px",fontSize:17,fontWeight:700}}>Terminar conteo</h3>
-            <p style={{fontSize:14,color:"#374151",marginBottom:24}}>¿Estás seguro de que deseas terminar este conteo?</p>
-            <div style={{display:"flex",gap:10}}>
-              <Btn c="#dc2626" onClick={cerrarConteo} full>Sí, terminar conteo</Btn>
-              <Btn c="#64748b" onClick={()=>setModalCerrar(false)} full>Cancelar</Btn>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={modalCerrar}
+        onOpenChange={setModalCerrar}
+        icon={CheckCircle}
+        iconClassName="text-primary"
+        iconBg="bg-blue-50"
+        title="Terminar conteo"
+        description="¿Estás seguro de que deseas terminar este conteo?"
+        confirmText="Sí, terminar conteo"
+        confirmVariant="default"
+        onConfirm={cerrarConteo}
+      />
       <BtnNotas G={G} usuario={usuario} rerender={rerender} showToast={showToast}/>
       {showCam&&<CamScanner color={rcol[miRonda]} onClose={()=>setShowCam(false)} onDetect={onCamDetect}/>}
       {modalSalirJSX}
@@ -4109,8 +4333,8 @@ function BtnNotas({G,usuario,rerender,showToast}){
   const eliminar=(id)=>{G.notas=G.notas.filter(n=>n.id!==id);rerender();};
 
   if(!open)return(
-    <button onClick={()=>setOpen(true)} style={{position:"fixed",bottom:24,right:24,width:52,height:52,borderRadius:99,background:"linear-gradient(135deg,#2563eb,#7c3aed)",color:"white",border:"none",cursor:"pointer",fontSize:22,boxShadow:"0 4px 20px rgba(37,99,235,0.5)",zIndex:900,display:"flex",alignItems:"center",justifyContent:"center"}}>
-      📝
+    <button onClick={()=>setOpen(true)} style={{position:"fixed",bottom:24,right:24,width:52,height:52,borderRadius:99,background:"linear-gradient(135deg,#2563eb,#7c3aed)",color:"white",border:"none",cursor:"pointer",boxShadow:"0 4px 20px rgba(37,99,235,0.5)",zIndex:900,display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <FileText size={22}/>
       {notasInv.length>0&&<span style={{position:"absolute",top:-4,right:-4,background:"#dc2626",color:"white",borderRadius:99,fontSize:9,fontWeight:800,width:18,height:18,display:"flex",alignItems:"center",justifyContent:"center"}}>{notasInv.length}</span>}
     </button>
   );
@@ -4120,10 +4344,10 @@ function BtnNotas({G,usuario,rerender,showToast}){
       {/* Header */}
       <div style={{background:"linear-gradient(135deg,#2563eb,#7c3aed)",padding:"14px 18px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
         <div style={{color:"white"}}>
-          <div style={{fontWeight:800,fontSize:14}}>📝 Notas del inventario</div>
+          <div style={{fontWeight:800,fontSize:14,display:"flex",alignItems:"center",gap:6}}><FileText size={14}/> Notas del inventario</div>
           <div style={{fontSize:11,opacity:0.8}}>{G.inventario?.nombre||"Sin inventario activo"}</div>
         </div>
-        <button onClick={()=>setOpen(false)} style={{background:"rgba(255,255,255,0.2)",border:"none",color:"white",width:28,height:28,borderRadius:99,cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+        <button onClick={()=>setOpen(false)} style={{background:"rgba(255,255,255,0.2)",border:"none",color:"white",width:28,height:28,borderRadius:99,cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}><X size={15}/></button>
       </div>
       {/* Notas existentes */}
       <div style={{maxHeight:220,overflowY:"auto",padding:"10px 14px",display:"flex",flexDirection:"column",gap:8}}>
@@ -4136,7 +4360,7 @@ function BtnNotas({G,usuario,rerender,showToast}){
                 <span style={{fontSize:11,fontWeight:700,color:"#374151"}}>{n.usuario}</span>
                 <span style={{fontSize:10,color:"#94a3b8"}}>{n.fecha} {n.hora}</span>
               </div>
-              {(usuario.rol==="admin"||n.usuario===usuario.nombre)&&<button onClick={()=>eliminar(n.id)} style={{background:"none",border:"none",color:"#dc2626",cursor:"pointer",fontSize:13}}>✕</button>}
+              {(usuario.rol==="admin"||n.usuario===usuario.nombre)&&<button onClick={()=>eliminar(n.id)} style={{background:"none",border:"none",color:"#dc2626",cursor:"pointer",display:"inline-flex",alignItems:"center"}}><X size={14}/></button>}
             </div>
             {n.texto&&<div style={{fontSize:13,color:"#374151",lineHeight:1.5}}>{n.texto}</div>}
             {n.fotos?.length>0&&(
@@ -4159,14 +4383,14 @@ function BtnNotas({G,usuario,rerender,showToast}){
               {fotos.map((f,i)=>(
                 <div key={i} style={{position:"relative"}}>
                   <img src={f.data} alt={f.name} style={{width:48,height:48,objectFit:"cover",borderRadius:6,border:"1px solid #e2e8f0"}}/>
-                  <button onClick={()=>setFotos(fs=>fs.filter((_,j)=>j!==i))} style={{position:"absolute",top:-4,right:-4,width:16,height:16,background:"#dc2626",color:"white",border:"none",borderRadius:99,cursor:"pointer",fontSize:9,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+                  <button onClick={()=>setFotos(fs=>fs.filter((_,j)=>j!==i))} style={{position:"absolute",top:-4,right:-4,width:16,height:16,background:"#dc2626",color:"white",border:"none",borderRadius:99,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><X size={10}/></button>
                 </div>
               ))}
             </div>
           )}
           <div style={{display:"flex",gap:8,marginTop:8}}>
-            <label style={{padding:"7px 12px",background:"#f1f5f9",border:"1px solid #e2e8f0",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:600,color:"#374151"}}>
-              📷 Foto<input type="file" accept="image/*" multiple onChange={agregarFoto} style={{display:"none"}}/>
+            <label style={{padding:"7px 12px",background:"#f1f5f9",border:"1px solid #e2e8f0",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:600,color:"#374151",display:"inline-flex",alignItems:"center",gap:5}}>
+              <Camera size={14}/> Foto<input type="file" accept="image/*" multiple onChange={agregarFoto} style={{display:"none"}}/>
             </label>
             <button onClick={guardar} style={{flex:1,padding:"7px",background:"linear-gradient(135deg,#2563eb,#7c3aed)",color:"white",border:"none",borderRadius:8,fontWeight:700,cursor:"pointer",fontSize:13}}>
               Guardar nota
@@ -4181,7 +4405,7 @@ function BtnNotas({G,usuario,rerender,showToast}){
 // ─────────────────────────────────────────
 // MÓDULO GERENTE — solo lectura
 // ─────────────────────────────────────────
-function ModGerente({usuario,setUsuario,G,rerender,recargar,showToast}){
+function ModGerente({usuario,setUsuario,logout,G,rerender,recargar,showToast}){
   const [view,setView]=useState("resumen");
   const [modalSalir,setModalSalir]=useState(false);
 
@@ -4191,9 +4415,9 @@ function ModGerente({usuario,setUsuario,G,rerender,recargar,showToast}){
   },[]);
 
   const nav=[
-    {id:"resumen",icon:"📊",label:"Resumen"},
-    {id:"notas",icon:"📝",label:"Notas"},
-    {id:"historial",icon:"🏛️",label:"Historial"},
+    {id:"resumen",icon:BarChart2,label:"Resumen"},
+    {id:"notas",icon:FileText,  label:"Notas"},
+    {id:"historial",icon:Landmark,label:"Historial"},
   ];
 
   const pct=G.conteos.length>0?Math.round(G.conteos.filter(c=>c.estado==="completado").length/G.conteos.length*100):0;
@@ -4204,7 +4428,7 @@ function ModGerente({usuario,setUsuario,G,rerender,recargar,showToast}){
       {/* Topbar */}
       <div style={{background:"linear-gradient(135deg,#7c3aed 0%,#4f46e5 100%)",color:"white",padding:"0 20px",display:"flex",alignItems:"center",justifyContent:"space-between",height:58,position:"sticky",top:0,zIndex:100,boxShadow:"0 2px 12px rgba(0,0,0,0.25)"}}>
         <div style={{display:"flex",alignItems:"center",gap:12}}>
-          <div style={{width:32,height:32,background:"rgba(255,255,255,0.2)",borderRadius:9,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>📦</div>
+          <div style={{width:32,height:32,background:"rgba(255,255,255,0.2)",borderRadius:9,display:"flex",alignItems:"center",justifyContent:"center"}}><Package size={18} color="white"/></div>
           <div>
             <div style={{fontWeight:800,fontSize:15,letterSpacing:-0.5}}>TOMFIC</div>
             <div style={{fontSize:9,color:"rgba(255,255,255,0.6)",letterSpacing:1,textTransform:"uppercase"}}>Vista Gerente</div>
@@ -4212,7 +4436,7 @@ function ModGerente({usuario,setUsuario,G,rerender,recargar,showToast}){
           {G.inventario&&<div style={{background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.25)",fontSize:11,padding:"3px 12px",borderRadius:20,fontWeight:700}}>● {G.inventario.nombre}</div>}
         </div>
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
-          <button onClick={async()=>{await recargar();showToast("Actualizado ✓");}} style={{background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.15)",color:"white",padding:"5px 12px",borderRadius:8,fontSize:11,cursor:"pointer"}}>🔄 Sync</button>
+          <button onClick={async()=>{await recargar();showToast("Actualizado ✓");}} style={{background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.15)",color:"white",padding:"5px 12px",borderRadius:8,fontSize:11,cursor:"pointer"}}><RefreshCw size={11} style={{display:"inline",marginRight:4}}/> Sync</button>
           <div style={{display:"flex",alignItems:"center",gap:6,background:"rgba(255,255,255,0.1)",borderRadius:9,padding:"5px 10px"}}>
             <div style={{width:24,height:24,background:"linear-gradient(135deg,#7c3aed,#2563eb)",borderRadius:99,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700}}>{usuario.nombre[0]}</div>
             <span style={{fontSize:12,fontWeight:600}}>{usuario.nombre}</span>
@@ -4221,15 +4445,15 @@ function ModGerente({usuario,setUsuario,G,rerender,recargar,showToast}){
         </div>
       </div>
 
-      <div style={{display:"flex",minHeight:"calc(100vh - 58px)"}}>
+      <div style={{display:"flex",height:"calc(100vh - 58px)",overflow:"hidden"}}>
         {/* Sidebar */}
-        <div style={{width:160,background:"linear-gradient(180deg,#4f46e5,#7c3aed)",flexShrink:0,padding:"16px 8px",display:"flex",flexDirection:"column",gap:4}}>
+        <div style={{width:160,background:"linear-gradient(180deg,#4f46e5,#7c3aed)",flexShrink:0,padding:"16px 8px",display:"flex",flexDirection:"column",gap:4,height:"100%",overflowY:"auto"}}>
           {nav.map(n=>{
             const active=view===n.id;
             return(
               <button key={n.id} onClick={()=>setView(n.id)}
                 style={{width:"100%",display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:active?"rgba(255,255,255,0.2)":"transparent",color:"white",border:"none",cursor:"pointer",fontSize:13,borderRadius:10,fontWeight:active?700:400,opacity:active?1:0.7}}>
-                <span>{n.icon}</span><span>{n.label}</span>
+                <n.icon size={16}/><span>{n.label}</span>
               </button>
             );
           })}
@@ -4239,21 +4463,16 @@ function ModGerente({usuario,setUsuario,G,rerender,recargar,showToast}){
         <div style={{flex:1,padding:24,overflowY:"auto"}}>
           {view==="resumen"&&(
             <div>
-              {/* Header */}
-              <div style={{background:"linear-gradient(135deg,#7c3aed 0%,#4f46e5 100%)",borderRadius:16,padding:"20px 24px",marginBottom:20,color:"white",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <div>
-                  <div style={{fontSize:11,fontWeight:600,opacity:0.75,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>Vista Gerente</div>
-                  <div style={{fontSize:22,fontWeight:800}}>{G.inventario?.nombre||"Sin inventario activo"}</div>
-                  <div style={{fontSize:12,opacity:0.8,marginTop:4}}>Solo lectura · {TODAY()}</div>
-                </div>
-                <div style={{textAlign:"right"}}>
-                  <div style={{fontSize:36,fontWeight:900}}>{pct}%</div>
-                  <div style={{fontSize:11,opacity:0.8}}>completado</div>
-                </div>
-              </div>
+              <PageHeader
+                label="Vista Gerente"
+                title={G.inventario?.nombre||"Sin inventario activo"}
+                icon={BarChart2}
+                subtitle={`Solo lectura · ${TODAY()}`}
+                right={<div className="text-right"><div className="text-3xl font-extrabold leading-none">{pct}%</div><div className="text-[11px] text-white/80 mt-1">completado</div></div>}
+              />
               {!G.inventario?(
                 <div style={{textAlign:"center",padding:"48px 20px",background:"white",borderRadius:14,border:"2px dashed #e2e8f0",color:"#64748b"}}>
-                  <div style={{fontSize:48,marginBottom:12}}>📋</div>
+                  <div style={{display:"flex",justifyContent:"center",marginBottom:12}}><ClipboardList size={48} color="#94a3b8"/></div>
                   <div style={{fontSize:15,fontWeight:700}}>Sin inventario activo</div>
                 </div>
               ):(
@@ -4261,14 +4480,14 @@ function ModGerente({usuario,setUsuario,G,rerender,recargar,showToast}){
                   {/* KPIs */}
                   <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:12,marginBottom:16}}>
                     {[
-                      {icon:"📦",l:"Productos",v:G.productos.length,c:"#2563eb",bg:"#eff6ff"},
-                      {icon:"📋",l:"Conteos",v:G.conteos.length,c:"#475569",bg:"#f8fafc"},
-                      {icon:"✅",l:"Completados",v:G.conteos.filter(c=>c.estado==="completado").length,c:"#16a34a",bg:"#f0fdf4"},
-                      {icon:"⚠️",l:"Diferencias",v:G.conteos.filter(c=>c.estado==="diferencia").length,c:"#dc2626",bg:"#fef2f2"},
-                      {icon:"📝",l:"Notas",v:notasInv.length,c:"#7c3aed",bg:"#faf5ff"},
+                      {icon:Package,      l:"Productos",v:G.productos.length,c:"#2563eb",bg:"#eff6ff"},
+                      {icon:ClipboardList,l:"Conteos",v:G.conteos.length,c:"#475569",bg:"#f8fafc"},
+                      {icon:CheckCircle,  l:"Completados",v:G.conteos.filter(c=>c.estado==="completado").length,c:"#16a34a",bg:"#f0fdf4"},
+                      {icon:AlertTriangle,l:"Diferencias",v:G.conteos.filter(c=>c.estado==="diferencia").length,c:"#dc2626",bg:"#fef2f2"},
+                      {icon:FileText,     l:"Notas",v:notasInv.length,c:"#7c3aed",bg:"#faf5ff"},
                     ].map(s=>(
                       <div key={s.l} style={{background:s.bg,borderRadius:14,padding:"14px 16px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",border:`1px solid ${s.c}22`}}>
-                        <div style={{fontSize:20,marginBottom:6}}>{s.icon}</div>
+                        <s.icon size={20} color={s.c} style={{marginBottom:6}}/>
                         <div style={{fontSize:26,fontWeight:900,color:s.c,lineHeight:1}}>{s.v}</div>
                         <div style={{fontSize:11,color:"#64748b",marginTop:4,fontWeight:600}}>{s.l}</div>
                       </div>
@@ -4305,9 +4524,9 @@ function ModGerente({usuario,setUsuario,G,rerender,recargar,showToast}){
                               <td style={{padding:"10px 14px",fontWeight:700,color:"#0f172a"}}>{c.nombre}</td>
                               <td style={{padding:"10px 14px",fontSize:12,color:"#64748b"}}>{c.locLabel||"—"}</td>
                               <td style={{padding:"10px 14px",color:"#2563eb",fontWeight:600}}>{c.usuarioC1||"—"}</td>
-                              <td style={{padding:"10px 14px"}}>{c.usuarioC1?<span style={{background:["cerradoC1","cerradoC2","completado"].includes(c.estado)?"#f0fdf4":"#fffbeb",color:["cerradoC1","cerradoC2","completado"].includes(c.estado)?"#16a34a":"#d97706",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:700}}>{["cerradoC1","cerradoC2","completado"].includes(c.estado)?"OK ✓":"En curso"}</span>:"—"}</td>
+                              <td style={{padding:"10px 14px"}}>{c.usuarioC1?<span style={{background:["cerradoC1","cerradoC2","completado"].includes(c.estado)?"#f0fdf4":"#fffbeb",color:["cerradoC1","cerradoC2","completado"].includes(c.estado)?"#16a34a":"#d97706",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:700}}>{["cerradoC1","cerradoC2","completado"].includes(c.estado)?"OK":"En curso"}</span>:"—"}</td>
                               <td style={{padding:"10px 14px",color:"#16a34a",fontWeight:600}}>{c.usuarioC2||"N/A"}</td>
-                              <td style={{padding:"10px 14px"}}>{c.usuarioC2?<span style={{background:["cerradoC2","completado"].includes(c.estado)?"#f0fdf4":"#fffbeb",color:["cerradoC2","completado"].includes(c.estado)?"#16a34a":"#d97706",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:700}}>{["cerradoC2","completado"].includes(c.estado)?"OK ✓":"Pendiente"}</span>:"—"}</td>
+                              <td style={{padding:"10px 14px"}}>{c.usuarioC2?<span style={{background:["cerradoC2","completado"].includes(c.estado)?"#f0fdf4":"#fffbeb",color:["cerradoC2","completado"].includes(c.estado)?"#16a34a":"#d97706",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:700}}>{["cerradoC2","completado"].includes(c.estado)?"OK":"Pendiente"}</span>:"—"}</td>
                               <td style={{padding:"10px 14px"}}><span style={{background:c.estado==="completado"?"#f0fdf4":c.estado==="diferencia"?"#fef2f2":"#f8fafc",color:c.estado==="completado"?"#16a34a":c.estado==="diferencia"?"#dc2626":"#64748b",borderRadius:6,padding:"3px 8px",fontSize:11,fontWeight:700}}>{c.estado}</span></td>
                             </tr>
                           ))}
@@ -4322,16 +4541,16 @@ function ModGerente({usuario,setUsuario,G,rerender,recargar,showToast}){
 
           {view==="notas"&&(
             <div>
-              <div style={{background:"linear-gradient(135deg,#2563eb 0%,#7c3aed 100%)",borderRadius:16,padding:"20px 24px",marginBottom:20,color:"white",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <div>
-                  <div style={{fontSize:11,fontWeight:600,opacity:0.75,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>Observaciones</div>
-                  <div style={{fontSize:22,fontWeight:800}}>Notas del inventario</div>
-                </div>
-                <div style={{fontSize:28,fontWeight:900}}>{notasInv.length}</div>
-              </div>
+              <PageHeader
+                label="Observaciones"
+                title="Notas del inventario"
+                icon={FileText}
+                count={notasInv.length}
+                countLabel="notas"
+              />
               {notasInv.length===0?(
                 <div style={{textAlign:"center",padding:"48px 20px",background:"white",borderRadius:14,border:"2px dashed #e2e8f0",color:"#64748b"}}>
-                  <div style={{fontSize:48,marginBottom:12}}>📝</div>
+                  <div style={{display:"flex",justifyContent:"center",marginBottom:12}}><FileText size={48} color="#94a3b8"/></div>
                   <div style={{fontSize:15,fontWeight:700}}>Sin notas aún</div>
                   <div style={{fontSize:13,marginTop:4}}>El admin y los capturadores pueden agregar notas durante el inventario.</div>
                 </div>
@@ -4363,16 +4582,16 @@ function ModGerente({usuario,setUsuario,G,rerender,recargar,showToast}){
 
           {view==="historial"&&(
             <div>
-              <div style={{background:"linear-gradient(135deg,#1e293b 0%,#0f172a 100%)",borderRadius:16,padding:"20px 24px",marginBottom:20,color:"white",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <div>
-                  <div style={{fontSize:11,fontWeight:600,opacity:0.75,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>Inventarios</div>
-                  <div style={{fontSize:22,fontWeight:800}}>Historial</div>
-                </div>
-                <div style={{fontSize:28,fontWeight:900}}>{G.historial.length}</div>
-              </div>
+              <PageHeader
+                label="Inventarios"
+                title="Historial"
+                icon={Landmark}
+                count={G.historial.length}
+                countLabel="inventarios"
+              />
               {G.historial.length===0?(
                 <div style={{textAlign:"center",padding:"48px 20px",background:"white",borderRadius:14,border:"2px dashed #e2e8f0",color:"#64748b"}}>
-                  <div style={{fontSize:48,marginBottom:12}}>🏛️</div>
+                  <div style={{display:"flex",justifyContent:"center",marginBottom:12}}><Landmark size={48} color="#94a3b8"/></div>
                   <div style={{fontSize:15,fontWeight:700}}>Sin historial</div>
                 </div>
               ):(
@@ -4390,7 +4609,7 @@ function ModGerente({usuario,setUsuario,G,rerender,recargar,showToast}){
                         </div>
                         {notasH.length>0&&(
                           <div style={{marginTop:12,paddingTop:12,borderTop:"1px solid #f1f5f9"}}>
-                            <div style={{fontSize:11,fontWeight:700,color:"#94a3b8",marginBottom:8,textTransform:"uppercase",letterSpacing:0.5}}>📝 {notasH.length} nota{notasH.length>1?"s":""}</div>
+                            <div style={{fontSize:11,fontWeight:700,color:"#94a3b8",marginBottom:8,textTransform:"uppercase",letterSpacing:0.5,display:"flex",alignItems:"center",gap:4}}><FileText size={10}/> {notasH.length} nota{notasH.length>1?"s":""}</div>
                             <div style={{display:"flex",flexDirection:"column",gap:6}}>
                               {notasH.map(n=>(
                                 <div key={n.id} style={{background:"#f8fafc",borderRadius:8,padding:"8px 12px",fontSize:13,color:"#374151"}}>
@@ -4410,20 +4629,15 @@ function ModGerente({usuario,setUsuario,G,rerender,recargar,showToast}){
         </div>
       </div>
 
-      {modalSalir&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center",backdropFilter:"blur(4px)"}}>
-          <div style={{background:"white",borderRadius:20,padding:32,width:380,maxWidth:"96vw"}}>
-            <div style={{textAlign:"center",marginBottom:16}}>
-              <div style={{fontSize:40,marginBottom:8}}>👋</div>
-              <h3 style={{margin:"0 0 8px",fontSize:18,fontWeight:800}}>¿Cerrar sesión?</h3>
-            </div>
-            <div style={{display:"flex",gap:10,marginTop:24}}>
-              <Btn c="#dc2626" onClick={()=>setUsuario(null)} full>Sí, salir</Btn>
-              <Btn c="#64748b" onClick={()=>setModalSalir(false)} full outline>Cancelar</Btn>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={modalSalir}
+        onOpenChange={setModalSalir}
+        icon={LogOut}
+        title="¿Cerrar sesión?"
+        description="Vas a salir de TOMFIC. Tus datos ya están guardados en la nube."
+        confirmText="Sí, salir"
+        onConfirm={logout}
+      />
     </div>
   );
 }

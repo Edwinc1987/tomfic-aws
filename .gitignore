@@ -1,1 +1,14 @@
-node_modules/ 
+# Dependencias
+node_modules/
+
+# Build
+dist/
+
+# Variables de entorno (llaves de Supabase) — NUNCA subir
+.env
+.env.*
+!.env.example
+
+# Local / editor
+.claude/
+.DS_Store
