@@ -194,7 +194,13 @@ const SB={
   resetMemberPassword:(id,pass)=>supabase.rpc("reset_member_password",{p_user_id:id,p_pass:pass}),
   deleteMember:(id)=>supabase.rpc("delete_member",{p_user_id:id}),
   setTenantActive:(tid,activo)=>supabase.rpc("set_tenant_active",{p_tid:tid,p_activo:activo}),
+  setMemberActive:(id,activo)=>supabase.rpc("set_member_active",{p_user_id:id,p_activo:activo}),
   loadUsuarios:(tid)=>supabase.from("usuarios").select("*").eq("tenant_id",tid),
+  // Gestión de clientes/pagos (Panel del Dueño).
+  updateTenant:(tid,patch)=>supabase.from("tenants").update(patch).eq("id",tid),
+  listPagos:(tid)=>supabase.from("pagos").select("*").eq("tenant_id",tid).order("fecha",{ascending:false}),
+  insertPago:(p)=>supabase.from("pagos").insert(p),
+  deletePago:(id)=>supabase.from("pagos").delete().eq("id",id),
   // Datos de UNA empresa (tenant). Si tid es null, trae todo (compatibilidad).
   async loadAll(tid){
     const f=(t)=>tid?supabase.from(t).select("*").eq("tenant_id",tid):supabase.from(t).select("*");
@@ -208,7 +214,9 @@ const SB={
   updateUsuario:(id,patch)=>supabase.from("usuarios").update(patch).eq("id",id),
   deleteUsuario:(id)=>supabase.from("usuarios").delete().eq("id",id),
   async upsertProductosBulk(prods){for(let i=0;i<prods.length;i+=500){await supabase.from("productos").upsert(prods.slice(i,i+500),{onConflict:"id"});}},
-  deleteAllProductos:(tid)=>tid?supabase.from("productos").delete().eq("tenant_id",tid):supabase.from("productos").delete().neq("id","__none__"),
+  // SIEMPRE scopeado por empresa. Si no hay tenant, es un NO-OP: nunca un borrado global
+  // (con RLS el dueño podría borrar productos de TODAS las empresas → se prohíbe de raíz).
+  deleteAllProductos:(tid)=>tid?supabase.from("productos").delete().eq("tenant_id",tid):Promise.resolve({data:null,error:null}),
   upsertInventario:(inv)=>supabase.from("inventarios").upsert(inv,{onConflict:"id"}),
   upsertConteo:(c)=>supabase.from("conteos").upsert(c,{onConflict:"id"}),
   deleteConteo:(id)=>supabase.from("conteos").delete().eq("id",id),
@@ -237,6 +245,10 @@ const initSnap=()=>{
 let _syncing=false,_pending=false,_syncTimer=null;
 let _busy=false; // true mientras se hace una operación crítica (importar base, eliminar, cerrar). Pausa el auto-refresco.
 const doSync=async()=>{
+  // El dueño (sin empresa asociada) NUNCA sincroniza datos de inventario. Su snapshot
+  // vacío haría que doSync intente "borrar" los productos/inventarios de la base — y por
+  // RLS el dueño puede tocar TODAS las empresas. Sin este guard se vacía la base entera.
+  if(!G.tenantId)return;
   if(_syncing){_pending=true;return;}
   _syncing=true;
   try{
@@ -317,6 +329,7 @@ export default function TomficApp(){
   const [lastSaved,setLastSaved]=useState(null);
   const [loading,setLoading]=useState(true);
   const [loadingTenant,setLoadingTenant]=useState(false); // cargando datos de la empresa tras el login
+  const [recovery,setRecovery]=useState(false); // pantalla "nueva contraseña" tras clic en el correo de recuperación
   const [loadErr,setLoadErr]=useState("");
 
   // Tras autenticarse (login nuevo o sesión restaurada al recargar): cargar el
@@ -353,6 +366,8 @@ export default function TomficApp(){
     // Mantener el estado en sincronía si la sesión expira o se cierra en otra pestaña.
     const {data:sub}=supabase.auth.onAuthStateChange((event)=>{
       if(event==="SIGNED_OUT"){G.tenantId=null;setUsuario(null);}
+      // El usuario llegó desde el enlace del correo de recuperación → pedir clave nueva.
+      if(event==="PASSWORD_RECOVERY"){setRecovery(true);}
     });
     return ()=>{try{sub.subscription.unsubscribe();}catch(e){}};
   },[]);
@@ -439,6 +454,9 @@ export default function TomficApp(){
     setUsuario(null);
   };
 
+  // Llegó desde el correo de recuperación: pantalla para fijar clave nueva (gana sobre todo).
+  if(recovery)return(<SetNewPassword onDone={()=>{setRecovery(false);setUsuario(null);setEntrar(true);setLoginForm(f=>({...f,tab:"admin"}));showToast("Contraseña actualizada. Inicia sesión con tu clave nueva.");}}/>);
+
   if(loading)return(<div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#0f172a",fontFamily:"system-ui,sans-serif"}}><div style={{textAlign:"center",color:"white"}}><div style={{display:"flex",justifyContent:"center",marginBottom:16}}><Package size={52} color="#2563eb"/></div><div style={{fontSize:24,fontWeight:900,marginBottom:8}}>TOMFIC</div><div style={{fontSize:14,color:"#64748b"}}>{loadErr||"Cargando datos de la nube..."}</div><div style={{marginTop:20,width:200,height:4,background:"#1e293b",borderRadius:99,overflow:"hidden",margin:"20px auto 0"}}><div style={{width:"60%",height:"100%",background:"linear-gradient(90deg,#2563eb,#16a34a)",borderRadius:99}}/></div></div></div>);
 
   if(loadingTenant)return(<div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#0f172a",fontFamily:"system-ui,sans-serif"}}><div style={{textAlign:"center",color:"white"}}><div style={{display:"flex",justifyContent:"center",marginBottom:16}}><Package size={52} color="#2563eb"/></div><div style={{fontSize:24,fontWeight:900,marginBottom:8}}>TOMFIC</div><div style={{fontSize:14,color:"#64748b"}}>Cargando tu empresa…</div></div></div>);
@@ -456,11 +474,71 @@ export default function TomficApp(){
 }
 
 // ─────────────────────────────────────────
+// NUEVA CONTRASEÑA (tras enlace de recuperación por correo)
+// ─────────────────────────────────────────
+function SetNewPassword({onDone}){
+  const [p1,setP1]=useState("");
+  const [p2,setP2]=useState("");
+  const [show,setShow]=useState(false);
+  const [busy,setBusy]=useState(false);
+  const [err,setErr]=useState("");
+  const guardar=async()=>{
+    setErr("");
+    if(p1.length<6)return setErr("La contraseña debe tener al menos 6 caracteres.");
+    if(p1!==p2)return setErr("Las contraseñas no coinciden.");
+    setBusy(true);
+    const {error}=await supabase.auth.updateUser({password:p1});
+    if(error){setBusy(false);return setErr(error.message||"No se pudo actualizar la contraseña.");}
+    try{await supabase.auth.signOut();}catch(e){}
+    setBusy(false);
+    onDone&&onDone();
+  };
+  return(
+    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#0f172a",fontFamily:"system-ui,sans-serif",padding:"1.5rem"}}>
+      <div style={{width:"100%",maxWidth:380,background:"white",borderRadius:16,padding:28,boxShadow:"0 4px 24px rgba(0,0,0,0.25)"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
+          <div style={{width:34,height:34,background:"linear-gradient(135deg,#2563eb,#0891b2)",borderRadius:9,display:"flex",alignItems:"center",justifyContent:"center"}}><Key size={17} color="white"/></div>
+          <span style={{fontSize:20,fontWeight:900,color:"#0f172a"}}>Nueva contraseña</span>
+        </div>
+        <p style={{fontSize:13,color:"#64748b",marginBottom:18}}>Escribe tu nueva contraseña para tu cuenta TOMFIC.</p>
+        <div className="space-y-3">
+          <div className="space-y-1.5"><Label>Nueva contraseña</Label>
+            <div className="relative">
+              <Input type={show?"text":"password"} value={p1} onChange={e=>setP1(e.target.value)} placeholder="mín. 6 caracteres" className="h-11 pr-11"/>
+              <button onClick={()=>setShow(v=>!v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">{show?<EyeOff size={18}/>:<Eye size={18}/>}</button>
+            </div>
+          </div>
+          <div className="space-y-1.5"><Label>Confirmar contraseña</Label>
+            <Input type={show?"text":"password"} value={p2} onChange={e=>setP2(e.target.value)} onKeyDown={e=>e.key==="Enter"&&guardar()} placeholder="repite la contraseña" className="h-11"/>
+          </div>
+          {err&&<div style={{background:"#fef2f2",color:"#dc2626",padding:"10px 14px",borderRadius:8,fontSize:13,fontWeight:600,display:"flex",alignItems:"center",gap:8}}><AlertTriangle size={14}/> {err}</div>}
+          <Button className="w-full h-11" onClick={guardar} disabled={busy}>{busy?"Guardando…":<><Key size={15}/> Guardar contraseña</>}</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────
 // LOGIN
 // ─────────────────────────────────────────
 function Login({lf,setLf,err,onLogin,lastSaved,onBack}){
   const [showPass,setShowPass]=useState(false);
   const [showRecuperar,setShowRecuperar]=useState(false);
+  const [recEmail,setRecEmail]=useState("");
+  const [recMsg,setRecMsg]=useState(null); // {ok:boolean, txt:string}
+  const [recBusy,setRecBusy]=useState(false);
+  const enviarRecuperacion=async()=>{
+    const email=(recEmail||lf.email||"").trim().toLowerCase();
+    setRecMsg(null);
+    if(!email||!email.includes("@"))return setRecMsg({ok:false,txt:"Escribe un email válido."});
+    setRecBusy(true);
+    const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:window.location.origin});
+    setRecBusy(false);
+    setRecMsg(error
+      ?{ok:false,txt:"No se pudo enviar: "+(error.message||"intenta de nuevo")}
+      :{ok:true,txt:"Listo ✓ Te enviamos un enlace a "+email+". Revisa tu correo (y la carpeta de spam)."});
+  };
   return(
     <div style={{minHeight:"100vh",display:"flex",fontFamily:"system-ui,sans-serif",background:"#0f172a"}}>
       {/* Panel izquierdo — branding */}
@@ -619,13 +697,23 @@ function Login({lf,setLf,err,onLogin,lastSaved,onBack}){
                 ¿Olvidaste tu contraseña?
               </button>
             </div>
-            {showRecuperar&&(
+            {showRecuperar&&(lf.tab==="admin"?(
               <div style={{marginTop:12,background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:10,padding:14,fontSize:13,color:"#1e40af",lineHeight:1.6}}>
-                <b>Para recuperar tu acceso:</b><br/>
-                Contacta al administrador del sistema.<br/>
-                <span style={{fontSize:12,color:"#64748b",marginTop:4,display:"block"}}>En la próxima versión podrás recuperarla por correo.</span>
+                <b>Recuperar contraseña</b><br/>
+                <span style={{fontSize:12,color:"#475569"}}>Te enviaremos un enlace a tu correo para crear una clave nueva.</span>
+                <div style={{marginTop:10}} className="space-y-2">
+                  <Input type="email" value={recEmail||lf.email} onChange={e=>setRecEmail(e.target.value)}
+                    placeholder="tucorreo@empresa.com" onKeyDown={e=>e.key==="Enter"&&enviarRecuperacion()} className="h-10 bg-white"/>
+                  <Button className="w-full h-10" onClick={enviarRecuperacion} disabled={recBusy}>{recBusy?"Enviando…":"Enviarme el correo"}</Button>
+                </div>
+                {recMsg&&<div style={{marginTop:8,fontSize:12,fontWeight:600,color:recMsg.ok?"#15803d":"#dc2626"}}>{recMsg.txt}</div>}
               </div>
-            )}
+            ):(
+              <div style={{marginTop:12,background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:10,padding:14,fontSize:13,color:"#1e40af",lineHeight:1.6}}>
+                <b>¿Olvidaste tu usuario o contraseña?</b><br/>
+                <span style={{fontSize:12,color:"#475569"}}>Pídele a tu <b>administrador</b> que te recuerde el usuario o restablezca tu clave desde el módulo <b>Usuarios</b>. Los accesos de equipo se recuperan por el administrador, no por correo.</span>
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -3491,10 +3579,175 @@ function VPaginaWeb({G,rerender,showToast}){
 }
 
 // ── PANEL DEL DUEÑO (super-admin, separado del inventario de clientes) ──
+// Ficha completa de un cliente-empresa: datos/plan, estado de pago, historial de
+// pagos y gestión de sus usuarios (activar/desactivar, resetear clave). Solo dueño.
+const money=(n)=>"$"+Math.round(Number(n)||0).toLocaleString("es-CO");
+const HOY=()=>new Date().toISOString().slice(0,10);
+function VClienteDetalle({t,showToast,onBack,onChanged}){
+  const [pagos,setPagos]=useState([]);
+  const [users,setUsers]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [meta,setMeta]=useState({plan:t.plan||"basico",precio:t.precio||0,max_usuarios:t.max_usuarios||5,vence:t.vence||"",notas:t.notas||""});
+  const [savingMeta,setSavingMeta]=useState(false);
+  const [pago,setPago]=useState({fecha:HOY(),monto:"",periodo_desde:"",periodo_hasta:"",metodo:"Transferencia",nota:""});
+  const [savingPago,setSavingPago]=useState(false);
+  const [resetFor,setResetFor]=useState(null); // usuario al que se le resetea la clave
+  const [newPass,setNewPass]=useState("");
+
+  const cargar=async()=>{
+    setLoading(true);
+    const [p,u]=await Promise.all([SB.listPagos(t.id),SB.loadUsuarios(t.id)]);
+    setPagos(p.data||[]); setUsers(u.data||[]);
+    setLoading(false);
+  };
+  useEffect(()=>{cargar();/* eslint-disable-next-line */},[t.id]);
+
+  const estado=!meta.vence?{txt:"Sin fecha",v:"secondary"}:meta.vence>=HOY()?{txt:"Al día",v:"success"}:{txt:"Vencido / Debe",v:"destructive"};
+
+  const guardarMeta=async()=>{
+    setSavingMeta(true);
+    try{
+      const patch={plan:meta.plan||"basico",precio:Number(meta.precio)||0,max_usuarios:Number(meta.max_usuarios)||0,vence:meta.vence||null,notas:meta.notas||null};
+      const {error}=await SB.updateTenant(t.id,patch); if(error)throw error;
+      Object.assign(t,patch); onChanged&&onChanged();
+      showToast("Datos del cliente guardados ✓");
+    }catch(e){showToast(e.message||"No se pudo guardar","err");}
+    setSavingMeta(false);
+  };
+
+  const registrarPago=async()=>{
+    if(!(Number(pago.monto)>0))return showToast("Ingresa un monto válido","err");
+    setSavingPago(true);
+    try{
+      const row={tenant_id:t.id,fecha:pago.fecha||HOY(),monto:Number(pago.monto),periodo_desde:pago.periodo_desde||null,periodo_hasta:pago.periodo_hasta||null,metodo:pago.metodo||null,nota:pago.nota||null};
+      const {error}=await SB.insertPago(row); if(error)throw error;
+      // Si el pago cubre un periodo, la fecha de vencimiento se corre a su fin.
+      if(pago.periodo_hasta){const {error:e2}=await SB.updateTenant(t.id,{vence:pago.periodo_hasta}); if(!e2){setMeta(m=>({...m,vence:pago.periodo_hasta}));Object.assign(t,{vence:pago.periodo_hasta});onChanged&&onChanged();}}
+      setPago({fecha:HOY(),monto:"",periodo_desde:"",periodo_hasta:"",metodo:pago.metodo,nota:""});
+      await cargar();
+      showToast("Pago registrado ✓");
+    }catch(e){showToast(e.message||"No se pudo registrar el pago","err");}
+    setSavingPago(false);
+  };
+  const borrarPago=async(id)=>{try{const {error}=await SB.deletePago(id);if(error)throw error;await cargar();showToast("Pago eliminado","warn");}catch(e){showToast(e.message||"Error","err");}};
+
+  const toggleUser=async(u)=>{try{const {error}=await SB.setMemberActive(u.id,!u.activo);if(error)throw error;await cargar();showToast(u.activo?"Usuario bloqueado":"Usuario activado","warn");}catch(e){showToast(e.message||"Error","err");}};
+  const resetear=async()=>{
+    if(newPass.length<6)return showToast("La clave debe tener al menos 6 caracteres","err");
+    try{const {error}=await SB.resetMemberPassword(resetFor.id,newPass);if(error)throw error;setResetFor(null);setNewPass("");showToast("Clave restablecida ✓");}catch(e){showToast(e.message||"Error","err");}
+  };
+
+  return(
+    <Section>
+      <div className="mb-4">
+        <Button variant="ghost" size="sm" className="text-indigo-200 hover:text-white hover:bg-white/10 mb-2" onClick={onBack}><ChevronLeft size={16}/> Volver a Clientes</Button>
+        <PageHeader label="Ficha del cliente" title={t.nombre} icon={Landmark} right={<UIBadge variant={estado.v} className="text-sm">{estado.txt}</UIBadge>}/>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        {/* Datos & plan */}
+        <Card className="p-5">
+          <div className="font-bold text-slate-900 mb-3 flex items-center gap-2"><Settings size={16}/> Datos y plan</div>
+          <div className="grid grid-cols-2 gap-2 text-sm mb-3">
+            <div><div className="text-xs text-muted-foreground">NIT</div><div className="font-medium">{t.nit||"—"}</div></div>
+            <div><div className="text-xs text-muted-foreground">Identificador (slug)</div><div className="font-mono">{t.slug||"—"}</div></div>
+            <div><div className="text-xs text-muted-foreground">Registrada</div><div className="font-medium">{(t.created_at||"").slice(0,10)||"—"}</div></div>
+            <div><div className="text-xs text-muted-foreground">Estado empresa</div><div>{t.activo?<UIBadge variant="success">Activa</UIBadge>:<UIBadge variant="destructive">Inactiva</UIBadge>}</div></div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1"><Label className="text-xs">Plan</Label><Input value={meta.plan} onChange={e=>setMeta(m=>({...m,plan:e.target.value}))}/></div>
+            <div className="space-y-1"><Label className="text-xs">Precio mensual</Label><Input type="number" value={meta.precio} onChange={e=>setMeta(m=>({...m,precio:e.target.value}))}/></div>
+            <div className="space-y-1"><Label className="text-xs">Máx. usuarios</Label><Input type="number" value={meta.max_usuarios} onChange={e=>setMeta(m=>({...m,max_usuarios:e.target.value}))}/></div>
+            <div className="space-y-1"><Label className="text-xs">Vence</Label><Input type="date" value={meta.vence||""} onChange={e=>setMeta(m=>({...m,vence:e.target.value}))}/></div>
+          </div>
+          <div className="space-y-1 mt-3"><Label className="text-xs">Notas</Label><Input value={meta.notas} onChange={e=>setMeta(m=>({...m,notas:e.target.value}))} placeholder="Observaciones del cliente"/></div>
+          <Button className="w-full mt-3" onClick={guardarMeta} disabled={savingMeta}>{savingMeta?"Guardando…":"Guardar datos"}</Button>
+        </Card>
+
+        {/* Registrar pago */}
+        <Card className="p-5">
+          <div className="font-bold text-slate-900 mb-3 flex items-center gap-2"><DollarSign size={16}/> Registrar pago</div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1"><Label className="text-xs">Fecha</Label><Input type="date" value={pago.fecha} onChange={e=>setPago(p=>({...p,fecha:e.target.value}))}/></div>
+            <div className="space-y-1"><Label className="text-xs">Monto</Label><Input type="number" value={pago.monto} onChange={e=>setPago(p=>({...p,monto:e.target.value}))} placeholder="0"/></div>
+            <div className="space-y-1"><Label className="text-xs">Periodo desde</Label><Input type="date" value={pago.periodo_desde} onChange={e=>setPago(p=>({...p,periodo_desde:e.target.value}))}/></div>
+            <div className="space-y-1"><Label className="text-xs">Periodo hasta</Label><Input type="date" value={pago.periodo_hasta} onChange={e=>setPago(p=>({...p,periodo_hasta:e.target.value}))}/></div>
+            <div className="space-y-1"><Label className="text-xs">Método</Label><Input value={pago.metodo} onChange={e=>setPago(p=>({...p,metodo:e.target.value}))}/></div>
+            <div className="space-y-1"><Label className="text-xs">Nota</Label><Input value={pago.nota} onChange={e=>setPago(p=>({...p,nota:e.target.value}))}/></div>
+          </div>
+          <p className="text-[11px] text-muted-foreground mt-2">Si llenas «Periodo hasta», la fecha de vencimiento se actualiza sola.</p>
+          <Button className="w-full mt-3" onClick={registrarPago} disabled={savingPago}>{savingPago?"Registrando…":<><Plus size={15}/> Registrar pago</>}</Button>
+        </Card>
+      </div>
+
+      {/* Historial de pagos */}
+      <Card className="mt-4 overflow-hidden">
+        <div className="px-5 pt-4 pb-2 font-bold text-slate-900 flex items-center gap-2"><FileText size={16}/> Historial de pagos <span className="text-xs font-normal text-muted-foreground">({pagos.length})</span></div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead><tr className="bg-slate-900 text-white">{["Fecha","Monto","Periodo","Método","Nota",""].map(h=><th key={h} className="px-3 py-2 text-left font-semibold text-xs whitespace-nowrap">{h}</th>)}</tr></thead>
+            <tbody>
+              {pagos.length===0?(<tr><td colSpan={6} className="px-3 py-6 text-center text-muted-foreground text-sm">Sin pagos registrados.</td></tr>):pagos.map(p=>(
+                <tr key={p.id} className="border-b last:border-0 hover:bg-slate-50">
+                  <td className="px-3 py-2 whitespace-nowrap">{(p.fecha||"").slice(0,10)}</td>
+                  <td className="px-3 py-2 font-semibold text-emerald-700">{money(p.monto)}</td>
+                  <td className="px-3 py-2 text-xs text-muted-foreground whitespace-nowrap">{p.periodo_desde?`${p.periodo_desde} → ${p.periodo_hasta||"?"}`:"—"}</td>
+                  <td className="px-3 py-2 text-xs">{p.metodo||"—"}</td>
+                  <td className="px-3 py-2 text-xs text-muted-foreground">{p.nota||"—"}</td>
+                  <td className="px-3 py-2"><button onClick={()=>borrarPago(p.id)} className="text-red-500 hover:text-red-700"><Trash2 size={14}/></button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {/* Usuarios de la empresa */}
+      <Card className="mt-4 overflow-hidden">
+        <div className="px-5 pt-4 pb-2 font-bold text-slate-900 flex items-center gap-2"><Users size={16}/> Usuarios
+          <span className={`text-xs font-normal ${users.length>Number(meta.max_usuarios||0)?"text-red-600 font-semibold":"text-muted-foreground"}`}>({users.length}/{meta.max_usuarios||"∞"})</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead><tr className="bg-slate-900 text-white">{["Usuario","Rol","Email de acceso","Estado","Acciones"].map(h=><th key={h} className="px-3 py-2 text-left font-semibold text-xs whitespace-nowrap">{h}</th>)}</tr></thead>
+            <tbody>
+              {loading?(<tr><td colSpan={5} className="px-3 py-6 text-center text-muted-foreground">Cargando…</td></tr>):users.length===0?(<tr><td colSpan={5} className="px-3 py-6 text-center text-muted-foreground">Sin usuarios.</td></tr>):users.map(u=>(
+                <tr key={u.id} className="border-b last:border-0 hover:bg-slate-50">
+                  <td className="px-3 py-2 font-semibold text-slate-900">{u.nombre}</td>
+                  <td className="px-3 py-2"><UIBadge variant="secondary">{u.rol}</UIBadge></td>
+                  <td className="px-3 py-2 font-mono text-xs text-muted-foreground">{u.email||u.correo||"—"}</td>
+                  <td className="px-3 py-2">{u.activo?<UIBadge variant="success">Activo</UIBadge>:<UIBadge variant="destructive">Bloqueado</UIBadge>}</td>
+                  <td className="px-3 py-2">
+                    <div className="flex gap-1.5">
+                      <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={()=>toggleUser(u)}>{u.activo?"Bloquear":"Activar"}</Button>
+                      <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={()=>{setResetFor(u);setNewPass("");}}><Key size={12}/> Clave</Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      <Dialog open={!!resetFor} onOpenChange={o=>{if(!o){setResetFor(null);setNewPass("");}}}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Restablecer clave de {resetFor?.nombre}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5"><Label>Nueva clave</Label><Input value={newPass} onChange={e=>setNewPass(e.target.value)} placeholder="mín. 6 caracteres"/></div>
+            <Button className="w-full" onClick={resetear}><Key size={15}/> Restablecer</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </Section>
+  );
+}
+
 function VClientes({G,rerender,recargar,showToast}){
   const [modal,setModal]=useState(false);
   const [form,setForm]=useState({nombre:"",nit:"",slug:"",adminNombre:"",adminEmail:"",adminPass:""});
   const [saving,setSaving]=useState(false);
+  const [sel,setSel]=useState(null); // empresa abierta en ficha detalle
 
   const crear=async()=>{
     if(!form.nombre.trim()||!form.nit.trim()||!form.adminEmail.trim()||!form.adminPass.trim())return showToast("Completa empresa, NIT, email y clave","err");
@@ -3517,6 +3770,8 @@ function VClientes({G,rerender,recargar,showToast}){
   };
 
   const tenants=G.tenants||[];
+  const reloadTenants=async()=>{await loadTenants();rerender();};
+  if(sel){const fresh=tenants.find(x=>x.id===sel.id)||sel;return <VClienteDetalle t={fresh} showToast={showToast} onBack={()=>setSel(null)} onChanged={reloadTenants}/>;}
   return(
     <Section>
       <PageHeader label="Empresas" title="Clientes" icon={Users} count={tenants.length} countLabel="empresas"
@@ -3541,7 +3796,12 @@ function VClientes({G,rerender,recargar,showToast}){
                     <td className="px-3 py-2.5"><UIBadge variant="secondary">{t.plan||"basico"}</UIBadge></td>
                     <td className="px-3 py-2.5">{t.activo?<UIBadge variant="success">Activa</UIBadge>:<UIBadge variant="destructive">Inactiva</UIBadge>}</td>
                     <td className="px-3 py-2.5 text-xs text-muted-foreground">{(t.created_at||"").slice(0,10)}</td>
-                    <td className="px-3 py-2.5"><Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" onClick={()=>toggleActivo(t)}>{t.activo?"Desactivar":"Activar"}</Button></td>
+                    <td className="px-3 py-2.5">
+                      <div className="flex gap-1.5">
+                        <Button size="sm" className="h-7 px-2.5 text-xs" onClick={()=>setSel(t)}><ChevronRight size={13}/> Ingresar</Button>
+                        <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" onClick={()=>toggleActivo(t)}>{t.activo?"Desactivar":"Activar"}</Button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
