@@ -5,6 +5,16 @@
 // Los iconos/colores NO son editables: viven en Landing.jsx por índice.
 // ─────────────────────────────────────────
 export const DEFAULT_LANDING = {
+  // Colores de la marca (editables desde el panel → Página web → Colores).
+  theme: {
+    primario: "#2563eb",   // color principal (botones, resaltados, acentos)
+    secundario: "#0891b2", // color secundario (promo, detalles)
+  },
+  // Banner de promoción (editable desde el panel → Página web → Promociones).
+  promo: {
+    activo: false,
+    texto: "",
+  },
   hero: {
     badge: "100% en la nube · sincronización en tiempo real",
     title: "Toma de inventarios físicos,",
@@ -60,6 +70,8 @@ export const DEFAULT_LANDING = {
 export function mergeLanding(saved) {
   const s = saved || {};
   return {
+    theme: { ...DEFAULT_LANDING.theme, ...(s.theme || {}) },
+    promo: { ...DEFAULT_LANDING.promo, ...(s.promo || {}) },
     hero: { ...DEFAULT_LANDING.hero, ...(s.hero || {}) },
     about: { ...DEFAULT_LANDING.about, ...(s.about || {}) },
     features: Array.isArray(s.features) && s.features.length ? s.features : DEFAULT_LANDING.features,

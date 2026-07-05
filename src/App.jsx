@@ -35,6 +35,7 @@ const memberEmail = (nombre, slug) => `${slugify(nombre)}@${slugify(slug)}.tomfi
 // Fecha de hoy en ISO (YYYY-MM-DD) y días desde hoy hasta una fecha ISO (negativo = ya pasó).
 const ISO_HOY = () => new Date().toISOString().slice(0,10);
 const diasHasta = (iso) => iso ? Math.round((new Date(iso.slice(0,10)+"T00:00:00") - new Date(ISO_HOY()+"T00:00:00")) / 86400000) : null;
+const addDias = (iso, n) => { const d = new Date((iso||ISO_HOY()).slice(0,10)+"T00:00:00"); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); };
 const fmtFechaCorta = (iso) => { if(!iso) return "—"; const [y,m,d] = iso.slice(0,10).split("-"); return `${d}/${m}/${y}`; };
 const GRACIA_DIAS = 3; // días de gracia tras el vencimiento antes de bloquear el acceso del cliente
 const AVISO_DIAS  = 7; // días de anticipación con que se le avisa al cliente que su plan vence
@@ -3477,9 +3478,19 @@ function Ta({value,onChange,rows=2,placeholder}){
   return <textarea value={value} onChange={onChange} rows={rows} placeholder={placeholder}
     className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-y"/>;
 }
+const ColorField=({label,value,onChange})=>(
+  <div className="space-y-1.5">
+    <Label className="text-xs">{label}</Label>
+    <div className="flex items-center gap-2">
+      <input type="color" value={value||"#000000"} onChange={e=>onChange(e.target.value)} className="h-10 w-12 rounded border border-slate-200 cursor-pointer bg-white p-0.5"/>
+      <Input value={value||""} onChange={e=>onChange(e.target.value)} className="font-mono"/>
+    </div>
+  </div>
+);
 function VPaginaWeb({G,rerender,showToast}){
   const [form,setForm]=useState(()=>mergeLanding(G.landingContent));
   const [saving,setSaving]=useState(false);
+  const [tab,setTab]=useState("contenido");
 
   const setHero=(k,v)=>setForm(f=>({...f,hero:{...f.hero,[k]:v}}));
   const setAbout=(k,v)=>setForm(f=>({...f,about:{...f.about,[k]:v}}));
@@ -3487,6 +3498,9 @@ function VPaginaWeb({G,rerender,showToast}){
   const setFeature=(i,k,v)=>setForm(f=>({...f,features:f.features.map((x,j)=>j===i?{...x,[k]:v}:x)}));
   const setStep=(i,k,v)=>setForm(f=>({...f,steps:f.steps.map((x,j)=>j===i?{...x,[k]:v}:x)}));
   const setPlan=(i,k,v)=>setForm(f=>({...f,planes:f.planes.map((x,j)=>j===i?{...x,[k]:v}:x)}));
+  const setTheme=(k,v)=>setForm(f=>({...f,theme:{...f.theme,[k]:v}}));
+  const setPromo=(k,v)=>setForm(f=>({...f,promo:{...f.promo,[k]:v}}));
+  const TABS=[["contenido","Contenido",FileText],["colores","Colores",Pencil],["promociones","Promociones",Bell],["preview","Vista previa",Eye]];
 
   const guardar=async()=>{
     setSaving(true);
@@ -3513,16 +3527,22 @@ function VPaginaWeb({G,rerender,showToast}){
     <Section>
       <PageHeader
         label="Web pública"
-        title="Editor de la página"
+        title="Página web"
         icon={Globe}
-        subtitle="Edita el contenido de la landing. Los cambios se publican al guardar."
+        subtitle="Edita tu web y publícala cuando quieras."
         right={<BtnGuardar className="bg-white text-blue-700 hover:bg-blue-50"/>}
       />
 
-      <div className="flex items-center gap-2 mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-        <Globe size={16} className="shrink-0"/> Lo que cambies acá se ve en la página pública apenas guardes. Los iconos e imágenes no se editan desde aquí.
+      <div className="flex flex-wrap gap-1 mb-5 border-b border-slate-200">
+        {TABS.map(([id,label,Ic])=>{const active=tab===id;return(
+          <button key={id} onClick={()=>setTab(id)}
+            className={`flex items-center gap-1.5 px-3.5 py-2 text-sm -mb-px border-b-2 transition-colors ${active?"border-indigo-600 text-indigo-700 font-semibold":"border-transparent text-slate-500 hover:text-slate-800"}`}>
+            <Ic size={15}/> {label}
+          </button>
+        );})}
       </div>
 
+      {tab==="contenido"&&(<>
       {/* HERO */}
       <Card className="p-5 mb-4">
         <div className="font-bold text-sm text-slate-900 mb-3">Encabezado principal (Hero)</div>
@@ -3609,8 +3629,60 @@ function VPaginaWeb({G,rerender,showToast}){
           <div className="space-y-1.5"><Label>WhatsApp</Label><Input value={form.contacto.whatsapp} onChange={e=>setContacto("whatsapp",e.target.value)}/></div>
         </div>
       </Card>
+      </>)}
 
-      <div className="flex justify-end gap-2 mb-2">
+      {tab==="colores"&&(
+        <Card className="p-5 mb-4">
+          <div className="font-bold text-sm text-slate-900 mb-1">Colores de la marca</div>
+          <p className="text-xs text-muted-foreground mb-4">Se aplican a botones, resaltados y acentos de tu web. Míralos en la pestaña «Vista previa» antes de publicar.</p>
+          <div className="grid sm:grid-cols-2 gap-4 max-w-lg">
+            <ColorField label="Color principal" value={form.theme.primario} onChange={v=>setTheme("primario",v)}/>
+            <ColorField label="Color secundario (promos)" value={form.theme.secundario} onChange={v=>setTheme("secundario",v)}/>
+          </div>
+          <div className="mt-5 flex flex-wrap gap-2">
+            <button onClick={()=>{setTheme("primario","#2563eb");setTheme("secundario","#0891b2");}} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">Azul (por defecto)</button>
+            <button onClick={()=>{setTheme("primario","#059669");setTheme("secundario","#0d9488");}} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">Verde</button>
+            <button onClick={()=>{setTheme("primario","#7c3aed");setTheme("secundario","#c026d3");}} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">Morado</button>
+            <button onClick={()=>{setTheme("primario","#ea580c");setTheme("secundario","#d97706");}} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">Naranja</button>
+          </div>
+        </Card>
+      )}
+
+      {tab==="promociones"&&(
+        <Card className="p-5 mb-4 max-w-lg">
+          <div className="font-bold text-sm text-slate-900 mb-1">Banner de promoción</div>
+          <p className="text-xs text-muted-foreground mb-4">Aparece como una franja en la parte superior de tu web.</p>
+          <label className="flex items-center gap-2 text-sm font-medium text-slate-700 cursor-pointer mb-3">
+            <input type="checkbox" checked={!!form.promo.activo} onChange={e=>setPromo("activo",e.target.checked)} className="h-4 w-4 accent-blue-600"/>
+            Mostrar el banner en la web
+          </label>
+          <div className="space-y-1.5"><Label>Texto de la promoción</Label><Input value={form.promo.texto} onChange={e=>setPromo("texto",e.target.value)} placeholder="Ej: ¡2 meses gratis en tu primer plan!"/></div>
+          {form.promo.activo&&form.promo.texto&&(
+            <div className="mt-4"><div className="text-xs text-muted-foreground mb-1.5">Así se verá:</div>
+              <div className="rounded-lg text-center text-sm font-semibold px-4 py-2 text-white" style={{background:form.theme.secundario}}>{form.promo.texto}</div>
+            </div>
+          )}
+        </Card>
+      )}
+
+      {tab==="preview"&&(
+        <div>
+          <div className="flex items-center gap-2 mb-3 text-xs text-muted-foreground"><Eye size={14}/> Vista previa de tus cambios <b>sin publicar</b>. La barra del navegador es solo del preview — no aparece en tu web real.</div>
+          <div className="rounded-xl border border-slate-200 overflow-hidden bg-white shadow-sm">
+            <div className="h-9 bg-slate-100 border-b border-slate-200 flex items-center gap-1.5 px-3">
+              <span className="w-3 h-3 rounded-full bg-red-400"/><span className="w-3 h-3 rounded-full bg-amber-400"/><span className="w-3 h-3 rounded-full bg-green-400"/>
+              <span className="ml-2 text-xs text-slate-400">tomfic.vercel.app · vista previa</span>
+            </div>
+            <div style={{height:540,overflow:"auto"}}>
+              <div style={{transform:"scale(0.62)",transformOrigin:"top left",width:"161.3%"}}>
+                <Landing content={form} preview/>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="flex justify-end gap-2 mb-2 mt-5">
         <Button variant="outline" onClick={()=>setForm(mergeLanding(null))}>Restaurar por defecto</Button>
         <BtnGuardar/>
       </div>
@@ -3629,7 +3701,7 @@ function VClienteDetalle({t,showToast,onBack,onChanged}){
   const [loading,setLoading]=useState(true);
   const [meta,setMeta]=useState({plan:t.plan||"basico",precio:t.precio||0,max_usuarios:t.max_usuarios||5,vence:t.vence||"",notas:t.notas||""});
   const [savingMeta,setSavingMeta]=useState(false);
-  const [pago,setPago]=useState({fecha:HOY(),monto:"",periodo_desde:"",periodo_hasta:"",metodo:"Transferencia",nota:""});
+  const [pago,setPago]=useState({fecha:HOY(),monto:"",metodo:"Transferencia",nota:""});
   const [savingPago,setSavingPago]=useState(false);
   const [resetFor,setResetFor]=useState(null); // usuario al que se le resetea la clave
   const [newPass,setNewPass]=useState("");
@@ -3659,13 +3731,16 @@ function VClienteDetalle({t,showToast,onBack,onChanged}){
     if(!(Number(pago.monto)>0))return showToast("Ingresa un monto válido","err");
     setSavingPago(true);
     try{
-      const row={tenant_id:t.id,fecha:pago.fecha||HOY(),monto:Number(pago.monto),periodo_desde:pago.periodo_desde||null,periodo_hasta:pago.periodo_hasta||null,metodo:pago.metodo||null,nota:pago.nota||null};
+      // El período corre automático: inicia en la fecha de pago y vence a los 30 días.
+      const desde=pago.fecha||HOY();
+      const hasta=addDias(desde,30);
+      const row={tenant_id:t.id,fecha:desde,monto:Number(pago.monto),periodo_desde:desde,periodo_hasta:hasta,metodo:pago.metodo||null,nota:pago.nota||null};
       const {error}=await SB.insertPago(row); if(error)throw error;
-      // Si el pago cubre un periodo, la fecha de vencimiento se corre a su fin.
-      if(pago.periodo_hasta){const {error:e2}=await SB.updateTenant(t.id,{vence:pago.periodo_hasta}); if(!e2){setMeta(m=>({...m,vence:pago.periodo_hasta}));Object.assign(t,{vence:pago.periodo_hasta});onChanged&&onChanged();}}
-      setPago({fecha:HOY(),monto:"",periodo_desde:"",periodo_hasta:"",metodo:pago.metodo,nota:""});
+      const {error:e2}=await SB.updateTenant(t.id,{vence:hasta});
+      if(!e2){setMeta(m=>({...m,vence:hasta}));Object.assign(t,{vence:hasta});onChanged&&onChanged();}
+      setPago({fecha:HOY(),monto:"",metodo:pago.metodo,nota:""});
       await cargar();
-      showToast("Pago registrado ✓");
+      showToast(`Pago registrado ✓ · vence ${fmtFechaCorta(hasta)}`);
     }catch(e){showToast(e.message||"No se pudo registrar el pago","err");}
     setSavingPago(false);
   };
@@ -3708,14 +3783,14 @@ function VClienteDetalle({t,showToast,onBack,onChanged}){
         <Card className="p-5">
           <div className="font-bold text-slate-900 mb-3 flex items-center gap-2"><DollarSign size={16}/> Registrar pago</div>
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1"><Label className="text-xs">Fecha</Label><Input type="date" value={pago.fecha} onChange={e=>setPago(p=>({...p,fecha:e.target.value}))}/></div>
+            <div className="space-y-1"><Label className="text-xs">Fecha de pago</Label><Input type="date" value={pago.fecha} onChange={e=>setPago(p=>({...p,fecha:e.target.value}))}/></div>
             <div className="space-y-1"><Label className="text-xs">Monto</Label><Input type="number" value={pago.monto} onChange={e=>setPago(p=>({...p,monto:e.target.value}))} placeholder="0"/></div>
-            <div className="space-y-1"><Label className="text-xs">Periodo desde</Label><Input type="date" value={pago.periodo_desde} onChange={e=>setPago(p=>({...p,periodo_desde:e.target.value}))}/></div>
-            <div className="space-y-1"><Label className="text-xs">Periodo hasta</Label><Input type="date" value={pago.periodo_hasta} onChange={e=>setPago(p=>({...p,periodo_hasta:e.target.value}))}/></div>
             <div className="space-y-1"><Label className="text-xs">Método</Label><Input value={pago.metodo} onChange={e=>setPago(p=>({...p,metodo:e.target.value}))}/></div>
             <div className="space-y-1"><Label className="text-xs">Nota</Label><Input value={pago.nota} onChange={e=>setPago(p=>({...p,nota:e.target.value}))}/></div>
           </div>
-          <p className="text-[11px] text-muted-foreground mt-2">Si llenas «Periodo hasta», la fecha de vencimiento se actualiza sola.</p>
+          <div className="mt-3 flex items-center gap-2 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs text-emerald-800">
+            <Calendar size={14} className="shrink-0"/> El plan queda pagado por <b>30 días</b> · vence el <b>{fmtFechaCorta(addDias(pago.fecha||HOY(),30))}</b>
+          </div>
           <Button className="w-full mt-3" onClick={registrarPago} disabled={savingPago}>{savingPago?"Registrando…":<><Plus size={15}/> Registrar pago</>}</Button>
         </Card>
       </div>
@@ -3783,7 +3858,7 @@ function VClienteDetalle({t,showToast,onBack,onChanged}){
   );
 }
 
-function VClientes({G,rerender,recargar,showToast,focusTenant,clearFocus}){
+function VClientes({G,rerender,recargar,showToast,focusTenant,clearFocus,initFiltro,clearFiltro}){
   const [modal,setModal]=useState(false);
   const [form,setForm]=useState({nombre:"",nit:"",slug:"",adminNombre:"",adminEmail:"",adminPass:""});
   const [saving,setSaving]=useState(false);
@@ -3794,6 +3869,8 @@ function VClientes({G,rerender,recargar,showToast,focusTenant,clearFocus}){
 
   // Al llegar desde el Dashboard con una empresa enfocada, abrir su ficha directamente.
   useEffect(()=>{ if(focusTenant){ setSel(focusTenant); clearFocus&&clearFocus(); } /* eslint-disable-next-line */ },[focusTenant]);
+  // Al llegar desde una tarjeta del Dashboard, aplicar su filtro (ej. "vencidas").
+  useEffect(()=>{ if(initFiltro){ if(initFiltro.pago)setFPago(initFiltro.pago); if(initFiltro.estado)setFEstado(initFiltro.estado); clearFiltro&&clearFiltro(); } /* eslint-disable-next-line */ },[initFiltro]);
 
   const crear=async()=>{
     if(!form.nombre.trim()||!form.nit.trim()||!form.adminEmail.trim()||!form.adminPass.trim())return showToast("Completa empresa, NIT, email y clave","err");
@@ -3915,7 +3992,7 @@ function VClientes({G,rerender,recargar,showToast,focusTenant,clearFocus}){
 }
 
 // ── DASHBOARD DEL DUEÑO (resumen de empresas, vencimientos e ingresos) ──
-function VResumen({G,showToast,onOpenCliente,irAClientes}){
+function VResumen({G,showToast,onOpenCliente,onGo}){
   const [pagos,setPagos]=useState([]);
   const [loading,setLoading]=useState(true);
   const cargar=async()=>{
@@ -3944,12 +4021,15 @@ function VResumen({G,showToast,onOpenCliente,irAClientes}){
   const ultimos=pagos.slice(0,6);
   const tName=(tid)=>{const t=tenants.find(x=>x.id===tid);return t?t.nombre:"—";};
 
-  const Metric=({icon:Ic,label,value,color,sub})=>(
-    <div style={{background:"white",border:"1px solid #e2e8f0",borderRadius:14,padding:"16px 18px",flex:"1 1 150px",minWidth:150,boxShadow:"0 1px 3px rgba(0,0,0,0.04)"}}>
-      <div style={{display:"flex",alignItems:"center",gap:7,color:color||"#64748b"}}><Ic size={15}/><span style={{fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:0.5}}>{label}</span></div>
+  const Metric=({icon:Ic,label,value,color,sub,onClick,border})=>(
+    <button type="button" onClick={onClick} disabled={!onClick}
+      style={{textAlign:"left",background:"white",border:`1px solid ${border||"#e2e8f0"}`,borderRadius:14,padding:"16px 18px",flex:"1 1 150px",minWidth:150,boxShadow:"0 1px 3px rgba(0,0,0,0.04)",cursor:onClick?"pointer":"default",transition:"box-shadow .15s,transform .15s"}}
+      onMouseEnter={e=>{if(onClick){e.currentTarget.style.boxShadow="0 4px 14px rgba(0,0,0,0.10)";e.currentTarget.style.transform="translateY(-1px)";}}}
+      onMouseLeave={e=>{e.currentTarget.style.boxShadow="0 1px 3px rgba(0,0,0,0.04)";e.currentTarget.style.transform="none";}}>
+      <div style={{display:"flex",alignItems:"center",gap:7,color:color||"#64748b"}}><Ic size={15}/><span style={{fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:0.5}}>{label}</span>{onClick&&<ChevronRight size={13} style={{marginLeft:"auto",opacity:0.5}}/>}</div>
       <div style={{fontSize:25,fontWeight:800,color:"#0f172a",marginTop:6,lineHeight:1}}>{value}</div>
       {sub&&<div style={{fontSize:11,color:"#94a3b8",marginTop:4}}>{sub}</div>}
-    </div>
+    </button>
   );
   const FilaEmpresa=({t})=>{const d=diasHasta(t.vence);return(
     <button onClick={()=>onOpenCliente&&onOpenCliente(t)} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,padding:"9px 12px",background:"white",border:"1px solid #f1f5f9",borderRadius:10,cursor:"pointer",textAlign:"left"}}>
@@ -3963,11 +4043,11 @@ function VResumen({G,showToast,onOpenCliente,irAClientes}){
       <PageHeader label="Panel del Dueño" title="Resumen" icon={BarChart2} subtitle={loading?"Cargando…":`${tenants.length} empresas · ${TODAY()}`}/>
       {/* Tarjetas de métricas */}
       <div style={{display:"flex",flexWrap:"wrap",gap:12,marginBottom:20}}>
-        <Metric icon={Users} label="Empresas" value={tenants.length} color="#4f46e5"/>
-        <Metric icon={CheckCircle} label="Activas" value={activas} color="#16a34a" sub={`${tenants.length-activas} inactivas`}/>
-        <Metric icon={Clock} label="Por vencer" value={porVencer.length} color="#b45309" sub={`próximos ${AVISO_DIAS} días`}/>
-        <Metric icon={AlertCircle} label="Vencidas" value={vencidas.length} color="#dc2626"/>
-        <Metric icon={DollarSign} label="Ingresos del mes" value={fmt(ingresosMes)} color="#0891b2" sub={nombreMes(mesAct)}/>
+        <Metric icon={Users} label="Empresas" value={tenants.length} color="#4f46e5" onClick={()=>onGo&&onGo("clientes",{pago:"todos"})}/>
+        <Metric icon={CheckCircle} label="Al día" value={conFecha.filter(t=>diasHasta(t.vence)>AVISO_DIAS).length} color="#16a34a" sub={`${tenants.length-activas} inactivas`} onClick={()=>onGo&&onGo("clientes",{pago:"aldia"})}/>
+        <Metric icon={Clock} label="Por vencer" value={porVencer.length} color="#b45309" sub={`próximos ${AVISO_DIAS} días`} border="#fde68a" onClick={()=>onGo&&onGo("clientes",{pago:"porvencer"})}/>
+        <Metric icon={AlertCircle} label="Vencidas" value={vencidas.length} color="#dc2626" border="#fecaca" onClick={()=>onGo&&onGo("clientes",{pago:"vencido"})}/>
+        <Metric icon={DollarSign} label="Ingresos del mes" value={fmt(ingresosMes)} color="#0891b2" sub={nombreMes(mesAct)} onClick={()=>onGo&&onGo("pagos")}/>
       </div>
 
       {/* Listas de vencimientos */}
@@ -4001,7 +4081,7 @@ function VResumen({G,showToast,onOpenCliente,irAClientes}){
           </div>
         </div>
         <div style={card}>
-          <div style={{fontWeight:800,fontSize:14,color:"#0f172a",marginBottom:12,display:"flex",alignItems:"center",gap:7}}><DollarSign size={16} color="#0891b2"/> Últimos pagos</div>
+          <div style={{fontWeight:800,fontSize:14,color:"#0f172a",marginBottom:12,display:"flex",alignItems:"center",gap:7}}><DollarSign size={16} color="#0891b2"/> Últimos pagos <button onClick={()=>onGo&&onGo("pagos")} style={{marginLeft:"auto",fontSize:12,fontWeight:600,color:"#4f46e5",background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:2}}>Ver todos <ChevronRight size={13}/></button></div>
           <div style={{display:"flex",flexDirection:"column",gap:2,maxHeight:200,overflowY:"auto"}}>
             {ultimos.length===0?<div style={{fontSize:13,color:"#94a3b8",padding:"8px 0"}}>Aún no hay pagos registrados.</div>:ultimos.map(p=>(
               <div key={p.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,padding:"7px 4px",borderBottom:"1px solid #f8fafc"}}>
@@ -4016,13 +4096,66 @@ function VResumen({G,showToast,onOpenCliente,irAClientes}){
   );
 }
 
+// ── MÓDULO PAGOS (todos los pagos de todas las empresas) ──
+function VPagos({G,showToast}){
+  const [pagos,setPagos]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [q,setQ]=useState("");
+  const tenants=G.tenants||[];
+  const tName=(tid)=>{const t=tenants.find(x=>x.id===tid);return t?t.nombre:"—";};
+  const cargar=async()=>{setLoading(true);const {data,error}=await SB.listAllPagos();if(error)console.warn("No se pudieron cargar los pagos:",error.message);setPagos(data||[]);setLoading(false);};
+  useEffect(()=>{cargar();/* eslint-disable-next-line */},[]);
+  const norm=s=>(s||"").toString().toLowerCase();
+  const filtered=pagos.filter(p=>!q||norm(tName(p.tenant_id)).includes(norm(q))||norm(p.metodo).includes(norm(q))||norm(p.nota).includes(norm(q)));
+  const mesAct=ISO_HOY().slice(0,7);
+  const totalMes=pagos.filter(p=>(p.fecha||"").slice(0,7)===mesAct).reduce((s,p)=>s+(Number(p.monto)||0),0);
+  const totalAll=pagos.reduce((s,p)=>s+(Number(p.monto)||0),0);
+  return(
+    <Section>
+      <PageHeader label="Facturación" title="Pagos" icon={DollarSign} count={pagos.length} countLabel="pagos"/>
+      <div className="grid grid-cols-2 gap-3 mb-4 max-w-md">
+        <div className="rounded-xl border border-slate-200 bg-white p-4"><div className="text-xs font-semibold uppercase tracking-wide text-cyan-600 flex items-center gap-1.5"><DollarSign size={14}/> Este mes</div><div className="text-2xl font-extrabold text-slate-900 mt-1">{money(totalMes)}</div></div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4"><div className="text-xs font-semibold uppercase tracking-wide text-indigo-600 flex items-center gap-1.5"><BarChart2 size={14}/> Total histórico</div><div className="text-2xl font-extrabold text-slate-900 mt-1">{money(totalAll)}</div></div>
+      </div>
+      <div className="relative mb-3 max-w-sm">
+        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/>
+        <Input value={q} onChange={e=>setQ(e.target.value)} placeholder="Buscar por empresa, método o nota…" className="pl-9 bg-white"/>
+      </div>
+      <Card className="overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead><tr className="bg-slate-900 text-white">{["Empresa","Fecha","Monto","Periodo","Método","Nota"].map(h=><th key={h} className="px-3 py-2.5 text-left font-semibold text-xs whitespace-nowrap">{h}</th>)}</tr></thead>
+            <tbody>
+              {loading?(<tr><td colSpan={6} className="px-3 py-8 text-center text-muted-foreground text-sm">Cargando…</td></tr>):
+               filtered.length===0?(<tr><td colSpan={6} className="px-3 py-8 text-center text-muted-foreground text-sm">{pagos.length===0?"Aún no hay pagos registrados.":"Ningún pago coincide con la búsqueda."}</td></tr>):
+               filtered.map(p=>(
+                <tr key={p.id} className="border-b last:border-0 hover:bg-slate-50">
+                  <td className="px-3 py-2.5 font-bold text-slate-900 whitespace-nowrap">{tName(p.tenant_id)}</td>
+                  <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">{fmtFechaCorta(p.fecha)}</td>
+                  <td className="px-3 py-2.5 font-semibold text-emerald-700 whitespace-nowrap">{money(p.monto)}</td>
+                  <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">{p.periodo_desde?`${fmtFechaCorta(p.periodo_desde)} → ${fmtFechaCorta(p.periodo_hasta)}`:"—"}</td>
+                  <td className="px-3 py-2.5 text-xs">{p.metodo||"—"}</td>
+                  <td className="px-3 py-2.5 text-xs text-muted-foreground">{p.nota||"—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </Section>
+  );
+}
+
 function PanelDueno({usuario,setUsuario,logout,G,rerender,recargar,showToast}){
   const [view,setView]=useState("resumen");
   const [modalSalir,setModalSalir]=useState(false);
   const [focusTenant,setFocusTenant]=useState(null); // empresa a abrir directo desde el Dashboard
+  const [clientesFiltro,setClientesFiltro]=useState(null); // filtro inicial al entrar a Clientes desde el dashboard
+  const irA=(v,filtro)=>{ if(v==="clientes")setClientesFiltro(filtro||null); setView(v); };
   const nav=[
     {id:"resumen",icon:BarChart2,label:"Resumen"},
     {id:"clientes",icon:Users,label:"Clientes"},
+    {id:"pagos",icon:DollarSign,label:"Pagos"},
     {id:"web",icon:Globe,label:"Página web"},
   ];
   return(
@@ -4043,16 +4176,23 @@ function PanelDueno({usuario,setUsuario,logout,G,rerender,recargar,showToast}){
         </div>
       </div>
       <div className="flex" style={{height:"calc(100vh - 56px)",overflow:"hidden"}}>
-        <div className="w-48 shrink-0 bg-gradient-to-b from-indigo-950 to-slate-900 p-3 flex flex-col gap-1.5 overflow-y-auto">
+        <div className="w-52 shrink-0 bg-white border-r border-slate-200 p-3 flex flex-col gap-1 overflow-y-auto">
+          <div className="px-3 pt-1 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">Gestión</div>
           {nav.map(n=>{const active=view===n.id;return(
-            <button key={n.id} onClick={()=>setView(n.id)} className={`flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm text-left transition-colors ${active?"bg-indigo-600 text-white font-semibold":"text-indigo-200/70 hover:bg-white/5"}`}>
-              <n.icon size={17}/> {n.label}
+            <button key={n.id} onClick={()=>irA(n.id)}
+              className={`flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm text-left transition-colors ${active?"bg-indigo-50 text-indigo-700 font-semibold":"text-slate-600 hover:bg-slate-50"}`}>
+              <n.icon size={17} className={active?"text-indigo-600":"text-slate-400"}/> {n.label}
             </button>
           );})}
+          <div className="mt-auto rounded-lg bg-slate-50 border border-slate-100 px-3 py-2.5">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Panel del Dueño</div>
+            <div className="text-xs text-slate-500 mt-0.5">v2.2</div>
+          </div>
         </div>
         <div className="flex-1 p-6 overflow-y-auto">
-          {view==="resumen"&&<VResumen G={G} showToast={showToast} onOpenCliente={(t)=>{setFocusTenant(t);setView("clientes");}} irAClientes={()=>setView("clientes")}/>}
-          {view==="clientes"&&<VClientes G={G} rerender={rerender} recargar={recargar} showToast={showToast} focusTenant={focusTenant} clearFocus={()=>setFocusTenant(null)}/>}
+          {view==="resumen"&&<VResumen G={G} showToast={showToast} onOpenCliente={(t)=>{setFocusTenant(t);setView("clientes");}} onGo={irA}/>}
+          {view==="clientes"&&<VClientes G={G} rerender={rerender} recargar={recargar} showToast={showToast} focusTenant={focusTenant} clearFocus={()=>setFocusTenant(null)} initFiltro={clientesFiltro} clearFiltro={()=>setClientesFiltro(null)}/>}
+          {view==="pagos"&&<VPagos G={G} showToast={showToast}/>}
           {view==="web"&&<VPaginaWeb G={G} rerender={rerender} showToast={showToast}/>}
         </div>
       </div>

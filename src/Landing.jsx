@@ -188,19 +188,28 @@ function HeroMockup() {
   );
 }
 
-export default function Landing({ onEnter, onRegister, content }) {
+export default function Landing({ onEnter, onRegister, content, preview }) {
   const c = content || DEFAULT_LANDING;
   const { hero, about, features, steps, planes, contacto } = c;
+  const theme = { ...DEFAULT_LANDING.theme, ...(c.theme || {}) };
+  const promo = { ...DEFAULT_LANDING.promo, ...(c.promo || {}) };
+  const P = theme.primario, P2 = theme.secundario; // colores de marca editables
   const [showReg, setShowReg] = useState(false);
-  const openReg = onRegister ? () => setShowReg(true) : onEnter;
+  const openReg = onRegister ? () => setShowReg(true) : (onEnter || (() => {}));
+  const go = onEnter || (() => {}); // en modo preview los botones no navegan
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans antialiased">
+      {promo.activo && promo.texto && (
+        <div style={{ background: P2, color: "#fff" }} className="text-center text-sm font-semibold px-4 py-2">
+          {promo.texto}
+        </div>
+      )}
       {showReg && onRegister && (
         <RegisterModal onClose={() => setShowReg(false)} onRegister={onRegister} onGoLogin={() => { setShowReg(false); onEnter(); }} />
       )}
       {/* NAVBAR */}
-      <header className="sticky top-0 z-50 bg-white/90 backdrop-blur border-b border-slate-100">
+      <header className={`${preview ? "relative" : "sticky"} top-0 z-50 bg-white/90 backdrop-blur border-b border-slate-100`}>
         <nav className="mx-auto max-w-6xl px-5 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <Logo size={34} />
@@ -214,7 +223,7 @@ export default function Landing({ onEnter, onRegister, content }) {
             <a href="#como" className="hover:text-slate-900 transition-colors">Cómo funciona</a>
             <a href="#precios" className="hover:text-slate-900 transition-colors">Precios</a>
           </div>
-          <Button onClick={onEnter}>Ingresar <ArrowRight size={16} /></Button>
+          <Button onClick={go} style={{ background: P }}>Ingresar <ArrowRight size={16} /></Button>
         </nav>
       </header>
 
@@ -228,11 +237,11 @@ export default function Landing({ onEnter, onRegister, content }) {
               <Cloud size={13} /> {hero.badge}
             </span>
             <h1 className="text-4xl md:text-[2.9rem] font-black leading-[1.1] tracking-tight">
-              {hero.title} <span className="text-blue-400">{hero.titleHighlight}</span>
+              {hero.title} <span style={{ color: P }}>{hero.titleHighlight}</span>
             </h1>
             <p className="mt-5 text-lg text-slate-300 max-w-md">{hero.subtitle}</p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Button size="lg" onClick={openReg}>{hero.ctaPrimary} <ArrowRight size={18} /></Button>
+              <Button size="lg" onClick={openReg} style={{ background: P }}>{hero.ctaPrimary} <ArrowRight size={18} /></Button>
               <Button size="lg" variant="outline" className="bg-transparent text-white border-white/30 hover:bg-white/10 hover:text-white" asChild>
                 <a href="#caracteristicas">{hero.ctaSecondary}</a>
               </Button>
@@ -309,8 +318,8 @@ export default function Landing({ onEnter, onRegister, content }) {
               const Icon = STEP_ICONS[i] || STEP_ICONS[0];
               return (
                 <div key={i} className="relative rounded-2xl border border-slate-100 bg-white p-7 shadow-sm">
-                  <div className="absolute -top-4 left-7 w-9 h-9 rounded-full bg-blue-600 text-white font-black flex items-center justify-center shadow-lg">{i + 1}</div>
-                  <Icon size={26} className="text-blue-600 mt-3 mb-3" />
+                  <div style={{ background: P }} className="absolute -top-4 left-7 w-9 h-9 rounded-full text-white font-black flex items-center justify-center shadow-lg">{i + 1}</div>
+                  <Icon size={26} style={{ color: P }} className="mt-3 mb-3" />
                   <h3 className="font-bold text-lg">{s.title}</h3>
                   <p className="mt-2 text-sm text-slate-600 leading-relaxed">{s.desc}</p>
                 </div>
@@ -326,8 +335,8 @@ export default function Landing({ onEnter, onRegister, content }) {
           <SectionHead label="Precios" title="Planes simples y claros" subtitle="Precios de ejemplo — los ajustamos a tu operación." />
           <div className="mt-12 grid md:grid-cols-3 gap-6 items-start">
             {planes.map((p, i) => (
-              <div key={i} className={`rounded-2xl border p-7 bg-white relative ${p.destacado ? "border-blue-600 shadow-xl md:-mt-3 md:mb-3" : "border-slate-200 shadow-sm"}`}>
-                {p.destacado && <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-blue-600 text-white text-[11px] font-bold px-3 py-1">Más popular</div>}
+              <div key={i} style={{ borderColor: p.destacado ? P : undefined }} className={`rounded-2xl border p-7 bg-white relative ${p.destacado ? "shadow-xl md:-mt-3 md:mb-3" : "border-slate-200 shadow-sm"}`}>
+                {p.destacado && <div style={{ background: P }} className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full text-white text-[11px] font-bold px-3 py-1">Más popular</div>}
                 <div className="font-bold text-slate-500 uppercase text-xs tracking-wider">{p.nombre}</div>
                 <div className="mt-3 flex items-end gap-1">
                   <span className="text-4xl font-black">{p.precio}</span>
@@ -341,7 +350,7 @@ export default function Landing({ onEnter, onRegister, content }) {
                     </li>
                   ))}
                 </ul>
-                <Button onClick={openReg} className="w-full mt-7" variant={p.destacado ? "default" : "outline"}>
+                <Button onClick={openReg} className="w-full mt-7" variant={p.destacado ? "default" : "outline"} style={p.destacado ? { background: P } : undefined}>
                   Empezar
                 </Button>
               </div>
@@ -351,11 +360,11 @@ export default function Landing({ onEnter, onRegister, content }) {
       </section>
 
       {/* CTA FINAL */}
-      <section className="bg-gradient-to-br from-blue-600 to-blue-800 text-white py-16">
+      <section style={{ background: P }} className="text-white py-16">
         <div className="mx-auto max-w-3xl px-5 text-center">
           <h2 className="text-3xl md:text-4xl font-black tracking-tight">¿Listo para tu próxima toma física?</h2>
-          <p className="mt-4 text-blue-100">Entra al sistema y crea tu primer inventario en minutos.</p>
-          <Button size="lg" onClick={openReg} className="mt-8 bg-white text-blue-700 hover:bg-blue-50">
+          <p className="mt-4 text-white/80">Entra al sistema y crea tu primer inventario en minutos.</p>
+          <Button size="lg" onClick={openReg} className="mt-8 bg-white hover:bg-white/90" style={{ color: P }}>
             {hero.ctaPrimary} <ArrowRight size={18} />
           </Button>
         </div>
@@ -377,7 +386,7 @@ export default function Landing({ onEnter, onRegister, content }) {
               <li><a href="#caracteristicas" className="hover:text-white transition-colors">Características</a></li>
               <li><a href="#como" className="hover:text-white transition-colors">Cómo funciona</a></li>
               <li><a href="#precios" className="hover:text-white transition-colors">Precios</a></li>
-              <li><button onClick={onEnter} className="hover:text-white transition-colors">Ingresar</button></li>
+              <li><button onClick={go} className="hover:text-white transition-colors">Ingresar</button></li>
             </ul>
           </div>
           <div>
