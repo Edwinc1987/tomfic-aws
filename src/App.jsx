@@ -211,6 +211,11 @@ const SB={
   listPagos:(tid)=>supabase.from("pagos").select("*").eq("tenant_id",tid).order("fecha",{ascending:false}),
   // Todos los pagos de todas las empresas (dashboard del dueño). Requiere que RLS permita al dueño leerlos.
   listAllPagos:()=>supabase.from("pagos").select("*").order("fecha",{ascending:false}),
+  // Leads (prospectos capturados desde la web pública).
+  capturarLead:(nombre,email,telefono,mensaje)=>supabase.rpc("capturar_lead",{p_nombre:nombre||"",p_email:email||"",p_telefono:telefono||"",p_mensaje:mensaje||""}),
+  listLeads:()=>supabase.from("leads").select("*").order("created_at",{ascending:false}),
+  updateLead:(id,patch)=>supabase.from("leads").update(patch).eq("id",id),
+  deleteLead:(id)=>supabase.from("leads").delete().eq("id",id),
   insertPago:(p)=>supabase.from("pagos").insert(p),
   deletePago:(id)=>supabase.from("pagos").delete().eq("id",id),
   // Datos de UNA empresa (tenant). Si tid es null, trae todo (compatibilidad).
@@ -462,6 +467,12 @@ export default function TomficApp(){
     if(error)return {ok:false,error:error.message||"No se pudo completar el registro"};
     return {ok:true,data};
   };
+  // Captura de un prospecto (lead) desde la web pública. Va por RPC (visitante anónimo).
+  const capturarLead=async({nombre,email,telefono,mensaje})=>{
+    const {error}=await SB.capturarLead(nombre,email,telefono,mensaje);
+    if(error)return {ok:false,error:error.message||"No se pudo enviar. Intenta de nuevo."};
+    return {ok:true};
+  };
 
   // Cierre de sesión: termina la sesión de Auth y limpia el estado en memoria.
   const logout=async()=>{
@@ -480,7 +491,7 @@ export default function TomficApp(){
 
   if(!usuario) return entrar
     ? <Login lf={loginForm} setLf={setLoginForm} err={loginErr} onLogin={login} lastSaved={lastSaved} onBack={()=>{setEntrar(false);setLoginErr("");}}/>
-    : <Landing onEnter={()=>setEntrar(true)} onRegister={registrarEmpresa} content={mergeLanding(G.landingContent)}/>;
+    : <Landing onEnter={()=>setEntrar(true)} onRegister={registrarEmpresa} onLead={capturarLead} content={mergeLanding(G.landingContent)}/>;
   const p={usuario,setUsuario,logout,G,rerender,recargar,showToast,lastSaved,limpiarDatos};
   return(
     <>
@@ -4146,6 +4157,67 @@ function VPagos({G,showToast}){
   );
 }
 
+// ── MÓDULO LEADS (prospectos capturados desde la web pública) ──
+function VLeads({G,showToast}){
+  const [leads,setLeads]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [q,setQ]=useState("");
+  const [fEstado,setFEstado]=useState("todos");
+  const cargar=async()=>{setLoading(true);const {data,error}=await SB.listLeads();if(error)console.warn("No se pudieron cargar los leads:",error.message);setLeads(data||[]);setLoading(false);};
+  useEffect(()=>{cargar();/* eslint-disable-next-line */},[]);
+  const cambiarEstado=async(l,estado)=>{try{const {error}=await SB.updateLead(l.id,{estado});if(error)throw error;setLeads(ls=>ls.map(x=>x.id===l.id?{...x,estado}:x));}catch(e){showToast(e.message||"Error","err");}};
+  const borrar=async(id)=>{try{const {error}=await SB.deleteLead(id);if(error)throw error;setLeads(ls=>ls.filter(x=>x.id!==id));showToast("Lead eliminado","warn");}catch(e){showToast(e.message||"Error","err");}};
+  const norm=s=>(s||"").toString().toLowerCase();
+  const filtered=leads.filter(l=>{
+    if(q){const s=norm(q);if(!(norm(l.nombre).includes(s)||norm(l.email).includes(s)||norm(l.telefono).includes(s)))return false;}
+    if(fEstado!=="todos"&&(l.estado||"nuevo")!==fEstado)return false;
+    return true;
+  });
+  const nuevos=leads.filter(l=>(l.estado||"nuevo")==="nuevo").length;
+  return(
+    <Section>
+      <PageHeader label="Web pública" title="Leads" icon={UserPlus} count={leads.length} countLabel="leads" subtitle={nuevos?`${nuevos} nuevos sin contactar`:"Prospectos que llegan desde tu web"}/>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <div className="relative flex-1 min-w-[200px]"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/><Input value={q} onChange={e=>setQ(e.target.value)} placeholder="Buscar por nombre, email o teléfono…" className="pl-9 bg-white"/></div>
+        <select value={fEstado} onChange={e=>setFEstado(e.target.value)} className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700">
+          <option value="todos">Todos</option>
+          <option value="nuevo">Nuevos</option>
+          <option value="contactado">Contactados</option>
+          <option value="descartado">Descartados</option>
+        </select>
+      </div>
+      <Card className="overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead><tr className="bg-slate-900 text-white">{["Recibido","Nombre","Email","Teléfono","Mensaje","Estado",""].map(h=><th key={h} className="px-3 py-2.5 text-left font-semibold text-xs whitespace-nowrap">{h}</th>)}</tr></thead>
+            <tbody>
+              {loading?(<tr><td colSpan={7} className="px-3 py-8 text-center text-muted-foreground text-sm">Cargando…</td></tr>):
+               filtered.length===0?(<tr><td colSpan={7} className="px-3 py-8 text-center text-muted-foreground text-sm">{leads.length===0?"Aún no llegan prospectos desde la web.":"Ningún lead coincide con la búsqueda."}</td></tr>):
+               filtered.map(l=>(
+                <tr key={l.id} className="border-b last:border-0 hover:bg-slate-50 align-top">
+                  <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">{(l.created_at||"").slice(0,10)}</td>
+                  <td className="px-3 py-2.5 font-bold text-slate-900 whitespace-nowrap">{l.nombre||"—"}</td>
+                  <td className="px-3 py-2.5 text-xs">{l.email||"—"}</td>
+                  <td className="px-3 py-2.5 text-xs whitespace-nowrap">{l.telefono||"—"}</td>
+                  <td className="px-3 py-2.5 text-xs text-muted-foreground max-w-[220px]">{l.mensaje||"—"}</td>
+                  <td className="px-3 py-2.5">
+                    <select value={l.estado||"nuevo"} onChange={e=>cambiarEstado(l,e.target.value)} className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700">
+                      <option value="nuevo">Nuevo</option>
+                      <option value="contactado">Contactado</option>
+                      <option value="descartado">Descartado</option>
+                    </select>
+                  </td>
+                  <td className="px-3 py-2.5"><button onClick={()=>borrar(l.id)} className="text-red-500 hover:text-red-700"><Trash2 size={14}/></button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </Section>
+  );
+}
+
 function PanelDueno({usuario,setUsuario,logout,G,rerender,recargar,showToast}){
   const [view,setView]=useState("resumen");
   const [modalSalir,setModalSalir]=useState(false);
@@ -4157,6 +4229,7 @@ function PanelDueno({usuario,setUsuario,logout,G,rerender,recargar,showToast}){
     {id:"clientes",icon:Users,label:"Clientes"},
     {id:"pagos",icon:DollarSign,label:"Pagos"},
     {id:"web",icon:Globe,label:"Página web"},
+    {id:"leads",icon:UserPlus,label:"Leads"},
   ];
   return(
     <div className="min-h-screen bg-slate-100 font-sans">
@@ -4194,6 +4267,7 @@ function PanelDueno({usuario,setUsuario,logout,G,rerender,recargar,showToast}){
           {view==="clientes"&&<VClientes G={G} rerender={rerender} recargar={recargar} showToast={showToast} focusTenant={focusTenant} clearFocus={()=>setFocusTenant(null)} initFiltro={clientesFiltro} clearFiltro={()=>setClientesFiltro(null)}/>}
           {view==="pagos"&&<VPagos G={G} showToast={showToast}/>}
           {view==="web"&&<VPaginaWeb G={G} rerender={rerender} showToast={showToast}/>}
+          {view==="leads"&&<VLeads G={G} showToast={showToast}/>}
         </div>
       </div>
       <ConfirmDialog open={modalSalir} onOpenChange={setModalSalir} icon={LogOut} title="¿Cerrar sesión?" description="Vas a salir del Panel del Dueño." confirmText="Sí, salir" confirmVariant="default" onConfirm={logout}/>

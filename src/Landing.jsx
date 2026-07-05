@@ -95,6 +95,44 @@ function RegisterModal({ onClose, onRegister, onGoLogin }) {
   );
 }
 
+// ── Formulario de captura de prospectos (lead) en la web pública ──
+function LeadForm({ onLead, P }) {
+  const [f, setF] = useState({ nombre: "", email: "", telefono: "", mensaje: "" });
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
+  const [err, setErr] = useState("");
+  const submit = async () => {
+    setErr("");
+    if (!f.nombre.trim() || (!f.email.trim() && !f.telefono.trim())) return setErr("Déjanos tu nombre y un email o teléfono.");
+    setBusy(true);
+    const r = onLead ? await onLead(f) : { ok: true };
+    setBusy(false);
+    if (!r.ok) return setErr(r.error || "No se pudo enviar. Intenta de nuevo.");
+    setDone(true);
+  };
+  if (done) return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center max-w-lg mx-auto shadow-sm">
+      <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100"><CheckCircle size={26} className="text-emerald-600" /></div>
+      <h3 className="text-lg font-black text-slate-900">¡Gracias! Te contactaremos pronto.</h3>
+      <p className="mt-2 text-sm text-slate-600">Recibimos tus datos y te escribiremos muy pronto.</p>
+    </div>
+  );
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-6 md:p-8 max-w-lg mx-auto shadow-sm">
+      <div className="grid sm:grid-cols-2 gap-3">
+        <div className="space-y-1.5"><Label>Nombre</Label><Input value={f.nombre} onChange={e=>setF(p=>({...p,nombre:e.target.value}))} placeholder="Tu nombre" className="h-11" /></div>
+        <div className="space-y-1.5"><Label>Teléfono</Label><Input value={f.telefono} onChange={e=>setF(p=>({...p,telefono:e.target.value}))} placeholder="+57 300 000 0000" className="h-11" /></div>
+      </div>
+      <div className="space-y-1.5 mt-3"><Label>Email</Label><Input type="email" value={f.email} onChange={e=>setF(p=>({...p,email:e.target.value}))} placeholder="tucorreo@empresa.com" className="h-11" /></div>
+      <div className="space-y-1.5 mt-3"><Label>Mensaje (opcional)</Label>
+        <textarea value={f.mensaje} onChange={e=>setF(p=>({...p,mensaje:e.target.value}))} rows={3} placeholder="¿En qué te ayudamos?" className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-y" />
+      </div>
+      {err && <div className="mt-3 flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2.5 text-sm font-semibold text-red-600"><AlertTriangle size={15} className="shrink-0" /> {err}</div>}
+      <Button onClick={submit} disabled={busy} className="w-full mt-4" style={{ background: P }}>{busy ? "Enviando…" : "Enviar"}</Button>
+    </div>
+  );
+}
+
 // Iconos y colores por índice (no editables desde el panel)
 const FEATURE_META = [
   { icon: MapPin, color: "#2563eb" },
@@ -188,7 +226,7 @@ function HeroMockup() {
   );
 }
 
-export default function Landing({ onEnter, onRegister, content, preview }) {
+export default function Landing({ onEnter, onRegister, onLead, content, preview }) {
   const c = content || DEFAULT_LANDING;
   const { hero, about, features, steps, planes, contacto } = c;
   const theme = { ...DEFAULT_LANDING.theme, ...(c.theme || {}) };
@@ -356,6 +394,14 @@ export default function Landing({ onEnter, onRegister, content, preview }) {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* CONTACTO / LEADS */}
+      <section id="contacto" className="bg-slate-50 py-20 scroll-mt-16">
+        <div className="mx-auto max-w-6xl px-5">
+          <SectionHead label="Contáctanos" title="¿Quieres una demo?" subtitle="Déjanos tus datos y te escribimos para mostrarte TOMFIC." />
+          <div className="mt-10"><LeadForm onLead={onLead} P={P} /></div>
         </div>
       </section>
 
