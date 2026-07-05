@@ -31,6 +31,14 @@ const slugify = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g
 // Email sintético de un miembro de empresa (capturador/gerente/admin migrado).
 const memberEmail = (nombre, slug) => `${slugify(nombre)}@${slugify(slug)}.tomfic.app`;
 
+// --- Vencimiento de planes ---
+// Fecha de hoy en ISO (YYYY-MM-DD) y días desde hoy hasta una fecha ISO (negativo = ya pasó).
+const ISO_HOY = () => new Date().toISOString().slice(0,10);
+const diasHasta = (iso) => iso ? Math.round((new Date(iso.slice(0,10)+"T00:00:00") - new Date(ISO_HOY()+"T00:00:00")) / 86400000) : null;
+const fmtFechaCorta = (iso) => { if(!iso) return "—"; const [y,m,d] = iso.slice(0,10).split("-"); return `${d}/${m}/${y}`; };
+const GRACIA_DIAS = 3; // días de gracia tras el vencimiento antes de bloquear el acceso del cliente
+const AVISO_DIAS  = 7; // días de anticipación con que se le avisa al cliente que su plan vence
+
 // Exporta filas crudas a XLSX (encabezado + datos, sin filas de título). Sirve
 // para plantillas y para importaciones externas como el ajuste de Siigo.
 const exportSheet = (rows, header, fname, sheetName = "Datos") => {
@@ -71,6 +79,7 @@ let G = {
   historial: [],
   notas: [], // {id, texto, fotos:[], usuario, rol, fecha, hora, inventarioId}
   tenantId: null,   // empresa (tenant) del usuario logueado; null = dueño/super-admin
+  tenant: null,     // datos de la empresa del usuario (plan, precio, vence) para avisos
   tenants: [],      // lista de empresas (solo la carga el dueño)
 };
 
@@ -199,6 +208,8 @@ const SB={
   // Gestión de clientes/pagos (Panel del Dueño).
   updateTenant:(tid,patch)=>supabase.from("tenants").update(patch).eq("id",tid),
   listPagos:(tid)=>supabase.from("pagos").select("*").eq("tenant_id",tid).order("fecha",{ascending:false}),
+  // Todos los pagos de todas las empresas (dashboard del dueño). Requiere que RLS permita al dueño leerlos.
+  listAllPagos:()=>supabase.from("pagos").select("*").order("fecha",{ascending:false}),
   insertPago:(p)=>supabase.from("pagos").insert(p),
   deletePago:(id)=>supabase.from("pagos").delete().eq("id",id),
   // Datos de UNA empresa (tenant). Si tid es null, trae todo (compatibilidad).
@@ -340,9 +351,14 @@ export default function TomficApp(){
     const {data:perfil}=await SB.loadMyProfile(au.id);
     if(!perfil){await supabase.auth.signOut();setLoginErr("Tu usuario no tiene perfil. Contacta al administrador.");return false;}
     if(perfil.activo===false){await supabase.auth.signOut();setLoginErr("Tu usuario está inactivo.");return false;}
+    G.tenant=null; // datos de la empresa del usuario (null para el dueño)
     if(perfil.rol!=="dueno"){
       const {data:ten}=await SB.loadTenant(perfil.tenant_id);
       if(!ten||ten.activo===false){await supabase.auth.signOut();setLoginErr("Tu empresa está pendiente de aprobación o ha sido suspendida.");return false;}
+      // Bloqueo total por plan vencido: se permite un periodo de gracia tras la fecha de vencimiento.
+      const d=diasHasta(ten.vence);
+      if(d!==null&&d+GRACIA_DIAS<0){await supabase.auth.signOut();setLoginErr(`Tu plan venció el ${fmtFechaCorta(ten.vence)}. Contacta a tu proveedor para renovar el servicio.`);return false;}
+      G.tenant=ten; // plan, precio y fecha de vencimiento → para los avisos dentro de la app
     }
     setLoadingTenant(true);
     try{
@@ -365,7 +381,7 @@ export default function TomficApp(){
     })();
     // Mantener el estado en sincronía si la sesión expira o se cierra en otra pestaña.
     const {data:sub}=supabase.auth.onAuthStateChange((event)=>{
-      if(event==="SIGNED_OUT"){G.tenantId=null;setUsuario(null);}
+      if(event==="SIGNED_OUT"){G.tenantId=null;G.tenant=null;setUsuario(null);}
       // El usuario llegó desde el enlace del correo de recuperación → pedir clave nueva.
       if(event==="PASSWORD_RECOVERY"){setRecovery(true);}
     });
@@ -721,6 +737,29 @@ function Login({lf,setLf,err,onLogin,lastSaved,onBack}){
   );
 }
 
+// Aviso de vencimiento del plan dentro de la app del cliente (admin/gerente).
+// Aparece cuando faltan ≤ AVISO_DIAS o cuando el plan ya venció (dentro de la gracia).
+function BannerVencimiento({G}){
+  const v=G.tenant&&G.tenant.vence;
+  const d=diasHasta(v);
+  if(d===null||d>AVISO_DIAS)return null; // sin fecha o aún lejos → sin aviso
+  const vencido=d<0;
+  const restan=GRACIA_DIAS+d; // días que faltan para el bloqueo cuando ya venció
+  const bg=vencido?"#fef2f2":"#fffbeb", bd=vencido?"#fecaca":"#fde68a", fg=vencido?"#b91c1c":"#b45309";
+  const Icono=vencido?AlertCircle:Clock;
+  let msg;
+  if(!vencido) msg = d===0
+    ? <>Tu plan <b>vence hoy</b> ({fmtFechaCorta(v)}). Realiza el pago para no perder el acceso.</>
+    : <>Tu plan vence en <b>{d} día{d===1?"":"s"}</b> ({fmtFechaCorta(v)}). Renueva a tiempo para no perder el acceso.</>;
+  else msg = <>Tu plan <b>venció el {fmtFechaCorta(v)}</b>. Tu acceso se bloqueará {restan<=0?<b>hoy</b>:<>en <b>{restan} día{restan===1?"":"s"}</b></>} si no se registra el pago. Contacta a tu proveedor.</>;
+  return(
+    <div style={{display:"flex",alignItems:"center",gap:10,background:bg,border:`1px solid ${bd}`,color:fg,borderRadius:10,padding:"10px 14px",fontSize:13,fontWeight:600,marginBottom:16}}>
+      <Icono size={18} style={{flexShrink:0}}/>
+      <div>{msg}</div>
+    </div>
+  );
+}
+
 // ─────────────────────────────────────────
 // ADMIN
 // ─────────────────────────────────────────
@@ -835,6 +874,7 @@ function ModAdmin({usuario,setUsuario,logout,G,rerender,recargar,showToast,lastS
         {/* CONTENIDO */}
         <div style={{flex:1,padding:24,overflowY:"auto",minWidth:0}}>
 
+          <BannerVencimiento G={G}/>
           {view==="inventario"&&<VInventario {...props}/>}
           {view==="ubicaciones"&&<VUbicaciones {...props}/>}
           {view==="basedatos"&&<VBaseDatos {...props}/>}
@@ -3743,11 +3783,17 @@ function VClienteDetalle({t,showToast,onBack,onChanged}){
   );
 }
 
-function VClientes({G,rerender,recargar,showToast}){
+function VClientes({G,rerender,recargar,showToast,focusTenant,clearFocus}){
   const [modal,setModal]=useState(false);
   const [form,setForm]=useState({nombre:"",nit:"",slug:"",adminNombre:"",adminEmail:"",adminPass:""});
   const [saving,setSaving]=useState(false);
   const [sel,setSel]=useState(null); // empresa abierta en ficha detalle
+  const [q,setQ]=useState(""); // buscador por nombre/NIT/slug
+  const [fEstado,setFEstado]=useState("todos"); // filtro por estado de la empresa
+  const [fPago,setFPago]=useState("todos");     // filtro por estado de pago
+
+  // Al llegar desde el Dashboard con una empresa enfocada, abrir su ficha directamente.
+  useEffect(()=>{ if(focusTenant){ setSel(focusTenant); clearFocus&&clearFocus(); } /* eslint-disable-next-line */ },[focusTenant]);
 
   const crear=async()=>{
     if(!form.nombre.trim()||!form.nit.trim()||!form.adminEmail.trim()||!form.adminPass.trim())return showToast("Completa empresa, NIT, email y clave","err");
@@ -3771,6 +3817,21 @@ function VClientes({G,rerender,recargar,showToast}){
 
   const tenants=G.tenants||[];
   const reloadTenants=async()=>{await loadTenants();rerender();};
+  // Estado de pago derivado de la fecha de vencimiento.
+  const estadoPago=(t)=>{const d=diasHasta(t.vence);if(d===null)return "sinfecha";if(d<0)return "vencido";if(d<=AVISO_DIAS)return "porvencer";return "aldia";};
+  const pagoBadge=(t)=>{const e=estadoPago(t);
+    if(e==="sinfecha")return <UIBadge variant="secondary">Sin fecha</UIBadge>;
+    if(e==="vencido") return <UIBadge variant="destructive">Vencido</UIBadge>;
+    if(e==="porvencer")return <UIBadge variant="warning">Por vencer</UIBadge>;
+    return <UIBadge variant="success">Al día</UIBadge>;};
+  const norm=s=>(s||"").toString().toLowerCase();
+  const filtered=tenants.filter(t=>{
+    if(q){const s=norm(q);if(!(norm(t.nombre).includes(s)||norm(t.nit).includes(s)||norm(t.slug).includes(s)))return false;}
+    if(fEstado==="activa"&&!t.activo)return false;
+    if(fEstado==="inactiva"&&t.activo)return false;
+    if(fPago!=="todos"&&estadoPago(t)!==fPago)return false;
+    return true;
+  });
   if(sel){const fresh=tenants.find(x=>x.id===sel.id)||sel;return <VClienteDetalle t={fresh} showToast={showToast} onBack={()=>setSel(null)} onChanged={reloadTenants}/>;}
   return(
     <Section>
@@ -3783,19 +3844,42 @@ function VClientes({G,rerender,recargar,showToast}){
           <div className="text-sm">Crea la primera empresa-cliente.</div>
         </div>
       ):(
+        <>
+        {/* Buscador + filtros */}
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/>
+            <Input value={q} onChange={e=>setQ(e.target.value)} placeholder="Buscar por empresa, NIT o slug…" className="pl-9 bg-white"/>
+          </div>
+          <select value={fEstado} onChange={e=>setFEstado(e.target.value)} className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700">
+            <option value="todos">Todos los estados</option>
+            <option value="activa">Activas</option>
+            <option value="inactiva">Inactivas</option>
+          </select>
+          <select value={fPago} onChange={e=>setFPago(e.target.value)} className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700">
+            <option value="todos">Todo pago</option>
+            <option value="aldia">Al día</option>
+            <option value="porvencer">Por vencer</option>
+            <option value="vencido">Vencido</option>
+            <option value="sinfecha">Sin fecha</option>
+          </select>
+          {(q||fEstado!=="todos"||fPago!=="todos")&&<Button variant="outline" size="sm" className="h-10" onClick={()=>{setQ("");setFEstado("todos");setFPago("todos");}}><X size={14}/> Limpiar</Button>}
+          <span className="text-xs text-muted-foreground ml-auto">{filtered.length} de {tenants.length}</span>
+        </div>
         <Card className="overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead><tr className="bg-slate-900 text-white">{["Empresa","NIT","Slug","Plan","Estado","Creada","Acciones"].map(h=><th key={h} className="px-3 py-2.5 text-left font-semibold whitespace-nowrap text-xs">{h}</th>)}</tr></thead>
+              <thead><tr className="bg-slate-900 text-white">{["Empresa","NIT","Plan","Estado","Pago","Vence","Acciones"].map(h=><th key={h} className="px-3 py-2.5 text-left font-semibold whitespace-nowrap text-xs">{h}</th>)}</tr></thead>
               <tbody>
-                {tenants.map(t=>(
+                {filtered.length===0&&<tr><td colSpan={7} className="px-3 py-8 text-center text-sm text-muted-foreground">Ninguna empresa coincide con la búsqueda.</td></tr>}
+                {filtered.map(t=>(
                   <tr key={t.id} className="border-b last:border-0 hover:bg-slate-50">
-                    <td className="px-3 py-2.5 font-bold text-slate-900">{t.nombre}</td>
+                    <td className="px-3 py-2.5 font-bold text-slate-900">{t.nombre}<div className="font-mono text-[10px] font-normal text-slate-400">{t.slug||"—"}</div></td>
                     <td className="px-3 py-2.5 text-xs text-muted-foreground">{t.nit||"—"}</td>
-                    <td className="px-3 py-2.5 font-mono text-xs text-muted-foreground">{t.slug||"—"}</td>
                     <td className="px-3 py-2.5"><UIBadge variant="secondary">{t.plan||"basico"}</UIBadge></td>
                     <td className="px-3 py-2.5">{t.activo?<UIBadge variant="success">Activa</UIBadge>:<UIBadge variant="destructive">Inactiva</UIBadge>}</td>
-                    <td className="px-3 py-2.5 text-xs text-muted-foreground">{(t.created_at||"").slice(0,10)}</td>
+                    <td className="px-3 py-2.5">{pagoBadge(t)}</td>
+                    <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">{fmtFechaCorta(t.vence)}</td>
                     <td className="px-3 py-2.5">
                       <div className="flex gap-1.5">
                         <Button size="sm" className="h-7 px-2.5 text-xs" onClick={()=>setSel(t)}><ChevronRight size={13}/> Ingresar</Button>
@@ -3808,6 +3892,7 @@ function VClientes({G,rerender,recargar,showToast}){
             </table>
           </div>
         </Card>
+        </>
       )}
       <Dialog open={modal} onOpenChange={setModal}>
         <DialogContent className="max-w-md">
@@ -3829,12 +3914,116 @@ function VClientes({G,rerender,recargar,showToast}){
   );
 }
 
+// ── DASHBOARD DEL DUEÑO (resumen de empresas, vencimientos e ingresos) ──
+function VResumen({G,showToast,onOpenCliente,irAClientes}){
+  const [pagos,setPagos]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const cargar=async()=>{
+    setLoading(true);
+    const {data,error}=await SB.listAllPagos();
+    if(error)console.warn("No se pudieron cargar los pagos:",error.message);
+    setPagos(data||[]); setLoading(false);
+  };
+  useEffect(()=>{cargar();/* eslint-disable-next-line */},[]);
+
+  const tenants=G.tenants||[];
+  const fmt=(n)=>"$"+Math.round(n||0).toLocaleString("es-CO");
+  const conFecha=tenants.filter(t=>t.vence);
+  const porVencer=conFecha.filter(t=>{const d=diasHasta(t.vence);return d>=0&&d<=AVISO_DIAS;}).sort((a,b)=>a.vence.localeCompare(b.vence));
+  const vencidas=conFecha.filter(t=>diasHasta(t.vence)<0).sort((a,b)=>a.vence.localeCompare(b.vence));
+  const activas=tenants.filter(t=>t.activo).length;
+
+  const mesAct=ISO_HOY().slice(0,7);
+  const ingresosMes=pagos.filter(p=>(p.fecha||"").slice(0,7)===mesAct).reduce((s,p)=>s+(Number(p.monto)||0),0);
+  // Ingresos de los últimos 6 meses (para el mini-gráfico).
+  const meses=[];{const d=new Date();for(let i=5;i>=0;i--){const m=new Date(d.getFullYear(),d.getMonth()-i,1);meses.push(m.toISOString().slice(0,7));}}
+  const ingXMes=meses.map(m=>({m,total:pagos.filter(p=>(p.fecha||"").slice(0,7)===m).reduce((s,p)=>s+(Number(p.monto)||0),0)}));
+  const maxIng=Math.max(1,...ingXMes.map(x=>x.total));
+  const NM=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+  const nombreMes=(ym)=>{const [y,mm]=ym.split("-");return NM[+mm-1]+" '"+y.slice(2);};
+  const ultimos=pagos.slice(0,6);
+  const tName=(tid)=>{const t=tenants.find(x=>x.id===tid);return t?t.nombre:"—";};
+
+  const Metric=({icon:Ic,label,value,color,sub})=>(
+    <div style={{background:"white",border:"1px solid #e2e8f0",borderRadius:14,padding:"16px 18px",flex:"1 1 150px",minWidth:150,boxShadow:"0 1px 3px rgba(0,0,0,0.04)"}}>
+      <div style={{display:"flex",alignItems:"center",gap:7,color:color||"#64748b"}}><Ic size={15}/><span style={{fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:0.5}}>{label}</span></div>
+      <div style={{fontSize:25,fontWeight:800,color:"#0f172a",marginTop:6,lineHeight:1}}>{value}</div>
+      {sub&&<div style={{fontSize:11,color:"#94a3b8",marginTop:4}}>{sub}</div>}
+    </div>
+  );
+  const FilaEmpresa=({t})=>{const d=diasHasta(t.vence);return(
+    <button onClick={()=>onOpenCliente&&onOpenCliente(t)} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,padding:"9px 12px",background:"white",border:"1px solid #f1f5f9",borderRadius:10,cursor:"pointer",textAlign:"left"}}>
+      <div style={{minWidth:0}}><div style={{fontWeight:700,fontSize:13,color:"#0f172a",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{t.nombre}</div><div style={{fontSize:11,color:"#94a3b8"}}>Vence {fmtFechaCorta(t.vence)}</div></div>
+      <span style={{flexShrink:0,fontSize:11,fontWeight:700,padding:"3px 9px",borderRadius:20,background:d<0?"#fee2e2":"#fef3c7",color:d<0?"#b91c1c":"#b45309"}}>{d<0?`hace ${Math.abs(d)}d`:d===0?"hoy":`en ${d}d`}</span>
+    </button>
+  );};
+
+  return(
+    <Section>
+      <PageHeader label="Panel del Dueño" title="Resumen" icon={BarChart2} subtitle={loading?"Cargando…":`${tenants.length} empresas · ${TODAY()}`}/>
+      {/* Tarjetas de métricas */}
+      <div style={{display:"flex",flexWrap:"wrap",gap:12,marginBottom:20}}>
+        <Metric icon={Users} label="Empresas" value={tenants.length} color="#4f46e5"/>
+        <Metric icon={CheckCircle} label="Activas" value={activas} color="#16a34a" sub={`${tenants.length-activas} inactivas`}/>
+        <Metric icon={Clock} label="Por vencer" value={porVencer.length} color="#b45309" sub={`próximos ${AVISO_DIAS} días`}/>
+        <Metric icon={AlertCircle} label="Vencidas" value={vencidas.length} color="#dc2626"/>
+        <Metric icon={DollarSign} label="Ingresos del mes" value={fmt(ingresosMes)} color="#0891b2" sub={nombreMes(mesAct)}/>
+      </div>
+
+      {/* Listas de vencimientos */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:16,marginBottom:20}}>
+        <div style={card}>
+          <div style={{fontWeight:800,fontSize:14,color:"#0f172a",marginBottom:12,display:"flex",alignItems:"center",gap:7}}><Clock size={16} color="#b45309"/> Por vencer <span style={{marginLeft:"auto",fontSize:12,color:"#94a3b8",fontWeight:600}}>{porVencer.length}</span></div>
+          <div style={{display:"flex",flexDirection:"column",gap:7,maxHeight:230,overflowY:"auto"}}>
+            {porVencer.length===0?<div style={{fontSize:13,color:"#94a3b8",padding:"8px 0"}}>Nada por vencer en los próximos {AVISO_DIAS} días. 👍</div>:porVencer.map(t=><FilaEmpresa key={t.id} t={t}/>)}
+          </div>
+        </div>
+        <div style={card}>
+          <div style={{fontWeight:800,fontSize:14,color:"#0f172a",marginBottom:12,display:"flex",alignItems:"center",gap:7}}><AlertCircle size={16} color="#dc2626"/> Vencidas <span style={{marginLeft:"auto",fontSize:12,color:"#94a3b8",fontWeight:600}}>{vencidas.length}</span></div>
+          <div style={{display:"flex",flexDirection:"column",gap:7,maxHeight:230,overflowY:"auto"}}>
+            {vencidas.length===0?<div style={{fontSize:13,color:"#94a3b8",padding:"8px 0"}}>Ninguna empresa vencida. ✅</div>:vencidas.map(t=><FilaEmpresa key={t.id} t={t}/>)}
+          </div>
+        </div>
+      </div>
+
+      {/* Gráfico de ingresos + últimos pagos */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:16}}>
+        <div style={card}>
+          <div style={{fontWeight:800,fontSize:14,color:"#0f172a",marginBottom:16,display:"flex",alignItems:"center",gap:7}}><BarChart2 size={16} color="#4f46e5"/> Ingresos (últimos 6 meses)</div>
+          <div style={{display:"flex",alignItems:"flex-end",gap:10,height:130}}>
+            {ingXMes.map(x=>(
+              <div key={x.m} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end",gap:6,height:"100%"}}>
+                <div style={{fontSize:9,fontWeight:700,color:"#475569",whiteSpace:"nowrap"}}>{x.total?fmt(x.total).replace("$",""):""}</div>
+                <div style={{width:"68%",height:`${Math.max(3,(x.total/maxIng)*90)}px`,background:x.total?"linear-gradient(180deg,#6366f1,#4338ca)":"#e2e8f0",borderRadius:"6px 6px 0 0",transition:"height .3s"}}/>
+                <div style={{fontSize:10,color:"#94a3b8",whiteSpace:"nowrap"}}>{nombreMes(x.m)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div style={card}>
+          <div style={{fontWeight:800,fontSize:14,color:"#0f172a",marginBottom:12,display:"flex",alignItems:"center",gap:7}}><DollarSign size={16} color="#0891b2"/> Últimos pagos</div>
+          <div style={{display:"flex",flexDirection:"column",gap:2,maxHeight:200,overflowY:"auto"}}>
+            {ultimos.length===0?<div style={{fontSize:13,color:"#94a3b8",padding:"8px 0"}}>Aún no hay pagos registrados.</div>:ultimos.map(p=>(
+              <div key={p.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,padding:"7px 4px",borderBottom:"1px solid #f8fafc"}}>
+                <div style={{minWidth:0}}><div style={{fontSize:13,fontWeight:600,color:"#0f172a",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{tName(p.tenant_id)}</div><div style={{fontSize:11,color:"#94a3b8"}}>{fmtFechaCorta(p.fecha)}{p.metodo?" · "+p.metodo:""}</div></div>
+                <div style={{fontSize:13,fontWeight:800,color:"#16a34a",whiteSpace:"nowrap"}}>{fmt(p.monto)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </Section>
+  );
+}
+
 function PanelDueno({usuario,setUsuario,logout,G,rerender,recargar,showToast}){
-  const [view,setView]=useState("web");
+  const [view,setView]=useState("resumen");
   const [modalSalir,setModalSalir]=useState(false);
+  const [focusTenant,setFocusTenant]=useState(null); // empresa a abrir directo desde el Dashboard
   const nav=[
-    {id:"web",icon:Globe,label:"Página web"},
+    {id:"resumen",icon:BarChart2,label:"Resumen"},
     {id:"clientes",icon:Users,label:"Clientes"},
+    {id:"web",icon:Globe,label:"Página web"},
   ];
   return(
     <div className="min-h-screen bg-slate-100 font-sans">
@@ -3862,8 +4051,9 @@ function PanelDueno({usuario,setUsuario,logout,G,rerender,recargar,showToast}){
           );})}
         </div>
         <div className="flex-1 p-6 overflow-y-auto">
+          {view==="resumen"&&<VResumen G={G} showToast={showToast} onOpenCliente={(t)=>{setFocusTenant(t);setView("clientes");}} irAClientes={()=>setView("clientes")}/>}
+          {view==="clientes"&&<VClientes G={G} rerender={rerender} recargar={recargar} showToast={showToast} focusTenant={focusTenant} clearFocus={()=>setFocusTenant(null)}/>}
           {view==="web"&&<VPaginaWeb G={G} rerender={rerender} showToast={showToast}/>}
-          {view==="clientes"&&<VClientes G={G} rerender={rerender} recargar={recargar} showToast={showToast}/>}
         </div>
       </div>
       <ConfirmDialog open={modalSalir} onOpenChange={setModalSalir} icon={LogOut} title="¿Cerrar sesión?" description="Vas a salir del Panel del Dueño." confirmText="Sí, salir" confirmVariant="default" onConfirm={logout}/>
@@ -4721,6 +4911,7 @@ function ModGerente({usuario,setUsuario,logout,G,rerender,recargar,showToast}){
 
         {/* Contenido */}
         <div style={{flex:1,padding:24,overflowY:"auto"}}>
+          <BannerVencimiento G={G}/>
           {view==="resumen"&&(
             <div>
               <PageHeader
