@@ -276,17 +276,20 @@ const initSnap=()=>{
   _snap.inv=G.inventario?JSON.stringify(serInv(G.inventario,"abierto")):"";
   G.historial.forEach(h=>{_snap.hist[h.id]=JSON.stringify(serInv(h,"cerrado"));});
   G.conteos.forEach(c=>{_snap.c[c.id]=JSON.stringify(serConteo(c));});
+  _snap.cfg=JSON.stringify({localizaciones:G.localizaciones,ubicacionesTipos:G.ubicacionesTipos,localizacionTipos:G.localizacionTipos,alertas:G.alertas,notas:G.notas});
 };
 
 let _syncing=false,_pending=false,_syncTimer=null;
 let _dirty=false; // true cuando hay cambios locales sin confirmar en la nube. Evita que el auto-refresco los pise.
 let _clearBase=false; // true SOLO cuando el usuario pidió explícitamente vaciar la base. Habilita el borrado total.
 let _busy=false; // true mientras se hace una operación crítica (importar base, eliminar, cerrar). Pausa el auto-refresco.
+let _loadingTenant=false; // true mientras se cargan los datos de una empresa; bloquea doSync para no escribir config a medio cargar (evitaba borrar ubicaciones).
 const doSync=async()=>{
   // El dueño (sin empresa asociada) NUNCA sincroniza datos de inventario. Su snapshot
   // vacío haría que doSync intente "borrar" los productos/inventarios de la base — y por
   // RLS el dueño puede tocar TODAS las empresas. Sin este guard se vacía la base entera.
-  if(!G.tenantId)return;
+  // _loadingTenant: mientras se carga una empresa la config está a medio poblar; no sincronizar.
+  if(!G.tenantId||_loadingTenant)return;
   if(_syncing){_pending=true;return;}
   _syncing=true;_dirty=false;
   try{
@@ -319,8 +322,15 @@ const doSync=async()=>{
     for(const id in _snap.c){if(!curC[id]){await SB.deleteConteo(id);delete _snap.c[id];}}
     // Config por-empresa (localizaciones/tipos/alertas/notas) → app_config key tenant:<id>:config
     if(G.tenantId){
-      const cfg=JSON.stringify({localizaciones:G.localizaciones,ubicacionesTipos:G.ubicacionesTipos,localizacionTipos:G.localizacionTipos,alertas:G.alertas,notas:G.notas});
-      if(cfg!==_snap.cfg){await SB.setConfig(`tenant:${G.tenantId}:config`,JSON.parse(cfg));_snap.cfg=cfg;}
+      const cfgObj={localizaciones:G.localizaciones,ubicacionesTipos:G.ubicacionesTipos,localizacionTipos:G.localizacionTipos,alertas:G.alertas,notas:G.notas};
+      const cfg=JSON.stringify(cfgObj);
+      if(cfg!==_snap.cfg){
+        // FRENO: nunca pisar ubicaciones existentes con una config vacía (evita borrarlas por una carrera de carga).
+        let prevTeniaLoc=false;try{const pv=_snap.cfg?JSON.parse(_snap.cfg):null;prevTeniaLoc=!!(pv&&pv.localizaciones&&pv.localizaciones.length);}catch(e){}
+        const ahoraVacio=!cfgObj.localizaciones||cfgObj.localizaciones.length===0;
+        if(ahoraVacio&&prevTeniaLoc){console.warn("Sync: se evitó sobrescribir ubicaciones con config vacía.");}
+        else{await SB.setConfig(`tenant:${G.tenantId}:config`,cfgObj);_snap.cfg=cfg;}
+      }
     }
   }catch(e){_dirty=true;console.warn("Error de sincronización:",e);}
   _syncing=false;
@@ -338,6 +348,8 @@ const loadBootstrap=async()=>{
 
 // Carga de los datos de UNA empresa (tenant), tras el login del usuario.
 const loadTenantData=async(tid)=>{
+ _loadingTenant=true; // bloquea doSync mientras la config está a medio poblar (protege ubicaciones)
+ try{
   G.tenantId=tid;
   // Empieza SIEMPRE con config limpia para que ninguna empresa herede ubicaciones de otra.
   resetTenantConfig();
@@ -366,6 +378,7 @@ const loadTenantData=async(tid)=>{
     return {id:i.id,nombre:i.nombre,tipo:i.tipo,obs:i.obs,fecha:i.fecha,apertura:i.apertura,horaApertura:i.hora_apertura,usuarioApertura:i.usuario_apertura,cierre:i.cierre,horaCierre:i.hora_cierre,usuarioCierre:i.usuario_cierre,conteos:cs,capturas:ca,productos:pr,totalProductos:pr.length,totalCapturas:Object.keys(ca).length};
   }).sort((a,b)=>(b.cierre||"").localeCompare(a.cierre||""));
   initSnap();
+ } finally { _loadingTenant=false; }
 };
 
 // Lista de empresas (para el panel del dueño).
@@ -1224,6 +1237,28 @@ function VUbicaciones({G,rerender,showToast}){
     G.localizacionTipos.push(n);setNewLocTipo("");rerender();showToast("Tipo de localización creado ✓");
   };
 
+  // Recupera ubicaciones desde los conteos (activos e historial), que guardan ubicacion/localizacion/nro.
+  // Útil si la config se perdió: reconstruye lo que se usó en los inventarios.
+  const recuperarDesdeConteos=()=>{
+    const fuentes=[...G.conteos];
+    (G.historial||[]).forEach(h=>{(h.conteos||[]).forEach(c=>fuentes.push(c));});
+    const vistos=new Set(G.localizaciones.map(l=>`${l.ubicacion}|${l.localizacion}|${l.nro}`));
+    let n=0;
+    fuentes.forEach(c=>{
+      if(c.tipo==="ajuste")return;
+      const ub=(c.ubicacion||"").trim(),lo=(c.localizacion||"").trim(),nr=(c.nro||"").trim();
+      if(!ub||!lo)return;
+      const key=`${ub}|${lo}|${nr}`;
+      if(vistos.has(key))return;
+      vistos.add(key);
+      G.localizaciones.push({id:ID(),ubicacion:ub,localizacion:lo,nro:nr,observacion:c.observacion||""});
+      if(!G.ubicacionesTipos.includes(ub))G.ubicacionesTipos.push(ub);
+      if(!G.localizacionTipos.includes(lo))G.localizacionTipos.push(lo);
+      n++;
+    });
+    rerender();showToast(n>0?`Recuperadas ${n} ubicación(es) desde los conteos ✓`:"No se hallaron ubicaciones en los conteos","warn");
+  };
+
   const imprimirEtiqueta=(l)=>{
     const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Etiqueta ${l.nro}</title>
     <style>
@@ -1303,6 +1338,13 @@ function VUbicaciones({G,rerender,showToast}){
         count={G.localizaciones.length}
         countLabel="localizaciones"
       />
+
+      {(G.conteos.length>0||(G.historial||[]).length>0)&&(
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 flex-wrap">
+          <div className="text-sm text-amber-800"><b>¿Se perdieron ubicaciones?</b> Puedes reconstruirlas desde los conteos de tus inventarios (sin duplicar las que ya tengas).</div>
+          <Button variant="outline" size="sm" className="border-amber-300 text-amber-800 hover:bg-amber-100 shrink-0" onClick={recuperarDesdeConteos}><RefreshCw size={14}/> Recuperar desde conteos</Button>
+        </div>
+      )}
 
       {/* Tipos */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
