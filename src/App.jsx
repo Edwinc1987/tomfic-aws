@@ -7,7 +7,7 @@ import {
   Settings, Pencil, Trash2, FileText, Calendar, Scale, Wrench, Download,
   Upload, Printer, Search, Lightbulb, DollarSign, Clock, Cloud, Menu,
   ChevronRight, LogOut, Key, Smartphone, BarChart, TrendingDown, Circle,
-  AlertCircle, XCircle, Plus, Minus, X, Mail, UserPlus, Lock, ChevronDown, ChevronUp, ChevronLeft, Camera, CornerDownLeft, Globe,
+  AlertCircle, XCircle, Plus, Minus, X, Mail, UserPlus, Lock, ChevronDown, ChevronUp, ChevronLeft, Camera, CornerDownLeft, Globe, Sun, Moon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -2142,6 +2142,7 @@ function VProcesos({G,rerender,showToast,usuario}){
   const [modalReabrir,setModalReabrir]=useState(null); // {conteo}
   const [usuariosExtra,setUsuariosExtra]=useState({});
   const [verPendientes,setVerPendientes]=useState(false);
+  const [verAlertas,setVerAlertas]=useState(false);
   const [pendForm,setPendForm]=useState(null); // {tipo:'crear'|'c2'|'c3', id/locId, nombre, c1, c2}
   const caps=Object.values(G.capturas);
   const usuariosActivos=()=>G.usuarios.filter(u=>u.activo);
@@ -2237,10 +2238,14 @@ function VProcesos({G,rerender,showToast,usuario}){
   const asignarC3=(id,u)=>{G.conteos=G.conteos.map(c=>c.id===id?{...c,usuarioC3:u,estado:"enC3"}:c);rerender();showToast("C3 asignado ✓");};
 
   const reabrirRonda=(c,ronda)=>{
-    let nuevoEstado="enCurso";
-    if(ronda==="C2") nuevoEstado="cerradoC1";
-    else if(ronda==="C3") nuevoEstado="enC3";
-    G.conteos=G.conteos.map(x=>x.id===c.id?{...x,estado:nuevoEstado}:x);
+    // Debe QUITAR la ronda de rondasCerradas (no solo cambiar estado); si no, el capturador
+    // la sigue viendo cerrada y no la puede abrir. Misma lógica que en Conteos.
+    const rc=(c.rondasCerradas||[]).filter(r=>r!==ronda);
+    let nuevoEstado;
+    if(ronda==="C1")nuevoEstado="enCurso";
+    else if(ronda==="C2")nuevoEstado=rc.includes("C1")?"cerradoC1":"enCurso";
+    else if(ronda==="C3")nuevoEstado="diferencia";
+    G.conteos=G.conteos.map(x=>x.id===c.id?{...x,estado:nuevoEstado,rondasCerradas:rc}:x);
     setModalReabrir(null);rerender();showToast(`${ronda} reabierto ✓`,"warn");
   };
 
@@ -2356,32 +2361,15 @@ function VProcesos({G,rerender,showToast,usuario}){
           {l:"Completados",v:conteosCompletos,c:"#16a34a",bg:"#f0fdf4",icon:CheckCircle},
           {l:"En progreso",v:totalConteos-conteosCompletos,c:"#0891b2",bg:"#ecfeff",icon:Settings},
           {l:"Con diferencia",v:G.conteos.filter(c=>c.tipo==="2conteos"&&getDifsConteo(c).length>0).length,c:"#dc2626",bg:"#fef2f2",icon:AlertTriangle},
-          {l:"Alertas",v:G.alertas.filter(a=>!a.leida).length,c:"#7c3aed",bg:"#faf5ff",icon:Bell},
+          {l:"Alertas",v:G.alertas.filter(a=>!a.leida).length,c:"#7c3aed",bg:"#faf5ff",icon:Bell,onClick:()=>setVerAlertas(v=>!v)},
         ].map(s=>(
-          <Card key={s.l} className="p-4" style={{background:s.bg,borderColor:s.c+"22"}}>
+          <Card key={s.l} onClick={s.onClick} className={`p-4 ${s.onClick?"cursor-pointer hover:shadow-md transition-shadow":""}`} style={{background:s.bg,borderColor:s.c+"22"}}>
             <s.icon size={20} style={{color:s.c}} className="mb-1.5"/>
             <div className="text-[26px] font-black leading-none" style={{color:s.c}}>{s.v}</div>
-            <div className="text-[11px] text-muted-foreground mt-1 font-semibold">{s.l}</div>
+            <div className="text-[11px] text-muted-foreground mt-1 font-semibold">{s.l}{s.onClick&&<span className="ml-1 text-slate-400">›</span>}</div>
           </Card>
         ))}
       </div>
-
-      {/* Barra de avance */}
-      <Card className="p-5 mb-4">
-        <div className="flex justify-between items-center mb-2.5">
-          <div>
-            <div className="text-[13px] font-bold text-slate-900">Avance del inventario</div>
-            <div className="text-[11px] text-muted-foreground mt-0.5">{conteosCompletos} de {totalConteos} ubicaciones completadas</div>
-          </div>
-          <div className="rounded-lg px-3.5 py-1.5" style={{background:"linear-gradient(135deg,#1e40af,#0891b2)"}}>
-            <span className="text-lg font-black text-white">{pct}%</span>
-          </div>
-        </div>
-        <div className="bg-slate-200 rounded-full h-3.5 overflow-hidden">
-          <div className="h-full rounded-full transition-all duration-700" style={{width:pct+"%",background:"linear-gradient(90deg,#2563eb,#0891b2,#16a34a)"}}/>
-        </div>
-        <div className="flex justify-between mt-1.5 text-[10px] text-slate-400"><span>0%</span><span>50%</span><span>100%</span></div>
-      </Card>
 
       {/* Panel: Pendientes por hacer */}
       {(()=>{
@@ -2509,11 +2497,16 @@ function VProcesos({G,rerender,showToast,usuario}){
         );
       })()}
 
-      {/* Alertas */}
-      {G.alertas.filter(a=>!a.leida).length>0&&(
+      {/* Alertas — se muestran al hacer clic en la tarjeta "Alertas" */}
+      {verAlertas&&(
         <Card className="mb-4 border-amber-300 bg-amber-50 p-5">
-          <div className="flex items-center gap-1.5 font-bold text-[13px] text-amber-800 mb-2"><Bell size={14}/> Alertas pendientes</div>
-          {G.alertas.filter(a=>!a.leida).map((a,i)=>(
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-1.5 font-bold text-[13px] text-amber-800"><Bell size={14}/> Alertas pendientes</div>
+            <button onClick={()=>setVerAlertas(false)} className="text-amber-700 hover:text-amber-900"><X size={16}/></button>
+          </div>
+          {G.alertas.filter(a=>!a.leida).length===0?(
+            <div className="text-xs text-amber-800/70 px-1 py-1">No hay alertas pendientes.</div>
+          ):G.alertas.filter(a=>!a.leida).map((a,i)=>(
             <div key={i} className="flex justify-between items-center px-2.5 py-1.5 bg-amber-100 rounded-lg mb-1.5 text-xs">
               <span><b>{a.usuario}</b> terminó {a.ronda} del conteo <b>{a.conteoNombre}</b> · {a.hora}</span>
               <Button size="sm" className="h-7 px-2.5 bg-amber-600 hover:bg-amber-700" onClick={()=>{G.alertas=G.alertas.map(x=>x===a?{...x,leida:true}:x);rerender();}}>Visto</Button>
@@ -2528,11 +2521,11 @@ function VProcesos({G,rerender,showToast,usuario}){
       ):(
         <Card className="overflow-hidden mb-4">
           <div className="overflow-x-auto">
-            <table className="w-full text-xs min-w-[1000px]">
+            <table className="w-full text-[11px] min-w-[900px]">
               <thead>
                 <tr className="bg-slate-900 text-white">
                   {["Ubicación","Localización","N° Local.","Observación","Usuarios","Conteo 1","Obs C1","Conteo 2","Obs C2","Diferencia","Obs Dif","C3","Validador","Acciones"].map(h=>(
-                    <th key={h} className="px-2.5 py-2.5 text-left font-semibold whitespace-nowrap text-[11px]">{h}</th>
+                    <th key={h} className="px-2 py-1.5 text-left font-semibold whitespace-nowrap text-[10px]">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -4427,6 +4420,12 @@ function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,showToast}
   const [modalSalir,setModalSalir]=useState(false);
   const [busqCap,setBusqCap]=useState("");
   const [editCap,setEditCap]=useState(null); // {p, cap} cuando se edita una captura
+  // Modo Día/Noche del capturador (recordado). De noche el fondo blanco cansa la vista;
+  // se oscurece SOLO el contenido (no la barra ni la cámara) con un filtro suave.
+  const [dark,setDark]=useState(()=>{try{return localStorage.getItem("tomfic_capdark")==="1";}catch(e){return false;}});
+  const toggleDark=()=>setDark(d=>{const nv=!d;try{localStorage.setItem("tomfic_capdark",nv?"1":"0");}catch(e){}return nv;});
+  const pageBg=dark?"#0b1220":"#f1f5f9";
+  const nightFilter=dark?{filter:"invert(0.92) hue-rotate(180deg)"}:null;
   const scanRef=useRef(null);
   const unidadesRef=useRef(null);
 
@@ -4699,7 +4698,7 @@ function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,showToast}
     const activos=entradas.filter(e=>!e.cerrada);
     const cerrados=entradas.filter(e=>e.cerrada);
     return(
-      <div style={{minHeight:"100vh",background:"#f1f5f9",fontFamily:"system-ui,sans-serif"}}>
+      <div style={{minHeight:"100vh",background:pageBg,fontFamily:"system-ui,sans-serif"}}>
         <div style={{background:"#0f172a",color:"white",padding:"0 16px",display:"flex",alignItems:"center",justifyContent:"space-between",height:52,position:"sticky",top:0,zIndex:100}}>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
             <Package size={20} color="white"/>
@@ -4707,12 +4706,13 @@ function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,showToast}
             {G.inventario&&<span style={{background:"#16a34a",fontSize:10,padding:"2px 10px",borderRadius:20,fontWeight:700}}>● {G.inventario.nombre}</span>}
           </div>
           <div style={{display:"flex",gap:10,alignItems:"center"}}>
+            <button onClick={toggleDark} title={dark?"Modo día":"Modo noche"} style={{background:"transparent",border:"1px solid #334155",color:"#facc15",padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer",display:"inline-flex",alignItems:"center"}}>{dark?<Sun size={14}/>:<Moon size={14}/>}</button>
             <button onClick={async()=>{await recargar();showToast("Actualizado ✓");}} style={{background:"transparent",border:"1px solid #334155",color:"#94a3b8",padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer",display:"flex",alignItems:"center"}}><RefreshCw size={13}/></button>
             <span style={{fontSize:11,color:"#94a3b8",display:"flex",alignItems:"center",gap:4}}><Users size={11}/> {usuario.nombre}</span>
             <button onClick={()=>setModalSalir(true)} style={{background:"#dc2626",border:"none",color:"white",padding:"6px 16px",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:4}}><LogOut size={13}/> Salir</button>
           </div>
         </div>
-        <div style={{maxWidth:700,margin:"0 auto",padding:"20px 14px"}}>
+        <div style={{maxWidth:700,margin:"0 auto",padding:"20px 14px",...nightFilter}}>
           <h2 style={{margin:"0 0 16px",fontSize:20,fontWeight:700,color:"#0f172a"}}>Mis conteos asignados</h2>
 
           {/* Activos */}
@@ -4792,7 +4792,7 @@ function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,showToast}
   // ── VISTA CAPTURA ──
   const total=calcTotal(form);
   return(
-    <div style={{minHeight:"100vh",background:"#f1f5f9",fontFamily:"system-ui,sans-serif"}}>
+    <div style={{minHeight:"100vh",background:pageBg,fontFamily:"system-ui,sans-serif"}}>
       <div style={{background:"#0f172a",color:"white",padding:"0 16px",display:"flex",alignItems:"center",justifyContent:"space-between",height:52,position:"sticky",top:0,zIndex:100}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <button onClick={()=>{setConteoActivo(null);setRondaActiva(null);setProductoActivo(null);setScanInput("");setBusqueda("");}}
@@ -4801,6 +4801,7 @@ function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,showToast}
           <span style={{background:rcol[miRonda],fontSize:10,padding:"2px 10px",borderRadius:20,fontWeight:700}}>{rlbl[miRonda]}</span>
         </div>
         <div style={{display:"flex",gap:10,alignItems:"center"}}>
+          <button onClick={toggleDark} title={dark?"Modo día":"Modo noche"} style={{background:"transparent",border:"1px solid #334155",color:"#facc15",padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer",display:"inline-flex",alignItems:"center"}}>{dark?<Sun size={14}/>:<Moon size={14}/>}</button>
           <button onClick={async()=>{await recargar();showToast("Actualizado ✓");}} title="Traer lo último de la nube" style={{background:"transparent",border:"1px solid #334155",color:"#94a3b8",padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer",display:"flex",alignItems:"center"}}><RefreshCw size={13}/></button>
           <span style={{fontSize:11,color:"#94a3b8",display:"flex",alignItems:"center",gap:4}}><Users size={11}/> {usuario.nombre}</span>
           {soyPrincipal(miConteo)&&<button onClick={()=>setModalCerrar(true)} style={{background:"#dc2626",color:"white",border:"none",padding:"6px 14px",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:700}}>Terminar conteo</button>}
@@ -4808,7 +4809,7 @@ function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,showToast}
         </div>
       </div>
 
-      <div style={{padding:"12px 14px",maxWidth:1000,margin:"0 auto"}}>
+      <div style={{padding:"12px 14px",maxWidth:1000,margin:"0 auto",...nightFilter}}>
         {/* Info */}
         <div style={{background:"white",borderRadius:10,padding:"12px 16px",marginBottom:10,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
           <div style={{display:"grid",gridTemplateColumns:"1fr auto",gap:12,alignItems:"center"}}>
