@@ -257,8 +257,14 @@ const DEF_LOC_TIPOS=["MUEBLE","LINEAL","NEVERA","PUNTA","JAULA","CAVA"];
 const resetTenantConfig=()=>{G.localizaciones=[];G.ubicacionesTipos=[];G.localizacionTipos=[...DEF_LOC_TIPOS];G.alertas=[];G.notas=[];};
 // ¿El conteo quedó completo/cerrado? (misma lógica que estadoConteo: null = completo)
 const conteoCompleto=(c)=>c.estado==="completado"||c.estado==="cerradoC2"||(c.estado==="cerradoC1"&&c.tipo!=="2conteos");
-// Habilita "Sube saldos": debe haber conteos y estar TODOS cerrados.
-const todosConteosCerrados=()=>G.conteos.length>0&&G.conteos.every(conteoCompleto);
+// Conteos "reales" = excluye el conteo de ajuste (tipo "ajuste"), que no cuenta como ronda normal.
+const conteosReales=()=>G.conteos.filter(c=>c.tipo!=="ajuste");
+const conteoAjusteActivo=()=>G.conteos.find(c=>c.tipo==="ajuste")||null;
+// Habilita "Sube saldos" / crear ajuste: debe haber conteos reales y estar TODOS cerrados.
+const todosConteosCerrados=()=>{const r=conteosReales();return r.length>0&&r.every(conteoCompleto);};
+// Cantidad final definitiva de un producto: si tiene ajuste (ronda "AJU"), ese valor ABSOLUTO
+// manda sobre la suma de conteos; si no, se usa la suma normal (sumC3||sumC2||sumC1).
+const finalAjustado=(prodCaps,sumFinal)=>{const a=prodCaps.filter(c=>c.ronda==="AJU");return a.length?a[a.length-1].cantidad:sumFinal;};
 const saveLocalCache=()=>{try{localStorage.setItem(STORAGE_KEY,JSON.stringify({productos:G.productos,usuarios:G.usuarios,inventario:G.inventario,conteos:G.conteos,capturas:G.capturas,historial:G.historial,savedAt:new Date().toISOString()}));}catch(e){}};
 
 // --- Snapshot para sincronización por diferencias ---
@@ -978,7 +984,7 @@ function VInventario({G,rerender,showToast,usuario}){
     if(c.estado==="enC3")return "C3 en curso";
     return "incompleto";
   };
-  const conteosIncompletos=()=>G.conteos.map(c=>({c,razon:estadoConteo(c)})).filter(x=>x.razon!==null);
+  const conteosIncompletos=()=>G.conteos.filter(c=>c.tipo!=="ajuste").map(c=>({c,razon:estadoConteo(c)})).filter(x=>x.razon!==null);
   const crear=()=>{
     if(!form.nombre.trim())return showToast("Ingresa un nombre","err");
     if(G.inventario)return showToast("Ya hay un inventario activo","err");
@@ -1022,8 +1028,9 @@ function VInventario({G,rerender,showToast,usuario}){
       const sumC3=caps.filter(c=>c.ronda==="C3").reduce((s,c)=>s+c.cantidad,0);
       const sumC2=caps.filter(c=>c.ronda==="C2").reduce((s,c)=>s+c.cantidad,0);
       const sumC1=caps.filter(c=>c.ronda==="C1").reduce((s,c)=>s+c.cantidad,0);
-      const final=sumC3||sumC2||sumC1;
-      return final>0?{...p,saldo:final}:p;
+      const final=finalAjustado(caps,sumC3||sumC2||sumC1);
+      const tieneAjuste=caps.some(c=>c.ronda==="AJU");
+      return (final>0||tieneAjuste)?{...p,saldo:final}:p; // un ajuste (aunque sea 0) siempre manda
     });
     G.inventario=null;G.conteos=[];G.capturas={};G.alertas=[];
     _busy=false;
@@ -1854,7 +1861,7 @@ function VConteos({G,rerender,showToast,usuario}){
                 </tr>
               </thead>
               <tbody>
-                {G.conteos.map((c)=>{
+                {conteosReales().map((c)=>{
                   const rc=c.rondasCerradas||[];
                   const c1Cerrado=rc.includes("C1")||["cerradoC1","cerradoC2","completado","diferencia","enC3"].includes(c.estado);
                   const c2Cerrado=rc.includes("C2")||["cerradoC2","completado","diferencia"].includes(c.estado);
@@ -2144,8 +2151,28 @@ function VProcesos({G,rerender,showToast,usuario}){
   const [verPendientes,setVerPendientes]=useState(false);
   const [verAlertas,setVerAlertas]=useState(false);
   const [pendForm,setPendForm]=useState(null); // {tipo:'crear'|'c2'|'c3', id/locId, nombre, c1, c2}
+  const [modalAjuste,setModalAjuste]=useState(false);
+  const [ajusteUser,setAjusteUser]=useState("");
   const caps=Object.values(G.capturas);
   const usuariosActivos=()=>G.usuarios.filter(u=>u.activo);
+  // Crea el Conteo de Ajuste (correcciones post-diferencias) y lo asigna a un usuario.
+  const crearAjuste=()=>{
+    if(!ajusteUser)return showToast("Selecciona el usuario que hará el ajuste","err");
+    if(conteoAjusteActivo())return showToast("Ya hay un conteo de ajuste en curso","err");
+    G.conteos.push({
+      id:ID(),nombre:"AJUSTE DE DIFERENCIAS",tipo:"ajuste",
+      locId:"",locLabel:"Ajuste de diferencias",ubicacion:"",localizacion:"",nro:"",
+      obs:"",usuarioC1:ajusteUser,usuarioC2:"",usuarioC3:"",
+      estado:"enCurso",rondasCerradas:[],fechaCreacion:TODAY(),
+    });
+    setModalAjuste(false);setAjusteUser("");rerender();showToast(`Ajuste asignado a ${ajusteUser} ✓`);
+  };
+  const borrarAjuste=()=>{
+    const a=conteoAjusteActivo();if(!a)return;
+    G.conteos=G.conteos.filter(c=>c.id!==a.id);
+    Object.keys(G.capturas).forEach(k=>{if(G.capturas[k].conteoId===a.id)delete G.capturas[k];});
+    rerender();showToast("Conteo de ajuste eliminado","warn");
+  };
   // Crear conteo rápido desde el panel de pendientes
   const crearConteoRapido=(loc,nombre,c1,c2)=>{
     if(!nombre.trim()||!c1)return showToast("Completa nombre y usuario C1","err");
@@ -2166,8 +2193,10 @@ function VProcesos({G,rerender,showToast,usuario}){
   };
   const total=G.productos.length;
 
-  const totalConteos=G.conteos.length;
-  const conteosCompletos=G.conteos.filter(c=>{
+  const conteosVis=conteosReales(); // excluye el conteo de ajuste de las vistas normales
+  const ajuste=conteoAjusteActivo();
+  const totalConteos=conteosVis.length;
+  const conteosCompletos=conteosVis.filter(c=>{
     if(c.tipo==="1conteo") return ["cerradoC1","completado"].includes(c.estado);
     return ["completado","cerradoC2"].includes(c.estado);
   }).length;
@@ -2371,9 +2400,42 @@ function VProcesos({G,rerender,showToast,usuario}){
         ))}
       </div>
 
+      {/* Conteo de ajuste — correcciones tras revisar diferencias (solo con conteos cerrados) */}
+      {todosConteosCerrados()&&(ajuste?(
+        <Card className="mb-4 p-4 border-violet-300 bg-violet-50 flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2 text-sm">
+            <Wrench size={16} className="text-violet-700"/>
+            <span className="font-bold text-violet-900">Conteo de ajuste en curso</span>
+            <span className="text-violet-700">· asignado a <b>{ajuste.usuarioC1}</b></span>
+          </div>
+          <Button variant="outline" size="sm" className="text-destructive border-red-200 hover:bg-red-50 hover:text-destructive" onClick={borrarAjuste}><Trash2 size={13}/> Quitar ajuste</Button>
+        </Card>
+      ):(
+        <Card className="mb-4 p-4 border-violet-200 flex items-center justify-between flex-wrap gap-3" style={{background:"#faf5ff"}}>
+          <div className="text-sm text-violet-900"><b>¿Detectaste diferencias por corregir?</b> Crea un conteo de ajuste y asígnalo a un usuario para dejar el saldo físico real.</div>
+          <Button className="bg-violet-600 hover:bg-violet-700 text-white" onClick={()=>{setAjusteUser("");setModalAjuste(true);}}><Wrench size={15}/> Conteo de ajuste</Button>
+        </Card>
+      ))}
+      <Dialog open={modalAjuste} onOpenChange={setModalAjuste}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle className="flex items-center gap-2"><Wrench size={18}/> Conteo de ajuste</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="text-sm text-muted-foreground">El usuario asignado verá <b>todos los productos</b> con su cantidad contada y el saldo del sistema, y podrá corregir la <b>cantidad física real</b>.</div>
+            <div className="space-y-1.5">
+              <Label>Asignar a</Label>
+              <Select value={ajusteUser||undefined} onValueChange={setAjusteUser}>
+                <SelectTrigger><SelectValue placeholder="Selecciona un usuario…"/></SelectTrigger>
+                <SelectContent>{usuariosActivos().map(u=><SelectItem key={u.id} value={u.nombre}>{u.nombre}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <Button className="w-full" onClick={crearAjuste}><CheckCircle size={15}/> Crear y asignar</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Panel: Pendientes por hacer */}
       {(()=>{
-        const conteosPend=G.conteos.filter(c=>c.estado!=="completado").map(c=>{
+        const conteosPend=G.conteos.filter(c=>c.estado!=="completado"&&c.tipo!=="ajuste").map(c=>{
           let razon="";
           if(c.estado==="pendiente")razon="Sin iniciar";
           else if(c.estado==="enCurso")razon="C1 en curso";
@@ -2530,7 +2592,7 @@ function VProcesos({G,rerender,showToast,usuario}){
                 </tr>
               </thead>
               <tbody>
-                {G.conteos.map((c,i)=>{
+                {conteosReales().map((c,i)=>{
                   const c1s=caps.filter(x=>x.conteoId===c.id&&x.ronda==="C1");
                   const c2s=caps.filter(x=>x.conteoId===c.id&&x.ronda==="C2");
                   const c3s=caps.filter(x=>x.conteoId===c.id&&x.ronda==="C3");
@@ -2778,7 +2840,7 @@ function VReportes({G,showToast,usuario}){
     const sumC1=misC.filter(c=>c.ronda==="C1").reduce((s,c)=>s+c.cantidad,0);
     const sumC2=misC.filter(c=>c.ronda==="C2").reduce((s,c)=>s+c.cantidad,0);
     const sumC3=misC.filter(c=>c.ronda==="C3").reduce((s,c)=>s+c.cantidad,0);
-    const final=sumC3||sumC2||sumC1;
+    const final=finalAjustado(misC,sumC3||sumC2||sumC1);
     const last=misC[misC.length-1];
     // Find conteo info
     const conteoId=last.conteoId;
@@ -2802,16 +2864,16 @@ function VReportes({G,showToast,usuario}){
   // Los no contados cuentan como físico = 0 (faltante total).
   const capByProd={};
   caps.forEach(c=>{
-    if(!capByProd[c.productoId])capByProd[c.productoId]={c1:0,c2:0,c3:0,last:null};
+    if(!capByProd[c.productoId])capByProd[c.productoId]={c1:0,c2:0,c3:0,last:null,aju:null};
     const r=capByProd[c.productoId];
-    if(c.ronda==="C1")r.c1+=c.cantidad;else if(c.ronda==="C2")r.c2+=c.cantidad;else if(c.ronda==="C3")r.c3+=c.cantidad;
+    if(c.ronda==="C1")r.c1+=c.cantidad;else if(c.ronda==="C2")r.c2+=c.cantidad;else if(c.ronda==="C3")r.c3+=c.cantidad;else if(c.ronda==="AJU")r.aju=c.cantidad;
     r.last=c;
   });
   const baseCompleta=G.productos.map(p=>{
     const r=capByProd[p.id];
     const sumC1=r?r.c1:0,sumC2=r?r.c2:0,sumC3=r?r.c3:0;
     const contado=!!r;
-    const final=contado?(sumC3||sumC2||sumC1):0;
+    const final=(r&&r.aju!==null)?r.aju:(contado?(sumC3||sumC2||sumC1):0); // el ajuste manda
     const last=r?r.last:null;
     const conteo=last?G.conteos.find(c=>c.id===last.conteoId):null;
     return{
@@ -4426,6 +4488,7 @@ function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,showToast}
   const toggleDark=()=>setDark(d=>{const nv=!d;try{localStorage.setItem("tomfic_capdark",nv?"1":"0");}catch(e){}return nv;});
   const pageBg=dark?"#0b1220":"#f1f5f9";
   const nightFilter=dark?{filter:"invert(0.92) hue-rotate(180deg)"}:null;
+  const [ajusteVals,setAjusteVals]=useState({}); // {productId: string} inputs del conteo de ajuste
   const scanRef=useRef(null);
   const unidadesRef=useRef(null);
 
@@ -4742,7 +4805,7 @@ function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,showToast}
                         <div style={{fontWeight:700,fontSize:14,color:"#0f172a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nombre}</div>
                         <div style={{fontSize:11,color:"#64748b",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}><MapPin size={11} style={{display:"inline",marginRight:2}}/> {c.locLabel}</div>
                         <div style={{display:"flex",gap:6,marginTop:6,flexWrap:"wrap"}}>
-                          <UIBadge className="border-transparent text-[10px] px-2 py-0.5" style={{background:rcol[r]+"22",color:rcol[r]}}>{rlbl[r]}</UIBadge>
+                          <UIBadge className="border-transparent text-[10px] px-2 py-0.5" style={{background:(c.tipo==="ajuste"?"#7c3aed":rcol[r])+"22",color:c.tipo==="ajuste"?"#7c3aed":rcol[r]}}>{c.tipo==="ajuste"?"AJUSTE":rlbl[r]}</UIBadge>
                           {caps.length>0&&<UIBadge className="border-transparent text-[10px] px-2 py-0.5" style={{background:"#64748b22",color:"#64748b"}}>{new Set(caps.map(x=>x.productoId)).size} capturados</UIBadge>}
                           {!puedeIniciar&&<UIBadge className="border-transparent text-[10px] px-2 py-0.5" style={{background:"#94a3b822",color:"#94a3b8"}}>No disponible aún</UIBadge>}
                         </div>
@@ -4783,6 +4846,88 @@ function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,showToast}
               </div>
             </div>
           )}
+        </div>
+        {modalSalirJSX}
+      </div>
+    );
+  }
+
+  // ── VISTA CONTEO DE AJUSTE ──
+  if(miConteo.tipo==="ajuste"){
+    const contadoDe=(pid)=>{
+      const cs=Object.values(G.capturas).filter(c=>c.productoId===pid&&c.ronda!=="AJU");
+      const s3=cs.filter(c=>c.ronda==="C3").reduce((s,c)=>s+c.cantidad,0);
+      const s2=cs.filter(c=>c.ronda==="C2").reduce((s,c)=>s+c.cantidad,0);
+      const s1=cs.filter(c=>c.ronda==="C1").reduce((s,c)=>s+c.cantidad,0);
+      return s3||s2||s1;
+    };
+    const ajusteDe=(pid)=>{const a=Object.values(G.capturas).filter(c=>c.conteoId===miConteo.id&&c.productoId===pid&&c.ronda==="AJU");return a.length?a[a.length-1].cantidad:null;};
+    const guardarAjuste=(p)=>{
+      const raw=ajusteVals[p.id];
+      const v=parseFloat(raw);
+      if(raw===undefined||raw===""||isNaN(v)||v<0)return showToast("Escribe una cantidad válida","err");
+      Object.keys(G.capturas).forEach(k=>{const c=G.capturas[k];if(c.conteoId===miConteo.id&&c.productoId===p.id&&c.ronda==="AJU")delete G.capturas[k];});
+      const key=`${miConteo.id}_${p.id}_AJU_${ID()}`;
+      G.capturas[key]={conteoId:miConteo.id,productoId:p.id,ronda:"AJU",ean:p.ean,codigo:p.codigo,nombre:p.nombre,referencia:p.referencia,categoria:p.categoria,subcategoria:p.subcategoria,subgrupo:p.subgrupo,saldo:p.saldo,costo:p.costo,proveedor:p.proveedor,nit:p.nit,cantidad:v,estado:"BUENO",obs:"Ajuste manual",usuario:usuario.nombre,fecha:TODAY(),hora:HOUR(),ajuste:true};
+      setAjusteVals(prev=>{const n={...prev};delete n[p.id];return n;});
+      rerender();showToast(`✓ ${p.nombre}: ${v}`);
+    };
+    const q=(busqCap||"").trim().toLowerCase();
+    const listaAj=G.productos.filter(p=>!q||p.nombre.toLowerCase().includes(q)||(p.codigo||"").toLowerCase().includes(q)||String(p.ean||"").toLowerCase().includes(q));
+    return(
+      <div style={{minHeight:"100vh",background:pageBg,fontFamily:"system-ui,sans-serif"}}>
+        <div style={{background:"#0f172a",color:"white",padding:"0 16px",display:"flex",alignItems:"center",justifyContent:"space-between",height:52,position:"sticky",top:0,zIndex:100}}>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <button onClick={()=>{setConteoActivo(null);setRondaActiva(null);}} style={{background:"transparent",border:"1px solid #334155",color:"#94a3b8",padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:3}}><ChevronLeft size={13}/> Mis conteos</button>
+            <span style={{fontWeight:800,fontSize:15,color:"white"}}>TOMFIC</span>
+            <span style={{background:"#7c3aed",fontSize:10,padding:"2px 10px",borderRadius:20,fontWeight:700}}>AJUSTE</span>
+          </div>
+          <div style={{display:"flex",gap:10,alignItems:"center"}}>
+            <button onClick={toggleDark} title={dark?"Modo día":"Modo noche"} style={{background:"transparent",border:"1px solid #334155",color:"#facc15",padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer",display:"inline-flex",alignItems:"center"}}>{dark?<Sun size={14}/>:<Moon size={14}/>}</button>
+            <span style={{fontSize:11,color:"#94a3b8",display:"flex",alignItems:"center",gap:4}}><Users size={11}/> {usuario.nombre}</span>
+            <button onClick={()=>setModalSalir(true)} style={{background:"#dc2626",border:"none",color:"white",padding:"6px 16px",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:4}}><LogOut size={13}/> Salir</button>
+          </div>
+        </div>
+        <div style={{maxWidth:1000,margin:"0 auto",padding:"14px",...nightFilter}}>
+          <div style={{background:"white",borderRadius:10,padding:"12px 14px",marginBottom:10,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+            <div style={{fontWeight:800,fontSize:16,color:"#0f172a"}}>Conteo de Ajuste</div>
+            <div style={{fontSize:12,color:"#64748b",marginTop:2}}>Corrige la <b>cantidad física real</b> de los productos con novedad. Lo que escribas reemplaza lo contado.</div>
+            <input value={busqCap} onChange={e=>setBusqCap(e.target.value)} placeholder="Buscar por nombre, código o código de barras…" style={{...inp,marginTop:10,border:"2px solid #7c3aed"}} autoFocus/>
+          </div>
+          <div style={{background:"white",borderRadius:10,overflow:"hidden",boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+              <thead><tr style={{background:"#f1f5f9"}}>
+                {["Código","Producto","Contado","Sistema","Diferencia","Cantidad real",""].map(h=><th key={h} style={{padding:"8px 10px",textAlign:"left",fontWeight:700,color:"#374151",fontSize:11,borderBottom:"1px solid #e2e8f0"}}>{h}</th>)}
+              </tr></thead>
+              <tbody>
+                {listaAj.slice(0,300).map((p,i)=>{
+                  const cont=contadoDe(p.id);
+                  const aju=ajusteDe(p.id);
+                  const finalActual=aju!==null?aju:cont;
+                  const dif=finalActual-(p.saldo||0);
+                  return(
+                    <tr key={p.id} style={{background:i%2?"#f8fafc":"white",borderBottom:"1px solid #f1f5f9"}}>
+                      <td style={{padding:"6px 10px",fontFamily:"monospace",color:"#2563eb",fontWeight:700,fontSize:11}}>{p.codigo}</td>
+                      <td style={{padding:"6px 10px",fontWeight:600}}>{p.nombre}</td>
+                      <td style={{padding:"6px 10px",textAlign:"center"}}>{cont}</td>
+                      <td style={{padding:"6px 10px",textAlign:"center",color:"#64748b"}}>{p.saldo||0}</td>
+                      <td style={{padding:"6px 10px",textAlign:"center",fontWeight:700,color:dif===0?"#16a34a":"#dc2626"}}>{dif>0?"+":""}{dif}</td>
+                      <td style={{padding:"6px 10px"}}>
+                        <input type="number" min="0" value={ajusteVals[p.id]??(aju!==null?String(aju):"")} onChange={e=>setAjusteVals(prev=>({...prev,[p.id]:e.target.value}))}
+                          onKeyDown={e=>{if(e.key==="Enter")guardarAjuste(p);}}
+                          placeholder={String(finalActual)} style={{width:90,padding:"6px 8px",border:`2px solid ${aju!==null?"#16a34a":"#7c3aed"}`,borderRadius:6,fontSize:14,fontWeight:700,textAlign:"center",outline:"none"}}/>
+                      </td>
+                      <td style={{padding:"6px 10px"}}>
+                        <button onClick={()=>guardarAjuste(p)} style={{background:aju!==null?"#16a34a":"#7c3aed",color:"white",border:"none",borderRadius:6,padding:"5px 12px",cursor:"pointer",fontWeight:700,fontSize:11}}>{aju!==null?"Actualizar":"Guardar"}</button>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {listaAj.length===0&&<tr><td colSpan={7} style={{padding:16,textAlign:"center",color:"#94a3b8"}}>Sin resultados</td></tr>}
+              </tbody>
+            </table>
+            {listaAj.length>300&&<div style={{padding:"8px 12px",fontSize:11,color:"#94a3b8",background:"#f8fafc"}}>Mostrando 300 de {listaAj.length}. Usa el buscador para encontrar un producto.</div>}
+          </div>
         </div>
         {modalSalirJSX}
       </div>
