@@ -4957,6 +4957,10 @@ function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,showToast}
                   <div style={{fontSize:11,color:"#94a3b8",marginBottom:2}}>CÓDIGO</div>
                   <div style={{fontFamily:"monospace",fontSize:16,fontWeight:800,color:"#2563eb"}}>{productoActivo.codigo}</div>
                   <div style={{marginTop:8}}>
+                    <div style={{fontSize:11,color:"#94a3b8"}}>CÓD. BARRAS (EAN)</div>
+                    <div style={{fontFamily:"monospace",fontSize:14,fontWeight:700,color:"#0f172a"}}>{productoActivo.ean||"—"}</div>
+                  </div>
+                  <div style={{marginTop:8}}>
                     <div style={{fontSize:11,color:"#94a3b8"}}>NOMBRE PRODUCTO</div>
                     <div style={{fontWeight:700,fontSize:15,color:"#0f172a"}}>{productoActivo.nombre}</div>
                   </div>
