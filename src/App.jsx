@@ -7,7 +7,7 @@ import {
   Settings, Pencil, Trash2, FileText, Calendar, Scale, Wrench, Download,
   Upload, Printer, Search, Lightbulb, DollarSign, Clock, Cloud, Menu,
   ChevronRight, LogOut, Key, Smartphone, BarChart, TrendingDown, Circle,
-  AlertCircle, XCircle, Plus, X, Mail, UserPlus, Lock, ChevronDown, ChevronUp, ChevronLeft, Camera, CornerDownLeft, Globe,
+  AlertCircle, XCircle, Plus, Minus, X, Mail, UserPlus, Lock, ChevronDown, ChevronUp, ChevronLeft, Camera, CornerDownLeft, Globe,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -204,6 +204,7 @@ const SB={
   resetMemberPassword:(id,pass)=>supabase.rpc("reset_member_password",{p_user_id:id,p_pass:pass}),
   deleteMember:(id)=>supabase.rpc("delete_member",{p_user_id:id}),
   setTenantActive:(tid,activo)=>supabase.rpc("set_tenant_active",{p_tid:tid,p_activo:activo}),
+  deleteTenant:(tid)=>supabase.rpc("delete_tenant",{p_tid:tid}),
   setMemberActive:(id,activo)=>supabase.rpc("set_member_active",{p_user_id:id,p_activo:activo}),
   loadUsuarios:(tid)=>supabase.from("usuarios").select("*").eq("tenant_id",tid),
   // Gestión de clientes/pagos (Panel del Dueño).
@@ -234,6 +235,7 @@ const SB={
   // SIEMPRE scopeado por empresa. Si no hay tenant, es un NO-OP: nunca un borrado global
   // (con RLS el dueño podría borrar productos de TODAS las empresas → se prohíbe de raíz).
   deleteAllProductos:(tid)=>tid?supabase.from("productos").delete().eq("tenant_id",tid):Promise.resolve({data:null,error:null}),
+  deleteProductosByIds:async(ids)=>{for(let i=0;i<ids.length;i+=200){const{error}=await supabase.from("productos").delete().in("id",ids.slice(i,i+200));if(error)throw error;}},
   upsertInventario:(inv)=>supabase.from("inventarios").upsert(inv,{onConflict:"id"}),
   upsertConteo:(c)=>supabase.from("conteos").upsert(c,{onConflict:"id"}),
   deleteConteo:(id)=>supabase.from("conteos").delete().eq("id",id),
@@ -244,22 +246,35 @@ const SB={
 };
 
 // --- Config local (localizaciones, tipos, alertas) ---
-const saveLocalConfig=()=>{try{localStorage.setItem(CONFIG_KEY,JSON.stringify({localizaciones:G.localizaciones,ubicacionesTipos:G.ubicacionesTipos,localizacionTipos:G.localizacionTipos,alertas:G.alertas}));}catch(e){}};
-const loadLocalConfig=()=>{try{const raw=localStorage.getItem(CONFIG_KEY);if(!raw)return;const d=JSON.parse(raw);if(d.localizaciones)G.localizaciones=d.localizaciones;if(d.ubicacionesTipos&&d.ubicacionesTipos.length)G.ubicacionesTipos=d.ubicacionesTipos;if(d.localizacionTipos&&d.localizacionTipos.length)G.localizacionTipos=d.localizacionTipos;if(d.alertas)G.alertas=d.alertas;}catch(e){}};
+// La config de ubicaciones es POR EMPRESA: la clave de localStorage se separa por tenant
+// para que el caché de una empresa nunca se mezcle con el de otra.
+const cfgKey=()=>CONFIG_KEY+(G.tenantId?(":"+G.tenantId):"");
+const saveLocalConfig=()=>{try{localStorage.setItem(cfgKey(),JSON.stringify({localizaciones:G.localizaciones,ubicacionesTipos:G.ubicacionesTipos,localizacionTipos:G.localizacionTipos,alertas:G.alertas}));}catch(e){}};
+const loadLocalConfig=()=>{try{const raw=localStorage.getItem(cfgKey());if(!raw)return;const d=JSON.parse(raw);if(d.localizaciones)G.localizaciones=d.localizaciones;if(d.ubicacionesTipos&&d.ubicacionesTipos.length)G.ubicacionesTipos=d.ubicacionesTipos;if(d.localizacionTipos&&d.localizacionTipos.length)G.localizacionTipos=d.localizacionTipos;if(d.alertas)G.alertas=d.alertas;}catch(e){}};
+// Config con la que arranca una empresa recién creada: vacía de ubicaciones/tipos propios
+// (el cliente crea los suyos). Los tipos de localización se dejan como catálogo genérico de arranque.
+const DEF_LOC_TIPOS=["MUEBLE","LINEAL","NEVERA","PUNTA","JAULA","CAVA"];
+const resetTenantConfig=()=>{G.localizaciones=[];G.ubicacionesTipos=[];G.localizacionTipos=[...DEF_LOC_TIPOS];G.alertas=[];G.notas=[];};
+// ¿El conteo quedó completo/cerrado? (misma lógica que estadoConteo: null = completo)
+const conteoCompleto=(c)=>c.estado==="completado"||c.estado==="cerradoC2"||(c.estado==="cerradoC1"&&c.tipo!=="2conteos");
+// Habilita "Sube saldos": debe haber conteos y estar TODOS cerrados.
+const todosConteosCerrados=()=>G.conteos.length>0&&G.conteos.every(conteoCompleto);
 const saveLocalCache=()=>{try{localStorage.setItem(STORAGE_KEY,JSON.stringify({productos:G.productos,usuarios:G.usuarios,inventario:G.inventario,conteos:G.conteos,capturas:G.capturas,historial:G.historial,savedAt:new Date().toISOString()}));}catch(e){}};
 
 // --- Snapshot para sincronización por diferencias ---
-let _snap={u:{},c:{},inv:"",hist:{},prods:"",cfg:""};
+let _snap={u:{},c:{},inv:"",hist:{},prods:{},cfg:""};
 const initSnap=()=>{
-  _snap={u:{},c:{},inv:"",hist:{},prods:"",cfg:""};
+  _snap={u:{},c:{},inv:"",hist:{},prods:{},cfg:""};
   G.usuarios.forEach(u=>{_snap.u[u.id]=JSON.stringify(userCols(u));});
-  _snap.prods=JSON.stringify(G.productos.map(prodCols));
+  G.productos.forEach(p=>{_snap.prods[p.id]=JSON.stringify(prodCols(p));});
   _snap.inv=G.inventario?JSON.stringify(serInv(G.inventario,"abierto")):"";
   G.historial.forEach(h=>{_snap.hist[h.id]=JSON.stringify(serInv(h,"cerrado"));});
   G.conteos.forEach(c=>{_snap.c[c.id]=JSON.stringify(serConteo(c));});
 };
 
 let _syncing=false,_pending=false,_syncTimer=null;
+let _dirty=false; // true cuando hay cambios locales sin confirmar en la nube. Evita que el auto-refresco los pise.
+let _clearBase=false; // true SOLO cuando el usuario pidió explícitamente vaciar la base. Habilita el borrado total.
 let _busy=false; // true mientras se hace una operación crítica (importar base, eliminar, cerrar). Pausa el auto-refresco.
 const doSync=async()=>{
   // El dueño (sin empresa asociada) NUNCA sincroniza datos de inventario. Su snapshot
@@ -267,12 +282,26 @@ const doSync=async()=>{
   // RLS el dueño puede tocar TODAS las empresas. Sin este guard se vacía la base entera.
   if(!G.tenantId)return;
   if(_syncing){_pending=true;return;}
-  _syncing=true;
+  _syncing=true;_dirty=false;
   try{
     // Los usuarios NO se sincronizan aquí: se crean/editan/eliminan con RPCs y
     // updates explícitos (VUsuarios), porque cada uno tiene credencial en Auth.
-    const ps=JSON.stringify(G.productos.map(prodCols));
-    if(ps!==_snap.prods){await SB.deleteAllProductos(G.tenantId);if(G.productos.length)await SB.upsertProductosBulk(G.productos.map(prodCols));_snap.prods=ps;}
+    // Sync de productos NO destructivo: upsert de lo nuevo/cambiado y borrado SOLO de los
+    // ids realmente eliminados. Nunca "borra todo y reinserta" (antes eso vaciaba la base si
+    // el upsert fallaba a mitad de camino o si G.productos quedaba vacío por una carrera).
+    const curP={};G.productos.forEach(p=>{curP[p.id]=prodCols(p);});
+    const cambiados=[];for(const id in curP){const s=JSON.stringify(curP[id]);if(_snap.prods[id]!==s)cambiados.push(curP[id]);}
+    const eliminados=[];for(const id in _snap.prods){if(!curP[id])eliminados.push(id);}
+    // Freno de seguridad: si de golpe desaparecen TODOS los productos y NO fue un borrado
+    // explícito del usuario, se cancela para no vaciar la base por un error o una carrera.
+    if(eliminados.length && Object.keys(curP).length===0 && !_clearBase){
+      throw new Error("Sync cancelado: se intentó vaciar toda la base de productos sin orden explícita.");
+    }
+    if(cambiados.length)await SB.upsertProductosBulk(cambiados);
+    if(eliminados.length)await SB.deleteProductosByIds(eliminados);
+    for(const id in curP)_snap.prods[id]=JSON.stringify(curP[id]);
+    for(const id in _snap.prods){if(!curP[id])delete _snap.prods[id];}
+    _clearBase=false;
     const invObj=G.inventario?serInv(G.inventario,"abierto"):null;
     const invS=invObj?JSON.stringify(invObj):"";
     if(invS!==_snap.inv){if(invObj)await SB.upsertInventario(invObj);_snap.inv=invS;}
@@ -287,11 +316,11 @@ const doSync=async()=>{
       const cfg=JSON.stringify({localizaciones:G.localizaciones,ubicacionesTipos:G.ubicacionesTipos,localizacionTipos:G.localizacionTipos,alertas:G.alertas,notas:G.notas});
       if(cfg!==_snap.cfg){await SB.setConfig(`tenant:${G.tenantId}:config`,JSON.parse(cfg));_snap.cfg=cfg;}
     }
-  }catch(e){console.warn("Error de sincronización:",e);}
+  }catch(e){_dirty=true;console.warn("Error de sincronización:",e);}
   _syncing=false;
   if(_pending){_pending=false;doSync();}
 };
-const scheduleSync=()=>{if(_syncTimer)clearTimeout(_syncTimer);_syncTimer=setTimeout(doSync,400);};
+const scheduleSync=()=>{_dirty=true;if(_syncTimer)clearTimeout(_syncTimer);_syncTimer=setTimeout(doSync,400);};
 if(typeof window!=="undefined"){window.addEventListener("beforeunload",()=>{try{doSync();}catch(e){}});}
 
 // Carga inicial mínima (al montar): solo el contenido público de la web.
@@ -304,7 +333,9 @@ const loadBootstrap=async()=>{
 // Carga de los datos de UNA empresa (tenant), tras el login del usuario.
 const loadTenantData=async(tid)=>{
   G.tenantId=tid;
-  // Config de la empresa (localizaciones/tipos/alertas/notas) desde la nube; si no hay, cae a localStorage.
+  // Empieza SIEMPRE con config limpia para que ninguna empresa herede ubicaciones de otra.
+  resetTenantConfig();
+  // Config de la empresa (localizaciones/tipos/alertas/notas) desde la nube; si no hay, cae a localStorage (por-empresa).
   const cfg=await SB.getConfig(`tenant:${tid}:config`);
   if(cfg){
     if(cfg.localizaciones)G.localizaciones=cfg.localizaciones;
@@ -424,7 +455,19 @@ export default function TomficApp(){
     scheduleSync();
     setLastSaved(new Date().toLocaleTimeString("es-CO"));
   };
-  const recargar=async()=>{if(_busy||_syncing)return;try{if(usuario&&usuario.rol==="dueno")await loadTenants();else if(G.tenantId)await loadTenantData(G.tenantId);}catch(e){}tick(n=>n+1);};
+  const recargar=async()=>{
+    if(_busy)return;
+    // Antes de bajar de la nube, empuja cualquier cambio local sin confirmar
+    // (evita que el auto-refresco borre una captura recién hecha).
+    if(G.tenantId&&_dirty){
+      if(_syncTimer){clearTimeout(_syncTimer);_syncTimer=null;}
+      try{await doSync();}catch(e){}
+      if(_dirty)return; // el envío falló → NO recargues: perderías lo local
+    }
+    if(_syncing)return;
+    try{if(usuario&&usuario.rol==="dueno")await loadTenants();else if(G.tenantId)await loadTenantData(G.tenantId);}catch(e){}
+    tick(n=>n+1);
+  };
 
   const toastRef=useRef(null);
   const [toast,setToast]=useState(null);
@@ -495,7 +538,7 @@ export default function TomficApp(){
   const p={usuario,setUsuario,logout,G,rerender,recargar,showToast,lastSaved,limpiarDatos};
   return(
     <>
-      {toast&&<div style={{position:"fixed",top:58,right:20,background:toast.type==="err"?"#dc2626":toast.type==="warn"?"#d97706":"#16a34a",color:"white",padding:"10px 20px",borderRadius:10,zIndex:9999,fontSize:14,fontWeight:700,boxShadow:"0 4px 20px rgba(0,0,0,0.2)",pointerEvents:"none",maxWidth:360}}>{toast.msg}</div>}
+      {toast&&<div style={{position:"fixed",top:66,right:10,background:toast.type==="err"?"#dc2626":toast.type==="warn"?"#d97706":"#16a34a",color:"white",padding:"6px 12px",borderRadius:8,zIndex:9999,fontSize:12,fontWeight:700,boxShadow:"0 3px 12px rgba(0,0,0,0.18)",pointerEvents:"none",maxWidth:210,lineHeight:1.25}}>{toast.msg}</div>}
       {usuario.rol==="dueno"?<PanelDueno {...p}/>:usuario.rol==="capturador"?<ModCapturador {...p}/>:usuario.rol==="gerente"?<ModGerente {...p}/>:<ModAdmin {...p}/>}
     </>
   );
@@ -1455,7 +1498,7 @@ function VBaseDatos({G,rerender,showToast}){
     try{
       await SB.deleteAllProductos(G.tenantId);
       if(mapped.length)await SB.upsertProductosBulk(mapped.map(prodCols));
-      _snap.prods=JSON.stringify(mapped.map(prodCols)); // marca como ya sincronizado
+      _snap.prods={};mapped.forEach(p=>{_snap.prods[p.id]=JSON.stringify(prodCols(p));}); // marca como ya sincronizado
     }catch(e){console.warn("Error subiendo productos:",e);showToast("Error subiendo a la nube, revisa tu conexión","err");}
     saveLocalCache();
     _busy=false;
@@ -1463,6 +1506,45 @@ function VBaseDatos({G,rerender,showToast}){
     const conCosto=mapped.filter(p=>p.costo>0).length,conSaldo=mapped.filter(p=>p.saldo>0).length;
     if(conCosto===0||conSaldo===0)showToast(`Importados ${mapped.length}, pero ${conCosto===0?"COSTO":""}${conCosto===0&&conSaldo===0?" y ":""}${conSaldo===0?"SALDO":""} salieron en 0 — revisa el nombre de esas columnas`,"warn");
     else showToast(`✓ ${mapped.length} productos importados y guardados en la nube`);
+  };
+
+  // "Sube saldos" (post-toma): actualiza saldo + costo de la base ACTUAL emparejando por
+  // código, SIN borrar ni regenerar ids (así no toca las capturas). Solo con conteos cerrados.
+  const subirSaldos=(e)=>{
+    const file=e.target.files[0];e.target.value="";if(!file)return;
+    if(!todosConteosCerrados())return showToast("Solo cuando TODOS los conteos estén cerrados","err");
+    if(!G.productos.length)return showToast("No hay base de productos que actualizar","err");
+    const reader=new FileReader();
+    reader.onload=(ev)=>{
+      const wb=XLSX.read(ev.target.result,{type:"binary"});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const data=XLSX.utils.sheet_to_json(ws,{defval:""});
+      if(!data.length)return showToast("Archivo vacío","err");
+      const normKey=(k)=>String(k).toUpperCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^A-Z0-9]/g,"");
+      const toNum=(v)=>{if(v===undefined||v===null||v==="")return 0;if(typeof v==="number")return isNaN(v)?0:v;let s=String(v).replace(/[^\d.,-]/g,"").trim();if(s==="")return 0;if(s.includes(".")&&s.includes(","))s=s.replace(/\./g,"").replace(",",".");else if(s.includes(","))s=s.replace(",",".");const n=parseFloat(s);return isNaN(n)?0:n;};
+      const norm=(s)=>String(s||"").trim().toUpperCase();
+      const saldoCols=["SALDO","EXISTENCIA","EXISTENCIAS","STOCK","SALDO SISTEMA","SALDO ACTUAL","CANTIDAD SISTEMA","INVENTARIO","DISPONIBLE","CANTIDAD","CANT"];
+      const costoCols=["COSTO","COSTO UNITARIO","COSTO PROMEDIO","COSTO UND","COSTO UNIDAD","ULTIMO COSTO","COSTO ACTUAL","COSTO REAL","PRECIO COSTO","VALOR UNITARIO","VR UNITARIO"];
+      const codCols=["CODIGO","CODIGO INTERNO","CODIGOINTERNO","COD","CODIGO PRODUCTO","SKU","PLU"];
+      const idx={};G.productos.forEach(p=>{if(p.codigo)idx[norm(p.codigo)]=p;});
+      let act=0,ign=0,tocaCosto=false;
+      data.forEach(rawRow=>{
+        const row={};Object.keys(rawRow).forEach(k=>{row[normKey(k)]=rawRow[k];});
+        const has=(...keys)=>keys.some(k=>{const nk=normKey(k);return row[nk]!==undefined&&row[nk]!==null&&String(row[nk]).trim()!=="";});
+        const get=(...keys)=>{for(const k of keys){const nk=normKey(k);if(row[nk]!==undefined&&row[nk]!==null&&String(row[nk]).trim()!=="")return String(row[nk]).trim();}return "";};
+        const getNum=(...keys)=>{for(const k of keys){const nk=normKey(k);if(row[nk]!==undefined&&row[nk]!==null&&String(row[nk]).trim()!=="")return toNum(row[nk]);}return 0;};
+        const cod=get(...codCols);
+        const prod=cod?idx[norm(cod)]:null;
+        if(!prod){ign++;return;} // no está en la base → se ignora
+        if(has(...saldoCols))prod.saldo=getNum(...saldoCols);
+        if(has(...costoCols)){prod.costo=getNum(...costoCols);tocaCosto=true;}
+        act++;
+      });
+      if(act===0)return showToast("Ningún código del archivo coincide con la base","err");
+      rerender();
+      showToast(`✓ Saldos actualizados: ${act} producto(s)${tocaCosto?" (saldo+costo)":" (saldo)"}${ign?` · ${ign} ignorado(s)`:""}`);
+    };
+    reader.readAsBinaryString(file);
   };
 
   const [mostrarEstructura,setMostrarEstructura]=useState(false);
@@ -1523,8 +1605,16 @@ function VBaseDatos({G,rerender,showToast}){
         <Button variant="outline" onClick={descargarPlantilla}>
           <Download size={15}/> Plantilla
         </Button>
+        {todosConteosCerrados()&&G.productos.length>0&&(
+          <Button asChild className="bg-emerald-600 hover:bg-emerald-700 text-white">
+            <label className="cursor-pointer" title="Sube la misma base con saldos frescos: actualiza saldo y costo por código, sin tocar las capturas">
+              <Upload size={15}/> Sube saldos (post-toma)
+              <input type="file" accept=".xlsx,.xls" onChange={subirSaldos} className="hidden"/>
+            </label>
+          </Button>
+        )}
         {G.productos.length>0&&(
-          <Button variant="outline" className="text-destructive border-red-200 hover:bg-red-50 hover:text-destructive" onClick={()=>{G.productos=[];rerender();showToast("Base de datos limpiada","warn");}}>
+          <Button variant="outline" className="text-destructive border-red-200 hover:bg-red-50 hover:text-destructive" onClick={()=>{if(!window.confirm("¿BORRAR toda la base de productos? Esta acción no se puede deshacer."))return;_clearBase=true;G.productos=[];rerender();showToast("Base de datos limpiada","warn");}}>
             <Trash2 size={15}/> Limpiar base
           </Button>
         )}
@@ -3716,6 +3806,9 @@ function VClienteDetalle({t,showToast,onBack,onChanged}){
   const [savingPago,setSavingPago]=useState(false);
   const [resetFor,setResetFor]=useState(null); // usuario al que se le resetea la clave
   const [newPass,setNewPass]=useState("");
+  const [delOpen,setDelOpen]=useState(false); // diálogo de "eliminar empresa"
+  const [delText,setDelText]=useState("");    // el dueño debe escribir el nombre para confirmar
+  const [borrando,setBorrando]=useState(false);
 
   const cargar=async()=>{
     setLoading(true);
@@ -3761,6 +3854,18 @@ function VClienteDetalle({t,showToast,onBack,onChanged}){
   const resetear=async()=>{
     if(newPass.length<6)return showToast("La clave debe tener al menos 6 caracteres","err");
     try{const {error}=await SB.resetMemberPassword(resetFor.id,newPass);if(error)throw error;setResetFor(null);setNewPass("");showToast("Clave restablecida ✓");}catch(e){showToast(e.message||"Error","err");}
+  };
+  // Elimina la empresa y TODO lo suyo (usuarios+auth, productos, inventarios, conteos, pagos, config).
+  const eliminarEmpresa=async()=>{
+    if(delText.trim()!==(t.nombre||"").trim())return showToast("El nombre no coincide","err");
+    setBorrando(true);
+    try{
+      const {error}=await SB.deleteTenant(t.id); if(error)throw error;
+      setDelOpen(false);setDelText("");
+      showToast("Empresa eliminada","warn");
+      onChanged&&onChanged(); onBack&&onBack();
+    }catch(e){showToast(e.message||"No se pudo eliminar la empresa","err");}
+    setBorrando(false);
   };
 
   return(
@@ -3856,12 +3961,38 @@ function VClienteDetalle({t,showToast,onBack,onChanged}){
         </div>
       </Card>
 
+      {/* Zona de peligro — eliminar empresa */}
+      <Card className="mt-4 p-5 border-red-200 bg-red-50/40">
+        <div className="font-bold text-red-700 mb-1 flex items-center gap-2"><AlertTriangle size={16}/> Zona de peligro</div>
+        <div className="text-sm text-red-800/80 mb-3">Eliminar esta empresa borra <b>de forma permanente</b> sus usuarios, productos, inventarios, conteos, pagos y configuración. No se puede deshacer.</div>
+        <Button variant="outline" className="text-destructive border-red-300 hover:bg-red-100 hover:text-destructive" onClick={()=>{setDelText("");setDelOpen(true);}}>
+          <Trash2 size={15}/> Eliminar empresa
+        </Button>
+      </Card>
+
       <Dialog open={!!resetFor} onOpenChange={o=>{if(!o){setResetFor(null);setNewPass("");}}}>
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Restablecer clave de {resetFor?.nombre}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1.5"><Label>Nueva clave</Label><Input value={newPass} onChange={e=>setNewPass(e.target.value)} placeholder="mín. 6 caracteres"/></div>
             <Button className="w-full" onClick={resetear}><Key size={15}/> Restablecer</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={delOpen} onOpenChange={o=>{if(!o){setDelOpen(false);setDelText("");}}}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle className="text-red-700 flex items-center gap-2"><AlertTriangle size={18}/> Eliminar «{t.nombre}»</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="text-sm text-slate-700">Esto borra <b>permanentemente</b> la empresa y todos sus datos y accesos. No se puede deshacer.</div>
+            <div className="space-y-1.5">
+              <Label>Para confirmar, escribe el nombre exacto: <span className="font-mono font-bold">{t.nombre}</span></Label>
+              <Input value={delText} onChange={e=>setDelText(e.target.value)} placeholder={t.nombre}/>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={()=>{setDelOpen(false);setDelText("");}}>Cancelar</Button>
+              <Button className="flex-1 bg-red-600 hover:bg-red-700 text-white" disabled={borrando||delText.trim()!==(t.nombre||"").trim()} onClick={eliminarEmpresa}>{borrando?"Eliminando…":<><Trash2 size={15}/> Eliminar</>}</Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -4454,6 +4585,34 @@ function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,showToast}
     setTimeout(()=>scanRef.current?.focus(),80);
   };
 
+  // Ajuste (−): resta unidades de un producto YA capturado, guardando una entrada negativa
+  // (queda como registro auditable). Permite corregir hacia abajo sin borrar capturas.
+  const guardarResta=()=>{
+    if(!productoActivo||!miConteo||!miRonda)return;
+    const cant=calcTotal(form);
+    if(cant<=0)return showToast("Ingresa cuántas unidades restar","err");
+    const totalAnt=getTotal(miConteo.id,miRonda,productoActivo.id);
+    if(cant>totalAnt)return showToast(`Solo hay ${totalAnt} capturadas; no puedes restar ${cant}`,"err");
+    if(miConteo.estado==="pendiente"){G.conteos=G.conteos.map(c=>c.id===miConteo.id?{...c,estado:"enCurso"}:c);}
+    const key=`${miConteo.id}_${productoActivo.id}_${miRonda}_${ID()}`;
+    G.capturas[key]={
+      conteoId:miConteo.id,productoId:productoActivo.id,ronda:miRonda,
+      ean:productoActivo.ean,codigo:productoActivo.codigo,nombre:productoActivo.nombre,
+      referencia:productoActivo.referencia,categoria:productoActivo.categoria,
+      subcategoria:productoActivo.subcategoria,subgrupo:productoActivo.subgrupo,
+      saldo:productoActivo.saldo,costo:productoActivo.costo,
+      proveedor:productoActivo.proveedor,nit:productoActivo.nit,
+      cantidad:-cant,unidades:-(parseFloat(form.unidades)||0),
+      cajas:parseFloat(form.cajas)||0,embalaje:parseFloat(form.embalaje)||0,
+      estado:form.estado,obs:form.obs?("(ajuste) "+form.obs):"Ajuste: resta de unidades",
+      usuario:usuario.nombre,fecha:TODAY(),hora:HOUR(),ajuste:true,
+    };
+    rerender();showToast(`➖ ${productoActivo.nombre} — restadas ${cant} und (queda ${totalAnt-cant})`);
+    setProductoActivo(null);setForm({unidades:"",embalaje:"",cajas:"",estado:"BUENO",obs:""});
+    setEditCap(null);
+    setTimeout(()=>scanRef.current?.focus(),80);
+  };
+
   // Guardar C3 desde la tabla directa
   const guardarC3Fila=(p,val)=>{
     const cantidad=parseFloat(val);
@@ -4876,6 +5035,10 @@ function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,showToast}
                   style={{padding:"10px 28px",background:miRonda==="C3"||total>0?"#16a34a":"#e2e8f0",color:miRonda==="C3"||total>0?"white":"#94a3b8",border:"none",borderRadius:8,cursor:miRonda==="C3"||total>0?"pointer":"not-allowed",fontWeight:700,fontSize:14}}>
                   GUARDAR
                 </button>
+                {totalAnt>0&&miRonda!=="C3"&&<button onClick={guardarResta} disabled={total<=0} title="Restar unidades de lo ya capturado"
+                  style={{padding:"10px 20px",background:total>0?"#ea580c":"#e2e8f0",color:total>0?"white":"#94a3b8",border:"none",borderRadius:8,cursor:total>0?"pointer":"not-allowed",fontWeight:700,fontSize:13,display:"inline-flex",alignItems:"center",gap:6}}>
+                  <Minus size={15}/> RESTAR
+                </button>}
                 <button onClick={()=>{setProductoActivo(null);setForm({unidades:"",embalaje:"",cajas:"",estado:"BUENO",obs:""});setEditCap(null);setTimeout(()=>scanRef.current?.focus(),80);}}
                   style={{padding:"10px 20px",background:"#64748b",color:"white",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:13}}>CANCELAR</button>
                 <div style={{flex:1}}/>
@@ -4895,7 +5058,7 @@ function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,showToast}
             </div>
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
               <thead><tr style={{background:"#f1f5f9"}}>
-                {["Código","Nombre","Ref.","Total","Estado","Obs","Acciones"].map(h=>(
+                {["Código","Cód. barras","Nombre","Ref.","Total","Estado","Obs","Acciones"].map(h=>(
                   <th key={h} style={{padding:"7px 10px",textAlign:"left",fontWeight:700,color:"#374151",borderBottom:"1px solid #e2e8f0",fontSize:11}}>{h}</th>
                 ))}
               </tr></thead>
@@ -4903,6 +5066,7 @@ function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,showToast}
                 {capturasRealizadas.filter(({p})=>!busqCap||p.nombre.toLowerCase().includes(busqCap.toLowerCase())||p.codigo.toLowerCase().includes(busqCap.toLowerCase())).map(({p,caps,total:tot},i)=>(
                   <tr key={p.id} style={{background:i%2?"#f8fafc":"white",borderBottom:"1px solid #f1f5f9"}}>
                     <td style={{padding:"7px 10px",fontFamily:"monospace",color:"#2563eb",fontWeight:700,fontSize:11}}>{p.codigo}</td>
+                    <td style={{padding:"7px 10px",fontFamily:"monospace",color:"#64748b",fontSize:11}}>{p.ean||"—"}</td>
                     <td style={{padding:"7px 10px",fontWeight:600}}>{p.nombre}</td>
                     <td style={{padding:"7px 10px",color:"#64748b",fontSize:11}}>{p.referencia}</td>
                     <td style={{padding:"7px 10px",textAlign:"center"}}>
