@@ -1654,14 +1654,23 @@ function VBaseDatos({G,rerender,showToast}){
         <Button variant="outline" onClick={descargarPlantilla}>
           <Download size={15}/> Plantilla
         </Button>
-        {todosConteosCerrados()&&G.productos.length>0&&(
+        {G.productos.length>0&&(todosConteosCerrados()?(
           <Button asChild className="bg-emerald-600 hover:bg-emerald-700 text-white">
             <label className="cursor-pointer" title="Sube la misma base con saldos frescos: actualiza saldo y costo por código, sin tocar las capturas">
               <Upload size={15}/> Sube saldos (post-toma)
               <input type="file" accept=".xlsx,.xls" onChange={subirSaldos} className="hidden"/>
             </label>
           </Button>
-        )}
+        ):(
+          // Visible siempre (para que no parezca que "desapareció"), pero deshabilitado
+          // hasta que TODOS los conteos estén cerrados. El tooltip dice qué falta.
+          <Button disabled className="bg-emerald-600 text-white opacity-50 cursor-not-allowed hover:bg-emerald-600"
+            title={conteosReales().length===0
+              ? "Disponible cuando haya conteos y estén todos cerrados"
+              : `Disponible cuando cierres todos los conteos (falta: ${conteosReales().filter(c=>!conteoCompleto(c)).map(c=>c.nombre).join(", ")})`}>
+            <Upload size={15}/> Sube saldos (post-toma)
+          </Button>
+        ))}
         {G.productos.length>0&&(
           <Button variant="outline" className="text-destructive border-red-200 hover:bg-red-50 hover:text-destructive" onClick={()=>{if(!window.confirm("¿BORRAR toda la base de productos? Esta acción no se puede deshacer."))return;_clearBase=true;G.productos=[];rerender();showToast("Base de datos limpiada","warn");}}>
             <Trash2 size={15}/> Limpiar base
@@ -1856,6 +1865,14 @@ function VConteos({G,rerender,showToast,usuario}){
     G.conteos=G.conteos.map(x=>x.id===c.id?{...x,estado:nuevoEstado,rondasCerradas:rc,...(ronda==="C3"?{}:{})}:x);
     setModalReabrir(null);rerender();showToast(`${ronda} reabierto ✓`,"warn");
   };
+  // Eliminar un conteo completo (cualquier estado) + todas sus capturas.
+  const borrarConteo=(c)=>{
+    const nCaps=Object.values(G.capturas).filter(x=>x.conteoId===c.id).length;
+    if(!window.confirm(`¿Eliminar el conteo «${c.nombre}»${nCaps?` y sus ${nCaps} captura${nCaps===1?"":"s"}`:""}? Esta acción no se puede deshacer.`))return;
+    G.conteos=G.conteos.filter(x=>x.id!==c.id);
+    Object.keys(G.capturas).forEach(k=>{if(G.capturas[k].conteoId===c.id)delete G.capturas[k];});
+    rerender();showToast("Conteo eliminado","warn");
+  };
   // Qué rondas se pueden reabrir según lo ya cerrado
   const rondasReabribles=(c)=>{
     const r=[];const rc=c.rondasCerradas||[];
@@ -1970,6 +1987,7 @@ function VConteos({G,rerender,showToast,usuario}){
                               </SelectContent>
                             </Select>
                           )}
+                          <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs text-destructive border-red-200 hover:bg-red-50 hover:text-destructive" onClick={()=>borrarConteo(c)}><Trash2 size={12}/> Eliminar</Button>
                         </div>
                         {editC2===c.id&&(
                           <div className="mt-1.5 flex gap-1.5 items-center">
@@ -4531,6 +4549,7 @@ function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,showToast}
   const pageBg=dark?"#0b1220":"#f1f5f9";
   const nightFilter=dark?{filter:"invert(0.92) hue-rotate(180deg)"}:null;
   const [ajusteVals,setAjusteVals]=useState({}); // {productId: string} inputs del conteo de ajuste
+  const [soloDif,setSoloDif]=useState(true); // ajuste: por defecto solo productos con diferencia
   const scanRef=useRef(null);
   const unidadesRef=useRef(null);
 
@@ -4915,7 +4934,16 @@ function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,showToast}
       rerender();showToast(`✓ ${p.nombre}: ${v}`);
     };
     const q=(busqCap||"").trim().toLowerCase();
-    const listaAj=G.productos.filter(p=>!q||p.nombre.toLowerCase().includes(q)||(p.codigo||"").toLowerCase().includes(q)||String(p.ean||"").toLowerCase().includes(q));
+    // Diferencia real de un producto: cantidad final (ajuste si existe, si no lo contado) menos el saldo del sistema.
+    const difProd=(p)=>{const aju=ajusteDe(p.id);const fa=aju!==null?aju:contadoDe(p.id);return fa-(p.saldo||0);};
+    const nConDif=G.productos.filter(p=>difProd(p)!==0).length;
+    const listaAj=G.productos.filter(p=>{
+      const matchQ=!q||p.nombre.toLowerCase().includes(q)||(p.codigo||"").toLowerCase().includes(q)||String(p.ean||"").toLowerCase().includes(q);
+      if(!matchQ)return false;
+      // Con buscador activo se muestran todos los coincidentes; sin buscador y en modo "solo diferencias", solo los que difieren.
+      if(soloDif&&!q&&difProd(p)===0)return false;
+      return true;
+    });
     return(
       <div style={{minHeight:"100vh",background:pageBg,fontFamily:"system-ui,sans-serif"}}>
         <div style={{background:"#0f172a",color:"white",padding:"0 16px",display:"flex",alignItems:"center",justifyContent:"space-between",height:52,position:"sticky",top:0,zIndex:100}}>
@@ -4935,6 +4963,12 @@ function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,showToast}
             <div style={{fontWeight:800,fontSize:16,color:"#0f172a"}}>Conteo de Ajuste</div>
             <div style={{fontSize:12,color:"#64748b",marginTop:2}}>Corrige la <b>cantidad física real</b> de los productos con novedad. Lo que escribas reemplaza lo contado.</div>
             <input value={busqCap} onChange={e=>setBusqCap(e.target.value)} placeholder="Buscar por nombre, código o código de barras…" style={{...inp,marginTop:10,border:"2px solid #7c3aed"}} autoFocus/>
+            <div style={{display:"flex",alignItems:"center",gap:10,marginTop:10,flexWrap:"wrap"}}>
+              <button onClick={()=>setSoloDif(v=>!v)} style={{background:soloDif?"#7c3aed":"#eef2ff",color:soloDif?"white":"#4338ca",border:"none",borderRadius:20,padding:"5px 14px",fontSize:12,fontWeight:700,cursor:"pointer"}}>
+                {soloDif?"● Solo diferencias":"○ Ver todos"}
+              </button>
+              <span style={{fontSize:12,color:"#64748b"}}><b style={{color:nConDif>0?"#dc2626":"#16a34a"}}>{nConDif}</b> producto{nConDif===1?"":"s"} con diferencia{soloDif&&busqCap?" · buscando en toda la base":""}</span>
+            </div>
           </div>
           <div style={{background:"white",borderRadius:10,overflow:"hidden",boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
@@ -4965,7 +4999,7 @@ function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,showToast}
                     </tr>
                   );
                 })}
-                {listaAj.length===0&&<tr><td colSpan={7} style={{padding:16,textAlign:"center",color:"#94a3b8"}}>Sin resultados</td></tr>}
+                {listaAj.length===0&&<tr><td colSpan={7} style={{padding:16,textAlign:"center",color:"#94a3b8"}}>{soloDif&&!busqCap?"No hay productos con diferencia. Toca «Ver todos» para ajustar cualquier producto.":"Sin resultados"}</td></tr>}
               </tbody>
             </table>
             {listaAj.length>300&&<div style={{padding:"8px 12px",fontSize:11,color:"#94a3b8",background:"#f8fafc"}}>Mostrando 300 de {listaAj.length}. Usa el buscador para encontrar un producto.</div>}
