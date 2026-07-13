@@ -2262,6 +2262,26 @@ function VProcesos({G,rerender,showToast,usuario}){
   }).length;
   const pct=totalConteos?Math.round(conteosCompletos/totalConteos*100):0;
 
+  // Pendientes por completar (ahora se muestran dentro del botón "Alertas").
+  const conteosPend=G.conteos.filter(c=>c.estado!=="completado"&&c.tipo!=="ajuste").map(c=>{
+    let razon="";
+    if(c.estado==="pendiente")razon="Sin iniciar";
+    else if(c.estado==="enCurso")razon="C1 en curso";
+    else if(c.estado==="cerradoC1")razon=c.tipo==="2conteos"?"Falta C2":"";
+    else if(c.estado==="diferencia")razon="Tiene diferencias, falta C3";
+    else if(c.estado==="enC3")razon="C3 en curso";
+    return {c,razon};
+  }).filter(x=>x.razon!=="");
+  // Ubicaciones sin conteo: comparar por RUTA (ubicación›localización›nro), NO por id.
+  // Tras "Recuperar desde conteos" los ids de ubicación cambian y no matchean el locId viejo
+  // → antes marcaba como "sin conteo" ubicaciones que sí tenían conteo.
+  const _norm=s=>(s||"").toString().trim().toUpperCase();
+  const _locKey=x=>`${_norm(x.ubicacion)}|${_norm(x.localizacion)}|${_norm(x.nro)}`;
+  const _locConConteo=new Set(G.conteos.filter(c=>c.tipo!=="ajuste").map(_locKey));
+  const locSinConteo=G.localizaciones.filter(l=>!_locConConteo.has(_locKey(l)));
+  const nAlertas=G.alertas.filter(a=>!a.leida).length;
+  const totalPend=conteosPend.length+locSinConteo.length;
+
   const expXLSX=(data,cols,fname,titulo)=>{
     const ws=XLSX.utils.aoa_to_sheet([[titulo],["Usuario: "+usuario.nombre+" | "+TODAY()],[],cols,...data]);
     const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Datos");XLSX.writeFile(wb,fname);showToast("Exportado ✓");
@@ -2450,7 +2470,7 @@ function VProcesos({G,rerender,showToast,usuario}){
           {l:"Completados",v:conteosCompletos,c:"#16a34a",bg:"#f0fdf4",icon:CheckCircle},
           {l:"En progreso",v:totalConteos-conteosCompletos,c:"#0891b2",bg:"#ecfeff",icon:Settings},
           {l:"Con diferencia",v:G.conteos.filter(c=>c.tipo==="2conteos"&&getDifsConteo(c).length>0).length,c:"#dc2626",bg:"#fef2f2",icon:AlertTriangle},
-          {l:"Alertas",v:G.alertas.filter(a=>!a.leida).length,c:"#7c3aed",bg:"#faf5ff",icon:Bell,onClick:()=>setVerAlertas(v=>!v)},
+          {l:"Alertas",v:nAlertas+totalPend,c:"#7c3aed",bg:"#faf5ff",icon:Bell,onClick:()=>setVerAlertas(v=>!v)},
         ].map(s=>(
           <Card key={s.l} onClick={s.onClick} className={`p-4 ${s.onClick?"cursor-pointer hover:shadow-md transition-shadow":""}`} style={{background:s.bg,borderColor:s.c+"22"}}>
             <s.icon size={20} style={{color:s.c}} className="mb-1.5"/>
@@ -2493,147 +2513,109 @@ function VProcesos({G,rerender,showToast,usuario}){
         </DialogContent>
       </Dialog>
 
-      {/* Panel: Pendientes por hacer */}
-      {(()=>{
-        const conteosPend=G.conteos.filter(c=>c.estado!=="completado"&&c.tipo!=="ajuste").map(c=>{
-          let razon="";
-          if(c.estado==="pendiente")razon="Sin iniciar";
-          else if(c.estado==="enCurso")razon="C1 en curso";
-          else if(c.estado==="cerradoC1")razon=c.tipo==="2conteos"?"Falta C2":"";
-          else if(c.estado==="diferencia")razon="Tiene diferencias, falta C3";
-          else if(c.estado==="enC3")razon="C3 en curso";
-          return {c,razon};
-        }).filter(x=>x.razon!=="");
-        const locConConteo=new Set(G.conteos.map(c=>c.locId));
-        const locSinConteo=G.localizaciones.filter(l=>!locConConteo.has(l.id));
-        const totalPend=conteosPend.length+locSinConteo.length;
-        return(
-          <Card className={`overflow-hidden mb-4 ${totalPend>0?"border-amber-300":"border-green-300"}`}>
-            {/* Header del panel */}
-            <div onClick={()=>setVerPendientes(v=>!v)} className="cursor-pointer px-5 py-3.5 flex justify-between items-center" style={{background:totalPend>0?"linear-gradient(135deg,#fffbeb,#fef3c7)":"linear-gradient(135deg,#f0fdf4,#dcfce7)"}}>
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-lg flex items-center justify-center text-white" style={{background:totalPend>0?"#f59e0b":"#16a34a"}}>
-                  {totalPend>0?<Clock size={16}/>:<CheckCircle size={16}/>}
-                </div>
-                <div>
-                  <div className="font-extrabold text-sm" style={{color:totalPend>0?"#92400e":"#166534"}}>
-                    {totalPend>0?`Faltan ${totalPend} pendiente${totalPend>1?"s":""} por completar`:"Todo al día — sin pendientes"}
-                  </div>
-                  {totalPend>0&&<div className="text-[11px] mt-0.5" style={{color:"#a16207"}}>{conteosPend.length} conteo{conteosPend.length!==1?"s":""} · {locSinConteo.length} ubicación{locSinConteo.length!==1?"es":""}</div>}
-                </div>
-              </div>
-              <div className="flex items-center gap-1 rounded-lg bg-white px-3 py-1 text-xs font-semibold shadow-sm" style={{color:totalPend>0?"#92400e":"#166534"}}>
-                {verPendientes?<><ChevronUp size={14}/> Ocultar</>:<><ChevronDown size={14}/> Ver detalle</>}
-              </div>
-            </div>
-
-            {verPendientes&&totalPend>0&&(
-              <div className="bg-white p-4">
-              <div className="grid gap-3.5" style={{gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))"}}>
-                <div>
-                  <div className="flex items-center gap-1.5 mb-2.5">
-                    <div className="w-1.5 h-1.5 rounded-full bg-amber-500"/>
-                    <div className="text-[11px] font-extrabold text-slate-700 uppercase tracking-wide">Conteos sin terminar ({conteosPend.length})</div>
-                  </div>
-                  {conteosPend.length===0?<div className="flex items-center gap-1.5 text-xs text-green-700 px-3 py-2 bg-green-50 rounded-lg"><CheckCircle size={13}/> Todos los conteos están completos</div>:(
-                    <div className="flex flex-col gap-2">
-                      {conteosPend.map(({c,razon})=>{
-                        const abierto=pendForm&&pendForm.id===c.id;
-                        const faltaC2=c.tipo==="2conteos"&&!c.usuarioC2;
-                        const faltaC3=c.estado==="diferencia"&&!c.usuarioC3;
-                        const accionable=faltaC2||faltaC3;
-                        return(
-                        <div key={c.id} className="rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-xs shadow-sm">
-                          <div onClick={()=>accionable&&setPendForm(abierto?null:{id:c.id,tipo:faltaC2?"c2":"c3",val:""})} className={accionable?"cursor-pointer":"cursor-default"}>
-                            <div className="font-bold text-slate-900 flex justify-between items-center gap-2">
-                              <span>{c.nombre}</span>
-                              {accionable&&<span className="rounded-md bg-primary text-white px-2 py-0.5 text-[10px] font-bold">{abierto?"cerrar":faltaC2?"Asignar C2":"Asignar C3"}</span>}
-                            </div>
-                            <div className="text-muted-foreground text-[11px] mt-0.5 flex items-center gap-1"><MapPin size={11}/> {c.locLabel}</div>
-                            <div className="inline-block rounded bg-amber-100 text-amber-800 px-1.5 py-0.5 text-[10px] font-bold mt-1">{razon}</div>
-                          </div>
-                          {abierto&&(
-                            <div className="mt-2.5 flex gap-1.5 items-center pt-2 border-t border-amber-200">
-                              <Select value={pendForm.val||undefined} onValueChange={v=>setPendForm({...pendForm,val:v})}>
-                                <SelectTrigger className="h-8 text-xs flex-1"><SelectValue placeholder="Selecciona usuario…"/></SelectTrigger>
-                                <SelectContent>{usuariosActivos().map(u=><SelectItem key={u.id} value={u.nombre}>{u.nombre}</SelectItem>)}</SelectContent>
-                              </Select>
-                              <Button size="sm" className="h-8 px-2.5" onClick={()=>pendForm.tipo==="c2"?asignarC2Rapido(c.id,pendForm.val):(pendForm.val&&asignarC3(c.id,pendForm.val),setPendForm(null))}><CheckCircle size={14}/></Button>
-                              <Button size="sm" variant="outline" className="h-8 px-2.5" onClick={()=>setPendForm(null)}><X size={14}/></Button>
-                            </div>
-                          )}
-                        </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <div className="flex items-center gap-1.5 mb-2.5">
-                    <div className="w-1.5 h-1.5 rounded-full bg-primary"/>
-                    <div className="text-[11px] font-extrabold text-slate-700 uppercase tracking-wide">Ubicaciones sin conteo ({locSinConteo.length})</div>
-                  </div>
-                  {locSinConteo.length===0?<div className="flex items-center gap-1.5 text-xs text-green-700 px-3 py-2 bg-green-50 rounded-lg"><CheckCircle size={13}/> Todas las ubicaciones tienen conteo</div>:(
-                    <div className="flex flex-col gap-2">
-                      {locSinConteo.map(l=>{
-                        const abierto=pendForm&&pendForm.locId===l.id;
-                        return(
-                        <div key={l.id} className="rounded-lg border border-blue-200 bg-blue-50 px-3.5 py-2.5 text-xs shadow-sm">
-                          <div onClick={()=>setPendForm(abierto?null:{locId:l.id,tipo:"crear",nombre:`${l.localizacion} ${l.nro}`,c1:"",c2:""})} className="cursor-pointer">
-                            <div className="font-bold text-blue-800 flex justify-between items-center gap-2">
-                              <span>{l.ubicacion} › {l.localizacion} › {l.nro}</span>
-                              <span className="rounded-md bg-primary text-white px-2 py-0.5 text-[10px] font-bold">{abierto?"cerrar":"+ Crear"}</span>
-                            </div>
-                            {l.observacion&&<div className="text-muted-foreground text-[11px] mt-0.5">{l.observacion}</div>}
-                            {!abierto&&<div className="inline-block rounded bg-blue-100 text-blue-800 px-1.5 py-0.5 text-[10px] font-bold mt-1">Sin conteo programado</div>}
-                          </div>
-                          {abierto&&(
-                            <div className="mt-2.5 flex flex-col gap-1.5 pt-2 border-t border-blue-200">
-                              <Input value={pendForm.nombre} onChange={e=>setPendForm({...pendForm,nombre:e.target.value})} placeholder="Nombre del conteo" className="h-8 text-xs"/>
-                              <Select value={pendForm.c1||undefined} onValueChange={v=>setPendForm({...pendForm,c1:v})}>
-                                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Usuario Conteo 1…"/></SelectTrigger>
-                                <SelectContent>{usuariosActivos().map(u=><SelectItem key={u.id} value={u.nombre}>{u.nombre}</SelectItem>)}</SelectContent>
-                              </Select>
-                              {G.inventario.tipo==="2conteos"&&(
-                                <Select value={pendForm.c2||undefined} onValueChange={v=>setPendForm({...pendForm,c2:v})}>
-                                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Usuario Conteo 2 (opcional)…"/></SelectTrigger>
-                                  <SelectContent>{usuariosActivos().map(u=><SelectItem key={u.id} value={u.nombre}>{u.nombre}</SelectItem>)}</SelectContent>
-                                </Select>
-                              )}
-                              <div className="flex gap-1.5">
-                                <Button size="sm" className="h-8 flex-1" onClick={()=>crearConteoRapido(l,pendForm.nombre,pendForm.c1,pendForm.c2)}><Plus size={14}/> Crear conteo</Button>
-                                <Button size="sm" variant="outline" className="h-8 flex-1" onClick={()=>setPendForm(null)}>Cancelar</Button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
-              </div>
-            )}
-          </Card>
-        );
-      })()}
-
-      {/* Alertas — se muestran al hacer clic en la tarjeta "Alertas" */}
+      {/* Alertas + pendientes — se muestran SOLO al hacer clic en la tarjeta "Alertas" */}
       {verAlertas&&(
         <Card className="mb-4 border-amber-300 bg-amber-50 p-5">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-1.5 font-bold text-[13px] text-amber-800"><Bell size={14}/> Alertas pendientes</div>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-1.5 font-bold text-[13px] text-amber-800"><Bell size={14}/> Alertas y pendientes</div>
             <button onClick={()=>setVerAlertas(false)} className="text-amber-700 hover:text-amber-900"><X size={16}/></button>
           </div>
-          {G.alertas.filter(a=>!a.leida).length===0?(
-            <div className="text-xs text-amber-800/70 px-1 py-1">No hay alertas pendientes.</div>
-          ):G.alertas.filter(a=>!a.leida).map((a,i)=>(
-            <div key={i} className="flex justify-between items-center px-2.5 py-1.5 bg-amber-100 rounded-lg mb-1.5 text-xs">
-              <span><b>{a.usuario}</b> terminó {a.ronda} del conteo <b>{a.conteoNombre}</b> · {a.hora}</span>
-              <Button size="sm" className="h-7 px-2.5 bg-amber-600 hover:bg-amber-700" onClick={()=>{G.alertas=G.alertas.map(x=>x===a?{...x,leida:true}:x);rerender();}}>Visto</Button>
+          {nAlertas===0&&totalPend===0?(
+            <div className="flex items-center gap-1.5 text-xs text-green-700 px-3 py-2 bg-green-50 rounded-lg"><CheckCircle size={13}/> Todo al día — sin alertas ni pendientes.</div>
+          ):(
+            <div className="space-y-4">
+              {/* Avisos: capturadores que terminaron una ronda */}
+              {nAlertas>0&&(
+                <div>
+                  <div className="text-[11px] font-extrabold text-amber-800 uppercase tracking-wide mb-2">Avisos ({nAlertas})</div>
+                  {G.alertas.filter(a=>!a.leida).map((a,i)=>(
+                    <div key={i} className="flex justify-between items-center px-2.5 py-1.5 bg-amber-100 rounded-lg mb-1.5 text-xs">
+                      <span><b>{a.usuario}</b> terminó {a.ronda} del conteo <b>{a.conteoNombre}</b> · {a.hora}</span>
+                      <Button size="sm" className="h-7 px-2.5 bg-amber-600 hover:bg-amber-700" onClick={()=>{G.alertas=G.alertas.map(x=>x===a?{...x,leida:true}:x);rerender();}}>Visto</Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {/* Conteos sin terminar */}
+              {conteosPend.length>0&&(
+                <div>
+                  <div className="text-[11px] font-extrabold text-slate-700 uppercase tracking-wide mb-2">Conteos sin terminar ({conteosPend.length})</div>
+                  <div className="flex flex-col gap-2">
+                    {conteosPend.map(({c,razon})=>{
+                      const abierto=pendForm&&pendForm.id===c.id;
+                      const faltaC2=c.tipo==="2conteos"&&!c.usuarioC2;
+                      const faltaC3=c.estado==="diferencia"&&!c.usuarioC3;
+                      const accionable=faltaC2||faltaC3;
+                      return(
+                      <div key={c.id} className="rounded-lg border border-amber-200 bg-white px-3.5 py-2.5 text-xs shadow-sm">
+                        <div onClick={()=>accionable&&setPendForm(abierto?null:{id:c.id,tipo:faltaC2?"c2":"c3",val:""})} className={accionable?"cursor-pointer":"cursor-default"}>
+                          <div className="font-bold text-slate-900 flex justify-between items-center gap-2">
+                            <span>{c.nombre}</span>
+                            {accionable&&<span className="rounded-md bg-primary text-white px-2 py-0.5 text-[10px] font-bold">{abierto?"cerrar":faltaC2?"Asignar C2":"Asignar C3"}</span>}
+                          </div>
+                          <div className="text-muted-foreground text-[11px] mt-0.5 flex items-center gap-1"><MapPin size={11}/> {c.locLabel}</div>
+                          <div className="inline-block rounded bg-amber-100 text-amber-800 px-1.5 py-0.5 text-[10px] font-bold mt-1">{razon}</div>
+                        </div>
+                        {abierto&&(
+                          <div className="mt-2.5 flex gap-1.5 items-center pt-2 border-t border-amber-200">
+                            <Select value={pendForm.val||undefined} onValueChange={v=>setPendForm({...pendForm,val:v})}>
+                              <SelectTrigger className="h-8 text-xs flex-1"><SelectValue placeholder="Selecciona usuario…"/></SelectTrigger>
+                              <SelectContent>{usuariosActivos().map(u=><SelectItem key={u.id} value={u.nombre}>{u.nombre}</SelectItem>)}</SelectContent>
+                            </Select>
+                            <Button size="sm" className="h-8 px-2.5" onClick={()=>pendForm.tipo==="c2"?asignarC2Rapido(c.id,pendForm.val):(pendForm.val&&asignarC3(c.id,pendForm.val),setPendForm(null))}><CheckCircle size={14}/></Button>
+                            <Button size="sm" variant="outline" className="h-8 px-2.5" onClick={()=>setPendForm(null)}><X size={14}/></Button>
+                          </div>
+                        )}
+                      </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              {/* Ubicaciones sin conteo */}
+              {locSinConteo.length>0&&(
+                <div>
+                  <div className="text-[11px] font-extrabold text-slate-700 uppercase tracking-wide mb-2">Ubicaciones sin conteo ({locSinConteo.length})</div>
+                  <div className="flex flex-col gap-2">
+                    {locSinConteo.map(l=>{
+                      const abierto=pendForm&&pendForm.locId===l.id;
+                      return(
+                      <div key={l.id} className="rounded-lg border border-blue-200 bg-white px-3.5 py-2.5 text-xs shadow-sm">
+                        <div onClick={()=>setPendForm(abierto?null:{locId:l.id,tipo:"crear",nombre:`${l.localizacion} ${l.nro}`,c1:"",c2:""})} className="cursor-pointer">
+                          <div className="font-bold text-blue-800 flex justify-between items-center gap-2">
+                            <span>{l.ubicacion} › {l.localizacion} › {l.nro}</span>
+                            <span className="rounded-md bg-primary text-white px-2 py-0.5 text-[10px] font-bold">{abierto?"cerrar":"+ Crear"}</span>
+                          </div>
+                          {l.observacion&&<div className="text-muted-foreground text-[11px] mt-0.5">{l.observacion}</div>}
+                          {!abierto&&<div className="inline-block rounded bg-blue-100 text-blue-800 px-1.5 py-0.5 text-[10px] font-bold mt-1">Sin conteo programado</div>}
+                        </div>
+                        {abierto&&(
+                          <div className="mt-2.5 flex flex-col gap-1.5 pt-2 border-t border-blue-200">
+                            <Input value={pendForm.nombre} onChange={e=>setPendForm({...pendForm,nombre:e.target.value})} placeholder="Nombre del conteo" className="h-8 text-xs"/>
+                            <Select value={pendForm.c1||undefined} onValueChange={v=>setPendForm({...pendForm,c1:v})}>
+                              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Usuario Conteo 1…"/></SelectTrigger>
+                              <SelectContent>{usuariosActivos().map(u=><SelectItem key={u.id} value={u.nombre}>{u.nombre}</SelectItem>)}</SelectContent>
+                            </Select>
+                            {G.inventario.tipo==="2conteos"&&(
+                              <Select value={pendForm.c2||undefined} onValueChange={v=>setPendForm({...pendForm,c2:v})}>
+                                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Usuario Conteo 2 (opcional)…"/></SelectTrigger>
+                                <SelectContent>{usuariosActivos().map(u=><SelectItem key={u.id} value={u.nombre}>{u.nombre}</SelectItem>)}</SelectContent>
+                              </Select>
+                            )}
+                            <div className="flex gap-1.5">
+                              <Button size="sm" className="h-8 flex-1" onClick={()=>crearConteoRapido(l,pendForm.nombre,pendForm.c1,pendForm.c2)}><Plus size={14}/> Crear conteo</Button>
+                              <Button size="sm" variant="outline" className="h-8 flex-1" onClick={()=>setPendForm(null)}>Cancelar</Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
-          ))}
+          )}
         </Card>
       )}
 
@@ -4943,7 +4925,8 @@ function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,showToast}
       // Con buscador activo se muestran todos los coincidentes; sin buscador y en modo "solo diferencias", solo los que difieren.
       if(soloDif&&!q&&difProd(p)===0)return false;
       return true;
-    });
+    // Orden: del más negativo (faltantes) al más positivo (sobrantes).
+    }).sort((a,b)=>difProd(a)-difProd(b));
     return(
       <div style={{minHeight:"100vh",background:pageBg,fontFamily:"system-ui,sans-serif"}}>
         <div style={{background:"#0f172a",color:"white",padding:"0 16px",display:"flex",alignItems:"center",justifyContent:"space-between",height:52,position:"sticky",top:0,zIndex:100}}>
@@ -4959,7 +4942,8 @@ function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,showToast}
           </div>
         </div>
         <div style={{maxWidth:1000,margin:"0 auto",padding:"14px",...nightFilter}}>
-          <div style={{background:"white",borderRadius:10,padding:"12px 14px",marginBottom:10,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+          {/* Cabecera fija: título + buscador + filtro (sticky bajo la barra superior) */}
+          <div style={{background:"white",borderRadius:10,padding:"12px 14px",marginBottom:10,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",position:"sticky",top:52,zIndex:20}}>
             <div style={{fontWeight:800,fontSize:16,color:"#0f172a"}}>Conteo de Ajuste</div>
             <div style={{fontSize:12,color:"#64748b",marginTop:2}}>Corrige la <b>cantidad física real</b> de los productos con novedad. Lo que escribas reemplaza lo contado.</div>
             <input value={busqCap} onChange={e=>setBusqCap(e.target.value)} placeholder="Buscar por nombre, código o código de barras…" style={{...inp,marginTop:10,border:"2px solid #7c3aed"}} autoFocus/>
@@ -4970,39 +4954,41 @@ function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,showToast}
               <span style={{fontSize:12,color:"#64748b"}}><b style={{color:nConDif>0?"#dc2626":"#16a34a"}}>{nConDif}</b> producto{nConDif===1?"":"s"} con diferencia{soloDif&&busqCap?" · buscando en toda la base":""}</span>
             </div>
           </div>
-          <div style={{background:"white",borderRadius:10,overflow:"hidden",boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
-            <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-              <thead><tr style={{background:"#f1f5f9"}}>
-                {["Código","Producto","Contado","Sistema","Diferencia","Cantidad real",""].map(h=><th key={h} style={{padding:"8px 10px",textAlign:"left",fontWeight:700,color:"#374151",fontSize:11,borderBottom:"1px solid #e2e8f0"}}>{h}</th>)}
-              </tr></thead>
-              <tbody>
-                {listaAj.slice(0,300).map((p,i)=>{
-                  const cont=contadoDe(p.id);
-                  const aju=ajusteDe(p.id);
-                  const finalActual=aju!==null?aju:cont;
-                  const dif=finalActual-(p.saldo||0);
-                  return(
-                    <tr key={p.id} style={{background:i%2?"#f8fafc":"white",borderBottom:"1px solid #f1f5f9"}}>
-                      <td style={{padding:"6px 10px",fontFamily:"monospace",color:"#2563eb",fontWeight:700,fontSize:11}}>{p.codigo}</td>
-                      <td style={{padding:"6px 10px",fontWeight:600}}>{p.nombre}</td>
-                      <td style={{padding:"6px 10px",textAlign:"center"}}>{cont}</td>
-                      <td style={{padding:"6px 10px",textAlign:"center",color:"#64748b"}}>{p.saldo||0}</td>
-                      <td style={{padding:"6px 10px",textAlign:"center",fontWeight:700,color:dif===0?"#16a34a":"#dc2626"}}>{dif>0?"+":""}{dif}</td>
-                      <td style={{padding:"6px 10px"}}>
-                        <input type="number" min="0" value={ajusteVals[p.id]??(aju!==null?String(aju):"")} onChange={e=>setAjusteVals(prev=>({...prev,[p.id]:e.target.value}))}
-                          onKeyDown={e=>{if(e.key==="Enter")guardarAjuste(p);}}
-                          placeholder={String(finalActual)} style={{width:90,padding:"6px 8px",border:`2px solid ${aju!==null?"#16a34a":"#7c3aed"}`,borderRadius:6,fontSize:14,fontWeight:700,textAlign:"center",outline:"none"}}/>
-                      </td>
-                      <td style={{padding:"6px 10px"}}>
-                        <button onClick={()=>guardarAjuste(p)} style={{background:aju!==null?"#16a34a":"#7c3aed",color:"white",border:"none",borderRadius:6,padding:"5px 12px",cursor:"pointer",fontWeight:700,fontSize:11}}>{aju!==null?"Actualizar":"Guardar"}</button>
-                      </td>
-                    </tr>
-                  );
-                })}
-                {listaAj.length===0&&<tr><td colSpan={7} style={{padding:16,textAlign:"center",color:"#94a3b8"}}>{soloDif&&!busqCap?"No hay productos con diferencia. Toca «Ver todos» para ajustar cualquier producto.":"Sin resultados"}</td></tr>}
-              </tbody>
-            </table>
-            {listaAj.length>300&&<div style={{padding:"8px 12px",fontSize:11,color:"#94a3b8",background:"#f8fafc"}}>Mostrando 300 de {listaAj.length}. Usa el buscador para encontrar un producto.</div>}
+          {/* Lista en tarjetas: se ve completa en celular, sin scroll lateral */}
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {listaAj.slice(0,300).map((p)=>{
+              const cont=contadoDe(p.id);
+              const aju=ajusteDe(p.id);
+              const finalActual=aju!==null?aju:cont;
+              const dif=finalActual-(p.saldo||0);
+              const difCol=dif<0?"#dc2626":dif>0?"#2563eb":"#16a34a";
+              return(
+                <div key={p.id} style={{background:"white",borderRadius:10,padding:"10px 12px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",borderLeft:`4px solid ${difCol}`}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
+                    <div style={{minWidth:0}}>
+                      <div style={{fontFamily:"monospace",color:"#2563eb",fontWeight:700,fontSize:11}}>{p.codigo}</div>
+                      <div style={{fontWeight:700,fontSize:14,color:"#0f172a",lineHeight:1.2}}>{p.nombre}</div>
+                    </div>
+                    <div style={{textAlign:"right",flexShrink:0}}>
+                      <div style={{fontSize:10,color:"#94a3b8",textTransform:"uppercase",letterSpacing:0.5}}>Diferencia</div>
+                      <div style={{fontWeight:800,fontSize:18,color:difCol}}>{dif>0?"+":""}{dif}</div>
+                    </div>
+                  </div>
+                  <div style={{display:"flex",gap:14,marginTop:6,fontSize:12,color:"#64748b"}}>
+                    <span>Contado: <b style={{color:"#0f172a"}}>{cont}</b></span>
+                    <span>Sistema: <b style={{color:"#0f172a"}}>{p.saldo||0}</b></span>
+                  </div>
+                  <div style={{display:"flex",gap:8,marginTop:8,alignItems:"center"}}>
+                    <input type="number" min="0" value={ajusteVals[p.id]??(aju!==null?String(aju):"")} onChange={e=>setAjusteVals(prev=>({...prev,[p.id]:e.target.value}))}
+                      onKeyDown={e=>{if(e.key==="Enter")guardarAjuste(p);}}
+                      placeholder={`Real (${finalActual})`} style={{flex:1,minWidth:0,padding:"8px 10px",border:`2px solid ${aju!==null?"#16a34a":"#7c3aed"}`,borderRadius:8,fontSize:16,fontWeight:700,textAlign:"center",outline:"none"}}/>
+                    <button onClick={()=>guardarAjuste(p)} style={{background:aju!==null?"#16a34a":"#7c3aed",color:"white",border:"none",borderRadius:8,padding:"9px 16px",cursor:"pointer",fontWeight:700,fontSize:13,flexShrink:0}}>{aju!==null?"Actualizar":"Guardar"}</button>
+                  </div>
+                </div>
+              );
+            })}
+            {listaAj.length===0&&<div style={{background:"white",borderRadius:10,padding:16,textAlign:"center",color:"#94a3b8",fontSize:13,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>{soloDif&&!busqCap?"No hay productos con diferencia. Toca «Ver todos» para ajustar cualquier producto.":"Sin resultados"}</div>}
+            {listaAj.length>300&&<div style={{padding:"8px 12px",fontSize:11,color:"#94a3b8",textAlign:"center"}}>Mostrando 300 de {listaAj.length}. Usa el buscador para encontrar un producto.</div>}
           </div>
         </div>
         {modalSalirJSX}
