@@ -692,7 +692,7 @@ function Login({lf,setLf,err,onLogin,lastSaved,onBack}){
           {/* Logo pequeño móvil */}
           <div style={{textAlign:"center",marginBottom:32}}>
             <div style={{display:"inline-flex",alignItems:"center",gap:10,marginBottom:8}}>
-              <svg width="36" height="36" viewBox="0 0 100 100" fill="none">
+              <svg width="46" height="46" viewBox="0 0 100 100" fill="none">
                 <defs><linearGradient id="grad2" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse"><stop offset="0%" stopColor="#2563eb"/><stop offset="100%" stopColor="#0891b2"/></linearGradient></defs>
                 <rect width="100" height="100" rx="22" fill="url(#grad2)"/>
                 <rect x="20" y="28" width="5" height="44" rx="2" fill="white" opacity="0.45"/>

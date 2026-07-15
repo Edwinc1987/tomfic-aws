@@ -256,7 +256,7 @@ export default function Landing({ onEnter, onRegister, onLead, content, preview 
       <header className={`${preview ? "relative" : "sticky"} top-0 z-50 bg-white/90 backdrop-blur border-b border-slate-100`}>
         <nav className="mx-auto max-w-6xl px-5 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <Logo size={34} />
+            <Logo size={46} />
             <div>
               <div className="font-extrabold text-lg tracking-tight leading-none">TOMFIC</div>
               <div className="text-[9px] uppercase tracking-[0.2em] text-slate-400">Inventarios</div>
@@ -471,7 +471,7 @@ export default function Landing({ onEnter, onRegister, onLead, content, preview 
         <div className="mx-auto max-w-6xl px-5 py-12 grid md:grid-cols-3 gap-8">
           <div>
             <div className="flex items-center gap-2.5 mb-3">
-              <Logo size={30} />
+              <Logo size={38} />
               <span className="font-extrabold text-white text-lg">TOMFIC</span>
             </div>
             <p className="text-sm leading-relaxed max-w-xs">Sistema de toma de inventarios físicos en la nube. Conteos por ubicación, multi-capturador y reportes exportables.</p>
