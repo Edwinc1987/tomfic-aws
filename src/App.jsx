@@ -641,22 +641,24 @@ function Login({lf,setLf,err,onLogin,lastSaved,onBack}){
         {/* Logo grande */}
         <div style={{marginBottom:32,textAlign:"center"}}>
           <svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect width="100" height="100" rx="22" fill="url(#grad1)"/>
             <defs>
               <linearGradient id="grad1" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
-                <stop offset="0%" stopColor="#1e40af"/>
+                <stop offset="0%" stopColor="#2563eb"/>
                 <stop offset="100%" stopColor="#0891b2"/>
               </linearGradient>
             </defs>
-            {/* Caja de inventario */}
-            <rect x="20" y="38" width="60" height="42" rx="4" fill="white" fillOpacity="0.15" stroke="white" strokeWidth="2.5"/>
-            <path d="M20 46 L50 54 L80 46" stroke="white" strokeWidth="2.5" fill="none"/>
-            <path d="M50 54 L50 80" stroke="white" strokeWidth="2.5"/>
-            {/* Tapa */}
-            <path d="M24 38 L50 28 L76 38" stroke="white" strokeWidth="2.5" fill="none" strokeLinejoin="round"/>
-            {/* Check */}
-            <circle cx="72" cy="28" r="14" fill="#10b981"/>
-            <path d="M65 28 L70 33 L79 23" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <rect width="100" height="100" rx="22" fill="url(#grad1)"/>
+            {/* Código de barras */}
+            <rect x="20" y="28" width="5" height="44" rx="2" fill="white" opacity="0.45"/>
+            <rect x="28" y="28" width="8" height="44" rx="2" fill="white" opacity="0.92"/>
+            <rect x="39" y="28" width="4" height="44" rx="2" fill="white" opacity="0.55"/>
+            <rect x="46" y="28" width="6" height="44" rx="2" fill="white"/>
+            <rect x="55" y="28" width="3" height="44" rx="2" fill="white" opacity="0.5"/>
+            <rect x="61" y="28" width="7" height="44" rx="2" fill="white" opacity="0.85"/>
+            <rect x="71" y="28" width="4" height="44" rx="2" fill="white" opacity="0.6"/>
+            <rect x="78" y="28" width="3" height="44" rx="2" fill="white" opacity="0.4"/>
+            {/* Línea de escaneo */}
+            <line x1="15" y1="50" x2="85" y2="50" stroke="#4ade80" strokeWidth="3" strokeDasharray="5,3" strokeLinecap="round" opacity="0.95"/>
           </svg>
         </div>
 
@@ -691,14 +693,16 @@ function Login({lf,setLf,err,onLogin,lastSaved,onBack}){
           <div style={{textAlign:"center",marginBottom:32}}>
             <div style={{display:"inline-flex",alignItems:"center",gap:10,marginBottom:8}}>
               <svg width="36" height="36" viewBox="0 0 100 100" fill="none">
+                <defs><linearGradient id="grad2" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse"><stop offset="0%" stopColor="#2563eb"/><stop offset="100%" stopColor="#0891b2"/></linearGradient></defs>
                 <rect width="100" height="100" rx="22" fill="url(#grad2)"/>
-                <defs><linearGradient id="grad2" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse"><stop offset="0%" stopColor="#1e40af"/><stop offset="100%" stopColor="#0891b2"/></linearGradient></defs>
-                <rect x="20" y="38" width="60" height="42" rx="4" fill="white" fillOpacity="0.15" stroke="white" strokeWidth="2.5"/>
-                <path d="M20 46 L50 54 L80 46" stroke="white" strokeWidth="2.5" fill="none"/>
-                <path d="M50 54 L50 80" stroke="white" strokeWidth="2.5"/>
-                <path d="M24 38 L50 28 L76 38" stroke="white" strokeWidth="2.5" fill="none" strokeLinejoin="round"/>
-                <circle cx="72" cy="28" r="14" fill="#10b981"/>
-                <path d="M65 28 L70 33 L79 23" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <rect x="20" y="28" width="5" height="44" rx="2" fill="white" opacity="0.45"/>
+                <rect x="28" y="28" width="8" height="44" rx="2" fill="white" opacity="0.92"/>
+                <rect x="39" y="28" width="4" height="44" rx="2" fill="white" opacity="0.55"/>
+                <rect x="46" y="28" width="6" height="44" rx="2" fill="white"/>
+                <rect x="55" y="28" width="3" height="44" rx="2" fill="white" opacity="0.5"/>
+                <rect x="61" y="28" width="7" height="44" rx="2" fill="white" opacity="0.85"/>
+                <rect x="71" y="28" width="4" height="44" rx="2" fill="white" opacity="0.6"/>
+                <rect x="78" y="28" width="3" height="44" rx="2" fill="white" opacity="0.4"/>
               </svg>
               <span style={{fontSize:24,fontWeight:900,color:"#0f172a"}}>TOMFIC</span>
             </div>
