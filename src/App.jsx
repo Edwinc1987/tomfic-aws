@@ -3696,6 +3696,12 @@ function VPaginaWeb({G,rerender,showToast}){
   const setFeature=(i,k,v)=>setForm(f=>({...f,features:f.features.map((x,j)=>j===i?{...x,[k]:v}:x)}));
   const setStep=(i,k,v)=>setForm(f=>({...f,steps:f.steps.map((x,j)=>j===i?{...x,[k]:v}:x)}));
   const setPlan=(i,k,v)=>setForm(f=>({...f,planes:f.planes.map((x,j)=>j===i?{...x,[k]:v}:x)}));
+  const setCaso=(i,k,v)=>setForm(f=>({...f,casos:(f.casos||[]).map((x,j)=>j===i?{...x,[k]:v}:x)}));
+  const addCaso=()=>setForm(f=>({...f,casos:[...(f.casos||[]),{nombre:"",empresa:"",historia:""}]}));
+  const delCaso=(i)=>setForm(f=>({...f,casos:(f.casos||[]).filter((_,j)=>j!==i)}));
+  const setArticulo=(i,k,v)=>setForm(f=>({...f,articulos:(f.articulos||[]).map((x,j)=>j===i?{...x,[k]:v}:x)}));
+  const addArticulo=()=>setForm(f=>({...f,articulos:[...(f.articulos||[]),{titulo:"",fecha:"",texto:""}]}));
+  const delArticulo=(i)=>setForm(f=>({...f,articulos:(f.articulos||[]).filter((_,j)=>j!==i)}));
   const setTheme=(k,v)=>setForm(f=>({...f,theme:{...f.theme,[k]:v}}));
   const setPromo=(k,v)=>setForm(f=>({...f,promo:{...f.promo,[k]:v}}));
   const TABS=[["contenido","Contenido",FileText],["colores","Colores",Pencil],["promociones","Promociones",Bell],["preview","Vista previa",Eye]];
@@ -3794,6 +3800,50 @@ function VPaginaWeb({G,rerender,showToast}){
               <div className="space-y-1.5"><Label>Descripción</Label><Ta value={s.desc} onChange={e=>setStep(i,"desc",e.target.value)} rows={2}/></div>
             </div>
           ))}
+        </div>
+      </Card>
+
+      {/* CASOS DE ÉXITO */}
+      <Card className="p-5 mb-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="font-bold text-sm text-slate-900">Casos de éxito ({(form.casos||[]).length})</div>
+          <Button size="sm" variant="outline" onClick={addCaso}><Plus size={14}/> Agregar</Button>
+        </div>
+        <div className="text-xs text-muted-foreground mb-3">Historias de clientes que contrataron el servicio.</div>
+        <div className="space-y-4">
+          {(form.casos||[]).map((cs,i)=>(
+            <div key={i} className="rounded-xl border border-slate-200 p-4 space-y-3">
+              <div className="grid sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5"><Label>Nombre</Label><Input value={cs.nombre} onChange={e=>setCaso(i,"nombre",e.target.value)}/></div>
+                <div className="space-y-1.5"><Label>Empresa</Label><Input value={cs.empresa} onChange={e=>setCaso(i,"empresa",e.target.value)}/></div>
+              </div>
+              <div className="space-y-1.5"><Label>Historia</Label><Ta value={cs.historia} onChange={e=>setCaso(i,"historia",e.target.value)} rows={3}/></div>
+              <Button size="sm" variant="outline" className="text-destructive border-red-200 hover:bg-red-50 hover:text-destructive" onClick={()=>delCaso(i)}><Trash2 size={13}/> Quitar</Button>
+            </div>
+          ))}
+          {(form.casos||[]).length===0&&<div className="text-xs text-muted-foreground">Sin casos. Agrega el primero con el botón de arriba.</div>}
+        </div>
+      </Card>
+
+      {/* ARTÍCULOS */}
+      <Card className="p-5 mb-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="font-bold text-sm text-slate-900">Artículos ({(form.articulos||[]).length})</div>
+          <Button size="sm" variant="outline" onClick={addArticulo}><Plus size={14}/> Agregar</Button>
+        </div>
+        <div className="text-xs text-muted-foreground mb-3">Blog / novedades de la web.</div>
+        <div className="space-y-4">
+          {(form.articulos||[]).map((a,i)=>(
+            <div key={i} className="rounded-xl border border-slate-200 p-4 space-y-3">
+              <div className="grid sm:grid-cols-[1fr_160px] gap-3">
+                <div className="space-y-1.5"><Label>Título</Label><Input value={a.titulo} onChange={e=>setArticulo(i,"titulo",e.target.value)}/></div>
+                <div className="space-y-1.5"><Label>Fecha</Label><Input value={a.fecha} onChange={e=>setArticulo(i,"fecha",e.target.value)} placeholder="Julio 2026"/></div>
+              </div>
+              <div className="space-y-1.5"><Label>Texto</Label><Ta value={a.texto} onChange={e=>setArticulo(i,"texto",e.target.value)} rows={3}/></div>
+              <Button size="sm" variant="outline" className="text-destructive border-red-200 hover:bg-red-50 hover:text-destructive" onClick={()=>delArticulo(i)}><Trash2 size={13}/> Quitar</Button>
+            </div>
+          ))}
+          {(form.articulos||[]).length===0&&<div className="text-xs text-muted-foreground">Sin artículos. Agrega el primero con el botón de arriba.</div>}
         </div>
       </Card>
 

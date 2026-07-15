@@ -43,6 +43,17 @@ export const DEFAULT_LANDING = {
     { title: "Asigna los conteos", desc: "Reparte ubicaciones entre tus capturadores y deja que cuenten desde su celular." },
     { title: "Revisa y exporta", desc: "Valida las diferencias, ajusta lo necesario y exporta los reportes para tu contabilidad." },
   ],
+  // Casos de éxito: historias de clientes que contrataron el servicio (editable desde el panel).
+  casos: [
+    { nombre: "Juan Pérez", empresa: "Tienda Gourmet", historia: "Antes cerrábamos el inventario en dos días con planillas de papel. Con TOMFIC lo hacemos en una tarde y las diferencias salen solas para contabilidad." },
+    { nombre: "María Gómez", empresa: "Distribuidora El Progreso", historia: "Poder tener varios capturadores contando al mismo tiempo, cada uno desde su celular, nos cambió la operación. Ya no se pisan ni se pierden hojas." },
+  ],
+  // Artículos / blog (editable desde el panel).
+  articulos: [
+    { titulo: "Cómo hacer una toma física sin errores", fecha: "Julio 2026", texto: "Planifica por ubicación, asigna capturadores y valida las diferencias antes de cerrar. Te contamos el paso a paso que usan los equipos ordenados." },
+    { titulo: "3 señales de que tu inventario necesita orden", fecha: "Julio 2026", texto: "Diferencias que nadie explica, planillas sueltas y conteos que se repiten. Si te suena, es hora de digitalizar tu toma física." },
+    { titulo: "Códigos de barras: por qué aceleran el conteo", fecha: "Julio 2026", texto: "Escanear en vez de escribir reduce errores y tiempo. Así funciona la captura con escáner o cámara en TOMFIC." },
+  ],
   planes: [
     {
       nombre: "Básico", precio: "$0", periodo: "/mes", destacado: false,
@@ -76,6 +87,8 @@ export function mergeLanding(saved) {
     about: { ...DEFAULT_LANDING.about, ...(s.about || {}) },
     features: Array.isArray(s.features) && s.features.length ? s.features : DEFAULT_LANDING.features,
     steps: Array.isArray(s.steps) && s.steps.length ? s.steps : DEFAULT_LANDING.steps,
+    casos: Array.isArray(s.casos) ? s.casos : DEFAULT_LANDING.casos,
+    articulos: Array.isArray(s.articulos) ? s.articulos : DEFAULT_LANDING.articulos,
     planes: Array.isArray(s.planes) && s.planes.length ? s.planes : DEFAULT_LANDING.planes,
     contacto: { ...DEFAULT_LANDING.contacto, ...(s.contacto || {}) },
   };

@@ -3,6 +3,7 @@ import {
   Package, ClipboardList, Users, BarChart2, Landmark, MapPin, Download,
   ScanLine, CheckCircle, ArrowRight, Cloud, Smartphone, LayoutGrid,
   ShieldCheck, RefreshCw, X, Eye, EyeOff, Building2, Mail, Lock, AlertTriangle, Hash,
+  Quote, Newspaper,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -229,6 +230,8 @@ function HeroMockup() {
 export default function Landing({ onEnter, onRegister, onLead, content, preview }) {
   const c = content || DEFAULT_LANDING;
   const { hero, about, features, steps, planes, contacto } = c;
+  const casos = Array.isArray(c.casos) ? c.casos : DEFAULT_LANDING.casos;
+  const articulos = Array.isArray(c.articulos) ? c.articulos : DEFAULT_LANDING.articulos;
   const theme = { ...DEFAULT_LANDING.theme, ...(c.theme || {}) };
   const promo = { ...DEFAULT_LANDING.promo, ...(c.promo || {}) };
   const P = theme.primario, P2 = theme.secundario; // colores de marca editables
@@ -256,9 +259,12 @@ export default function Landing({ onEnter, onRegister, onLead, content, preview 
               <div className="text-[9px] uppercase tracking-[0.2em] text-slate-400">Inventarios</div>
             </div>
           </div>
-          <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-600">
+          <div className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600">
+            <a href="#quienes" className="hover:text-slate-900 transition-colors">Quiénes somos</a>
             <a href="#caracteristicas" className="hover:text-slate-900 transition-colors">Características</a>
             <a href="#como" className="hover:text-slate-900 transition-colors">Cómo funciona</a>
+            <a href="#casos" className="hover:text-slate-900 transition-colors">Casos de éxito</a>
+            <a href="#articulos" className="hover:text-slate-900 transition-colors">Artículos</a>
             <a href="#precios" className="hover:text-slate-900 transition-colors">Precios</a>
           </div>
           <Button onClick={go} style={{ background: P }}>Ingresar <ArrowRight size={16} /></Button>
@@ -295,7 +301,7 @@ export default function Landing({ onEnter, onRegister, onLead, content, preview 
       </section>
 
       {/* QUIÉNES SOMOS */}
-      <section className="mx-auto max-w-6xl px-5 py-20">
+      <section id="quienes" className="mx-auto max-w-6xl px-5 py-20 scroll-mt-16">
         <div className="grid md:grid-cols-2 gap-12 items-center">
           <div>
             <span className="text-xs font-bold uppercase tracking-widest text-blue-600">{about.label}</span>
@@ -367,8 +373,30 @@ export default function Landing({ onEnter, onRegister, onLead, content, preview 
         </div>
       </section>
 
+      {/* CASOS DE ÉXITO */}
+      <section id="casos" className="bg-slate-50 py-20 scroll-mt-16">
+        <div className="mx-auto max-w-6xl px-5">
+          <SectionHead label="Casos de éxito" title="Historias de quienes ya cuentan con TOMFIC" subtitle="Equipos que dejaron atrás el papel y ordenaron su toma física." />
+          <div className="mt-12 grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {casos.map((cs, i) => (
+              <div key={i} className="rounded-2xl border border-slate-100 bg-white p-7 shadow-sm">
+                <Quote size={28} style={{ color: P }} className="opacity-40 mb-3" />
+                <p className="text-slate-700 leading-relaxed">{cs.historia}</p>
+                <div className="mt-5 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-black shrink-0" style={{ background: P }}>{(cs.nombre || "?").charAt(0)}</div>
+                  <div>
+                    <div className="font-bold text-sm">{cs.nombre}</div>
+                    <div className="text-xs text-slate-500">{cs.empresa}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* PRECIOS */}
-      <section id="precios" className="bg-slate-50 py-20 scroll-mt-16">
+      <section id="precios" className="py-20 scroll-mt-16">
         <div className="mx-auto max-w-6xl px-5">
           <SectionHead label="Precios" title="Planes simples y claros" subtitle="Precios de ejemplo — los ajustamos a tu operación." />
           <div className="mt-12 grid md:grid-cols-3 gap-6 items-start">
@@ -397,8 +425,27 @@ export default function Landing({ onEnter, onRegister, onLead, content, preview 
         </div>
       </section>
 
+      {/* ARTÍCULOS */}
+      <section id="articulos" className="bg-slate-50 py-20 scroll-mt-16">
+        <div className="mx-auto max-w-6xl px-5">
+          <SectionHead label="Artículos" title="Novedades y buenas prácticas" subtitle="Consejos para que tu toma física sea más rápida y sin errores." />
+          <div className="mt-12 grid md:grid-cols-3 gap-6">
+            {articulos.map((a, i) => (
+              <div key={i} className="rounded-2xl border border-slate-100 bg-white p-7 shadow-sm hover:shadow-md transition-shadow">
+                <div className="w-11 h-11 rounded-xl flex items-center justify-center mb-4" style={{ background: P + "1a" }}>
+                  <Newspaper size={22} style={{ color: P }} />
+                </div>
+                {a.fecha && <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">{a.fecha}</div>}
+                <h3 className="mt-1 font-bold text-lg leading-snug">{a.titulo}</h3>
+                <p className="mt-2 text-sm text-slate-600 leading-relaxed">{a.texto}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* CONTACTO / LEADS */}
-      <section id="contacto" className="bg-slate-50 py-20 scroll-mt-16">
+      <section id="contacto" className="py-20 scroll-mt-16">
         <div className="mx-auto max-w-6xl px-5">
           <SectionHead label="Contáctanos" title="¿Quieres una demo?" subtitle="Déjanos tus datos y te escribimos para mostrarte TOMFIC." />
           <div className="mt-10"><LeadForm onLead={onLead} P={P} /></div>
@@ -429,8 +476,10 @@ export default function Landing({ onEnter, onRegister, onLead, content, preview 
           <div>
             <div className="text-white font-semibold text-sm mb-3">Producto</div>
             <ul className="space-y-2 text-sm">
+              <li><a href="#quienes" className="hover:text-white transition-colors">Quiénes somos</a></li>
               <li><a href="#caracteristicas" className="hover:text-white transition-colors">Características</a></li>
-              <li><a href="#como" className="hover:text-white transition-colors">Cómo funciona</a></li>
+              <li><a href="#casos" className="hover:text-white transition-colors">Casos de éxito</a></li>
+              <li><a href="#articulos" className="hover:text-white transition-colors">Artículos</a></li>
               <li><a href="#precios" className="hover:text-white transition-colors">Precios</a></li>
               <li><button onClick={go} className="hover:text-white transition-colors">Ingresar</button></li>
             </ul>
