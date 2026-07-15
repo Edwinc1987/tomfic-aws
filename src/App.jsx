@@ -667,8 +667,7 @@ function Login({lf,setLf,err,onLogin,lastSaved,onBack}){
         </div>
 
         <h1 style={{fontSize:42,fontWeight:900,color:"white",margin:"0 0 8px",letterSpacing:-1,textAlign:"center"}}>TOMFIC</h1>
-        <div style={{fontSize:16,color:"#93c5fd",fontWeight:600,marginBottom:8,textAlign:"center",letterSpacing:0.5}}>Tomas Físicas</div>
-        <div style={{fontSize:13,color:"#64748b",textAlign:"center",maxWidth:280,lineHeight:1.6}}>Control de Inventarios Físicos</div>
+        <div style={{fontSize:15,color:"#93c5fd",fontWeight:600,marginBottom:8,textAlign:"center",letterSpacing:0.5}}>Tomas físicas de inventario</div>
 
         {/* Features */}
         <div style={{marginTop:40,display:"flex",flexDirection:"column",gap:12,width:"100%",maxWidth:300}}>
@@ -713,7 +712,7 @@ function Login({lf,setLf,err,onLogin,lastSaved,onBack}){
                 <rect x="79" y="24" width="3" height="52" rx="1" fill="white"/>
                 <line x1="12" y1="50" x2="88" y2="50" stroke="#f43f5e" strokeWidth="2.5" strokeLinecap="round" opacity="0.9"/>
               </svg>
-              <span style={{fontSize:24,fontWeight:900,color:"#0f172a"}}>TOMFIC</span>
+              <span style={{fontSize:24,fontWeight:900,backgroundImage:"linear-gradient(90deg,#0891b2,#16a34a)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text"}}>TOMFIC</span>
             </div>
             <div style={{fontSize:13,color:"#64748b"}}>Bienvenido · Inicia sesión para continuar</div>
           </div>
