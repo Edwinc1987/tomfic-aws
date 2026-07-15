@@ -156,15 +156,19 @@ function Logo({ size = 40 }) {
         </linearGradient>
       </defs>
       <rect width="100" height="100" rx="22" fill="url(#lgrad)" />
-      <rect x="20" y="28" width="5" height="44" rx="2" fill="white" opacity="0.45" />
-      <rect x="28" y="28" width="8" height="44" rx="2" fill="white" opacity="0.92" />
-      <rect x="39" y="28" width="4" height="44" rx="2" fill="white" opacity="0.55" />
-      <rect x="46" y="28" width="6" height="44" rx="2" fill="white" />
-      <rect x="55" y="28" width="3" height="44" rx="2" fill="white" opacity="0.5" />
-      <rect x="61" y="28" width="7" height="44" rx="2" fill="white" opacity="0.85" />
-      <rect x="71" y="28" width="4" height="44" rx="2" fill="white" opacity="0.6" />
-      <rect x="78" y="28" width="3" height="44" rx="2" fill="white" opacity="0.4" />
-      <line x1="15" y1="50" x2="85" y2="50" stroke="#4ade80" strokeWidth="3" strokeDasharray="5,3" strokeLinecap="round" opacity="0.95" />
+      <rect x="17" y="24" width="4" height="52" rx="1" fill="white" />
+      <rect x="23" y="24" width="2" height="52" rx="1" fill="white" />
+      <rect x="27" y="24" width="6" height="52" rx="1" fill="white" />
+      <rect x="35" y="24" width="3" height="52" rx="1" fill="white" />
+      <rect x="40" y="24" width="2" height="52" rx="1" fill="white" />
+      <rect x="44" y="24" width="5" height="52" rx="1" fill="white" />
+      <rect x="51" y="24" width="2" height="52" rx="1" fill="white" />
+      <rect x="55" y="24" width="4" height="52" rx="1" fill="white" />
+      <rect x="61" y="24" width="6" height="52" rx="1" fill="white" />
+      <rect x="69" y="24" width="2" height="52" rx="1" fill="white" />
+      <rect x="73" y="24" width="4" height="52" rx="1" fill="white" />
+      <rect x="79" y="24" width="3" height="52" rx="1" fill="white" />
+      <line x1="12" y1="50" x2="88" y2="50" stroke="#f43f5e" strokeWidth="2.5" strokeLinecap="round" opacity="0.9" />
     </svg>
   );
 }

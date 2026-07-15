@@ -649,16 +649,20 @@ function Login({lf,setLf,err,onLogin,lastSaved,onBack}){
             </defs>
             <rect width="100" height="100" rx="22" fill="url(#grad1)"/>
             {/* Código de barras */}
-            <rect x="20" y="28" width="5" height="44" rx="2" fill="white" opacity="0.45"/>
-            <rect x="28" y="28" width="8" height="44" rx="2" fill="white" opacity="0.92"/>
-            <rect x="39" y="28" width="4" height="44" rx="2" fill="white" opacity="0.55"/>
-            <rect x="46" y="28" width="6" height="44" rx="2" fill="white"/>
-            <rect x="55" y="28" width="3" height="44" rx="2" fill="white" opacity="0.5"/>
-            <rect x="61" y="28" width="7" height="44" rx="2" fill="white" opacity="0.85"/>
-            <rect x="71" y="28" width="4" height="44" rx="2" fill="white" opacity="0.6"/>
-            <rect x="78" y="28" width="3" height="44" rx="2" fill="white" opacity="0.4"/>
+            <rect x="17" y="24" width="4" height="52" rx="1" fill="white"/>
+            <rect x="23" y="24" width="2" height="52" rx="1" fill="white"/>
+            <rect x="27" y="24" width="6" height="52" rx="1" fill="white"/>
+            <rect x="35" y="24" width="3" height="52" rx="1" fill="white"/>
+            <rect x="40" y="24" width="2" height="52" rx="1" fill="white"/>
+            <rect x="44" y="24" width="5" height="52" rx="1" fill="white"/>
+            <rect x="51" y="24" width="2" height="52" rx="1" fill="white"/>
+            <rect x="55" y="24" width="4" height="52" rx="1" fill="white"/>
+            <rect x="61" y="24" width="6" height="52" rx="1" fill="white"/>
+            <rect x="69" y="24" width="2" height="52" rx="1" fill="white"/>
+            <rect x="73" y="24" width="4" height="52" rx="1" fill="white"/>
+            <rect x="79" y="24" width="3" height="52" rx="1" fill="white"/>
             {/* Línea de escaneo */}
-            <line x1="15" y1="50" x2="85" y2="50" stroke="#4ade80" strokeWidth="3" strokeDasharray="5,3" strokeLinecap="round" opacity="0.95"/>
+            <line x1="12" y1="50" x2="88" y2="50" stroke="#f43f5e" strokeWidth="2.5" strokeLinecap="round" opacity="0.9"/>
           </svg>
         </div>
 
@@ -695,14 +699,19 @@ function Login({lf,setLf,err,onLogin,lastSaved,onBack}){
               <svg width="46" height="46" viewBox="0 0 100 100" fill="none">
                 <defs><linearGradient id="grad2" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse"><stop offset="0%" stopColor="#2563eb"/><stop offset="100%" stopColor="#0891b2"/></linearGradient></defs>
                 <rect width="100" height="100" rx="22" fill="url(#grad2)"/>
-                <rect x="20" y="28" width="5" height="44" rx="2" fill="white" opacity="0.45"/>
-                <rect x="28" y="28" width="8" height="44" rx="2" fill="white" opacity="0.92"/>
-                <rect x="39" y="28" width="4" height="44" rx="2" fill="white" opacity="0.55"/>
-                <rect x="46" y="28" width="6" height="44" rx="2" fill="white"/>
-                <rect x="55" y="28" width="3" height="44" rx="2" fill="white" opacity="0.5"/>
-                <rect x="61" y="28" width="7" height="44" rx="2" fill="white" opacity="0.85"/>
-                <rect x="71" y="28" width="4" height="44" rx="2" fill="white" opacity="0.6"/>
-                <rect x="78" y="28" width="3" height="44" rx="2" fill="white" opacity="0.4"/>
+                <rect x="17" y="24" width="4" height="52" rx="1" fill="white"/>
+                <rect x="23" y="24" width="2" height="52" rx="1" fill="white"/>
+                <rect x="27" y="24" width="6" height="52" rx="1" fill="white"/>
+                <rect x="35" y="24" width="3" height="52" rx="1" fill="white"/>
+                <rect x="40" y="24" width="2" height="52" rx="1" fill="white"/>
+                <rect x="44" y="24" width="5" height="52" rx="1" fill="white"/>
+                <rect x="51" y="24" width="2" height="52" rx="1" fill="white"/>
+                <rect x="55" y="24" width="4" height="52" rx="1" fill="white"/>
+                <rect x="61" y="24" width="6" height="52" rx="1" fill="white"/>
+                <rect x="69" y="24" width="2" height="52" rx="1" fill="white"/>
+                <rect x="73" y="24" width="4" height="52" rx="1" fill="white"/>
+                <rect x="79" y="24" width="3" height="52" rx="1" fill="white"/>
+                <line x1="12" y1="50" x2="88" y2="50" stroke="#f43f5e" strokeWidth="2.5" strokeLinecap="round" opacity="0.9"/>
               </svg>
               <span style={{fontSize:24,fontWeight:900,color:"#0f172a"}}>TOMFIC</span>
             </div>
