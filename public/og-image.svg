@@ -1,0 +1,36 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="630" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0f172a"/><stop offset="100%" stop-color="#1e3a5f"/>
+    </linearGradient>
+    <linearGradient id="ico" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#2563eb"/><stop offset="100%" stop-color="#0891b2"/>
+    </linearGradient>
+    <linearGradient id="wm" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#22d3ee"/><stop offset="100%" stop-color="#4ade80"/>
+    </linearGradient>
+    <g id="logo">
+      <rect width="100" height="100" rx="22" fill="url(#ico)"/>
+      <rect x="17" y="24" width="4" height="52" rx="1" fill="#fff"/>
+      <rect x="23" y="24" width="2" height="52" rx="1" fill="#fff"/>
+      <rect x="27" y="24" width="6" height="52" rx="1" fill="#fff"/>
+      <rect x="35" y="24" width="3" height="52" rx="1" fill="#fff"/>
+      <rect x="40" y="24" width="2" height="52" rx="1" fill="#fff"/>
+      <rect x="44" y="24" width="5" height="52" rx="1" fill="#fff"/>
+      <rect x="51" y="24" width="2" height="52" rx="1" fill="#fff"/>
+      <rect x="55" y="24" width="4" height="52" rx="1" fill="#fff"/>
+      <rect x="61" y="24" width="6" height="52" rx="1" fill="#fff"/>
+      <rect x="69" y="24" width="2" height="52" rx="1" fill="#fff"/>
+      <rect x="73" y="24" width="4" height="52" rx="1" fill="#fff"/>
+      <rect x="79" y="24" width="3" height="52" rx="1" fill="#fff"/>
+      <line x1="12" y1="50" x2="88" y2="50" stroke="#f43f5e" stroke-width="2.5" stroke-linecap="round" opacity="0.9"/>
+    </g>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <use href="#logo" transform="translate(100,130) scale(1.6)"/>
+  <text x="300" y="235" font-family="system-ui,Segoe UI,sans-serif" font-weight="800" font-size="96" letter-spacing="-2" fill="url(#wm)">TOMFIC</text>
+  <text x="303" y="290" font-family="system-ui,Segoe UI,sans-serif" font-weight="500" font-size="30" letter-spacing="2" fill="#94a3b8">Tomas físicas · Control de inventarios</text>
+  <text x="100" y="420" font-family="system-ui,Segoe UI,sans-serif" font-weight="600" font-size="38" fill="#ffffff">Organiza tus conteos por ubicación,</text>
+  <text x="100" y="470" font-family="system-ui,Segoe UI,sans-serif" font-weight="600" font-size="38" fill="#ffffff">cuenta desde el móvil y exporta tus diferencias.</text>
+  <text x="100" y="545" font-family="system-ui,Segoe UI,sans-serif" font-size="28" letter-spacing="1" fill="#22d3ee">www.tomfic.com</text>
+</svg>
