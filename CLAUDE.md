@@ -50,6 +50,12 @@ sincroniza a la nube. Datos scopeados por `tenant_id`.
   degradado cian→verde. Subtítulo "Tomas físicas de inventario".
 - Paleta: azul `#2563eb`, cian `#0891b2`, verde `#16a34a`, rojo escáner `#f43f5e`,
   navy `#0f172a`. Tema CLARO (capturadores trabajan con luz directa).
+- **Morado `#7c3aed` = ajuste/desempate** (rol semántico oficial): badge "AJUSTE",
+  ronda C3 y botones del conteo de ajuste. No es un desvío de marca.
+- Fuente única de la paleta en `src/theme.js` (`import { C } from "@/theme"`).
+  Código nuevo debe usarla; los estilos inline viejos se migran incremental.
+- Accesibilidad: sobre fondo BLANCO, texto gris mínimo `slate-500 #64748b` (AA);
+  `slate-400 #94a3b8` solo sobre fondos OSCUROS (navbar/sidebar).
 
 ## Convenciones de trabajo
 - **Planear/proponer primero; no editar código, commit, push ni deploy hasta que

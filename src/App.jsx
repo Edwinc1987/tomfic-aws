@@ -328,7 +328,12 @@ const doSync=async()=>{
   if(_pending){_pending=false;doSync();}
 };
 const scheduleSync=()=>{_dirty=true;if(_syncTimer)clearTimeout(_syncTimer);_syncTimer=setTimeout(doSync,400);};
-if(typeof window!=="undefined"){window.addEventListener("beforeunload",()=>{try{doSync();}catch(e){}});}
+if(typeof window!=="undefined"){
+  window.addEventListener("beforeunload",()=>{try{doSync();}catch(e){}});
+  // Al recuperar la conexión, empuja automáticamente lo que quedó pendiente
+  // mientras se contaba sin internet (capturas guardadas en localStorage).
+  window.addEventListener("online",()=>{if(_dirty){try{doSync();}catch(e){}}});
+}
 
 // Carga inicial mínima (al montar): solo el contenido público de la web.
 // Los usuarios ya NO se precargan: cada login autentica contra Supabase Auth y
@@ -378,6 +383,26 @@ const loadTenants=async()=>{const t=await SB.listTenants();G.tenants=t.data||[];
 // ─────────────────────────────────────────
 // APP
 // ─────────────────────────────────────────
+// Aviso flotante de "sin conexión". Píldora abajo-centro, no bloquea toques
+// (pointerEvents:none). La app sigue funcionando: las capturas se guardan en
+// localStorage y se sincronizan solas al volver la señal (listener "online").
+function OfflineBanner(){
+  const [online,setOnline]=useState(typeof navigator!=="undefined"?navigator.onLine:true);
+  useEffect(()=>{
+    const on=()=>setOnline(true), off=()=>setOnline(false);
+    window.addEventListener("online",on);
+    window.addEventListener("offline",off);
+    return ()=>{window.removeEventListener("online",on);window.removeEventListener("offline",off);};
+  },[]);
+  if(online)return null;
+  return(
+    <div style={{position:"fixed",bottom:14,left:"50%",transform:"translateX(-50%)",zIndex:9998,background:"#b45309",color:"white",fontSize:12.5,fontWeight:700,padding:"8px 18px",borderRadius:22,boxShadow:"0 4px 16px rgba(0,0,0,0.28)",display:"flex",alignItems:"center",gap:8,pointerEvents:"none",maxWidth:"92vw"}}>
+      <span style={{width:8,height:8,borderRadius:99,background:"#fca5a5",display:"inline-block",flexShrink:0}}/>
+      Sin conexión — sigues contando; se sincroniza al reconectar
+    </div>
+  );
+}
+
 export default function TomficApp(){
   const [usuario,setUsuario]=useState(null);
   const [loginForm,setLoginForm]=useState({tab:"equipo",empresa:"",user:"",email:"",pass:""});
@@ -549,6 +574,7 @@ export default function TomficApp(){
   return(
     <>
       {toast&&<div style={{position:"fixed",top:66,right:10,background:toast.type==="err"?"#dc2626":toast.type==="warn"?"#d97706":"#16a34a",color:"white",padding:"6px 12px",borderRadius:8,zIndex:9999,fontSize:12,fontWeight:700,boxShadow:"0 3px 12px rgba(0,0,0,0.18)",pointerEvents:"none",maxWidth:210,lineHeight:1.25}}>{toast.msg}</div>}
+      <OfflineBanner/>
       {usuario.rol==="dueno"?<PanelDueno {...p}/>:usuario.rol==="capturador"?<ModCapturador {...p}/>:usuario.rol==="gerente"?<ModGerente {...p}/>:<ModAdmin {...p}/>}
     </>
   );
