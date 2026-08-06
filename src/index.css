@@ -53,4 +53,18 @@
   * {
     border-color: hsl(var(--border));
   }
+
+  /* Foco de teclado visible en toda la app (botones/enlaces con estilo inline
+     que no tienen ring propio). Los componentes shadcn ya definen su ring con
+     `focus-visible:outline-none` por clase, que gana en especificidad y por eso
+     no se ven afectados. `:focus-visible` NO se dispara al hacer clic con mouse,
+     solo al navegar con teclado, así que no molesta al capturador. */
+  button:focus-visible,
+  a:focus-visible,
+  [role="button"]:focus-visible,
+  [tabindex]:focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
 }

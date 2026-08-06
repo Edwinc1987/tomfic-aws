@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import * as XLSX from "xlsx";
 import { createClient } from "@supabase/supabase-js";
+import { BrowserMultiFormatReader, DecodeHintType, BarcodeFormat } from "@zxing/library";
 import {
   Package, ClipboardList, Database, MapPin, FolderOpen, Radio, BarChart2,
   Users, Landmark, Bell, RefreshCw, Eye, EyeOff, AlertTriangle, CheckCircle,
@@ -121,22 +122,12 @@ function CamScanner({onDetect,onClose,color="#2563eb"}){
   const [cargando,setCargando]=useState(true);
   useEffect(()=>{
     let activo=true;
-    const cargarZXing=()=>new Promise((resolve,reject)=>{
-      if(window.ZXing)return resolve();
-      const s=document.createElement("script");
-      s.src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js";
-      s.async=true;s.onload=()=>resolve();s.onerror=()=>reject(new Error("No se pudo cargar el lector (revisa tu conexión)."));
-      document.head.appendChild(s);
-    });
     (async()=>{
       try{
-        await cargarZXing();
-        if(!activo)return;
-        const Z=window.ZXing;
         const hints=new Map();
-        hints.set(Z.DecodeHintType.POSSIBLE_FORMATS,[Z.BarcodeFormat.EAN_13,Z.BarcodeFormat.EAN_8,Z.BarcodeFormat.UPC_A,Z.BarcodeFormat.UPC_E,Z.BarcodeFormat.CODE_128,Z.BarcodeFormat.CODE_39,Z.BarcodeFormat.ITF]);
-        hints.set(Z.DecodeHintType.TRY_HARDER,true);
-        const reader=new Z.BrowserMultiFormatReader(hints,300);
+        hints.set(DecodeHintType.POSSIBLE_FORMATS,[BarcodeFormat.EAN_13,BarcodeFormat.EAN_8,BarcodeFormat.UPC_A,BarcodeFormat.UPC_E,BarcodeFormat.CODE_128,BarcodeFormat.CODE_39,BarcodeFormat.ITF]);
+        hints.set(DecodeHintType.TRY_HARDER,true);
+        const reader=new BrowserMultiFormatReader(hints,300);
         readerRef.current=reader;setCargando(false);
         await reader.decodeFromConstraints({video:{facingMode:{ideal:"environment"}}},videoRef.current,(result)=>{
           if(!result||!activo)return;
@@ -631,8 +622,8 @@ function Login({lf,setLf,err,onLogin,lastSaved,onBack}){
   };
   return(
     <div style={{minHeight:"100vh",display:"flex",fontFamily:"system-ui,sans-serif",background:"#0f172a"}}>
-      {/* Panel izquierdo — branding */}
-      <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"3rem",background:"linear-gradient(145deg,#0f172a 0%,#1e3a5f 50%,#0f2d4a 100%)",position:"relative",overflow:"hidden",minWidth:0}}>
+      {/* Panel izquierdo — branding (oculto en móvil) */}
+      <div className="hidden md:flex" style={{flex:1,flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"3rem",background:"linear-gradient(145deg,#0f172a 0%,#1e3a5f 50%,#0f2d4a 100%)",position:"relative",overflow:"hidden",minWidth:0}}>
         {/* Círculos decorativos */}
         <div style={{position:"absolute",top:-80,left:-80,width:320,height:320,borderRadius:"50%",background:"rgba(37,99,235,0.08)",pointerEvents:"none"}}/>
         <div style={{position:"absolute",bottom:-60,right:-60,width:240,height:240,borderRadius:"50%",background:"rgba(16,163,74,0.07)",pointerEvents:"none"}}/>
@@ -689,8 +680,8 @@ function Login({lf,setLf,err,onLogin,lastSaved,onBack}){
         </div>
       </div>
 
-      {/* Panel derecho — formulario */}
-      <div style={{width:420,display:"flex",alignItems:"center",justifyContent:"center",padding:"2rem",background:"#f8fafc",flexShrink:0}}>
+      {/* Panel derecho — formulario (full-width en móvil) */}
+      <div className="w-full md:w-[420px] md:shrink-0" style={{display:"flex",alignItems:"center",justifyContent:"center",padding:"2rem",background:"#f8fafc"}}>
         <div style={{width:"100%",maxWidth:360}}>
           {/* Logo pequeño móvil */}
           <div style={{textAlign:"center",marginBottom:32}}>
