@@ -64,11 +64,17 @@ sincroniza a la nube. Datos scopeados por `tenant_id`.
 - Terminología del usuario: decir **"móvil"** (no "celular").
 - No exponer secretos (keys, contraseñas) en el repo.
 
-## Estado / pendientes (al 2026-07-23)
+## Estado / pendientes (al 2026-08-06)
 - ✅ En producción: multi-tenant, panel del dueño, landing con CMS, conteo de
   ajuste, "sube saldos", eliminar conteos, secciones web (Casos de éxito,
   Artículos), logo nuevo, SEO técnico (meta tags, sitemap, indexado en Google).
-- ⏳ Pendientes: convertir `og-image.svg` a PNG 1200×630; dar URL propia a cada
-  artículo (mejora de SEO); Facturación cliente Parte 2 (Mi plan + subir soporte
-  de pago, requiere SQL + bucket Storage); fotos/evidencia en el capturador.
+- ✅ PWA offline: service worker (vite-plugin-pwa) precachea la app + escáner;
+  abre e instala sin señal. Datos: capturas se guardan en localStorage y se
+  sincronizan solas al reconectar (listener `online` + `OfflineBanner`). Escáner
+  ZXing empaquetado (ya no depende de unpkg). Íconos PWA + `og-image.png` 1200×630.
+- ⏳ Pendientes: dar URL propia a cada artículo (mejora de SEO); Facturación
+  cliente Parte 2 (Mi plan + subir soporte de pago, requiere SQL + bucket
+  Storage); fotos/evidencia en el capturador; dark theme real del capturador
+  (hoy es `filter:invert`); `xlsx` con `import()` dinámico; migrar estilos inline
+  a `src/theme.js`.
 - 🔒 Seguridad: rotar la secret key de Supabase y cambiar la clave del dueño.
