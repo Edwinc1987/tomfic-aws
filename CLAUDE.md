@@ -77,4 +77,21 @@ sincroniza a la nube. Datos scopeados por `tenant_id`.
   Storage); fotos/evidencia en el capturador; dark theme real del capturador
   (hoy es `filter:invert`); `xlsx` con `import()` dinámico; migrar estilos inline
   a `src/theme.js`.
+- 🚧 **Multi-inventario** (prioridad del dueño): permitir VARIOS inventarios
+  activos a la vez (hoy `crear()` bloquea con "Ya hay un inventario activo").
+  Plan: columna `inventario_id` en `conteos` + `limite_inventarios` en `tenants`
+  (SQL que corre el usuario, sin cambiar RLS); selector de inventario en el admin;
+  agrupar por inventario en el capturador; cobro por límite de plan (upsell).
+- 🚧 **Reportes dentro del programa**: la meta es que TODOS los reportes se puedan
+  ver/filtrar/trabajar EN PANTALLA (no solo exportar). El Excel debe ser una salida
+  **opcional**, no la única.
+- 🚧 **Estado por producto en reportes** (split Bueno/Vencido): cuando las unidades
+  de un producto se reparten en varios estados, hoy `capFinal`/`baseCompleta` suman
+  bien la cantidad pero guardan solo `last.estado` (el último) → se pierde el
+  desglose. Regla acordada: el reporte de **DIFERENCIAS omite el estado** (solo
+  cantidad/diferencia); el desglose por estado (BUENO/VENCIDO) va en el **REPORTE
+  DE CAPTURA**.
+- 🎨 Re-skin UI en curso (local, sin desplegar): densidad + pulido con colores
+  intactos (fondo gris, cabecera compacta, tablas claras+zebra, pills/botones más
+  chicos, tarjetas con sombra). Botones de export unificados en azul de marca.
 - 🔒 Seguridad: rotar la secret key de Supabase y cambiar la clave del dueño.

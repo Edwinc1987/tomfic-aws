@@ -945,20 +945,20 @@ function ModAdmin({usuario,setUsuario,logout,G,rerender,recargar,showToast,lastS
       <div style={{display:"flex",height:"calc(100vh - 58px)",overflow:"hidden"}}>
 
         {/* SIDEBAR */}
-        <div style={{width:sideCollapsed?64:210,background:"linear-gradient(180deg,#1e293b 0%,#0f172a 100%)",flexShrink:0,height:"100%",overflowY:"auto",overflowX:"hidden",transition:"width 0.25s ease",boxShadow:"2px 0 12px rgba(0,0,0,0.2)"}}>
-          <div style={{padding:sideCollapsed?"12px 8px":"16px 10px",display:"flex",flexDirection:"column",gap:3}}>
+        <div style={{width:sideCollapsed?60:200,background:"linear-gradient(180deg,#1e293b 0%,#0f172a 100%)",flexShrink:0,height:"100%",overflowY:"auto",overflowX:"hidden",transition:"width 0.25s ease",boxShadow:"2px 0 12px rgba(0,0,0,0.2)"}}>
+          <div style={{padding:sideCollapsed?"10px 8px":"12px 9px",display:"flex",flexDirection:"column",gap:2}}>
             {nav.map(n=>{
               const active=view===n.id;
               return(
                 <button key={n.id} onClick={()=>setView(n.id)}
                   title={sideCollapsed?n.label:""}
-                  style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:sideCollapsed?"10px":"10px 12px",background:active?"linear-gradient(135deg,#2563eb,#1d4ed8)":"transparent",color:active?"white":"#64748b",border:"none",cursor:"pointer",fontSize:13,textAlign:"left",borderRadius:10,transition:"all 0.15s",position:"relative",overflow:"hidden"}}>
+                  style={{width:"100%",display:"flex",alignItems:"center",gap:9,padding:sideCollapsed?"9px":"8px 11px",background:active?"linear-gradient(135deg,#2563eb,#1d4ed8)":"transparent",color:active?"white":"#64748b",border:"none",cursor:"pointer",fontSize:12.5,textAlign:"left",borderRadius:9,transition:"all 0.15s",position:"relative",overflow:"hidden"}}>
                   {active&&<div style={{position:"absolute",left:0,top:"20%",bottom:"20%",width:3,background:"#60a5fa",borderRadius:"0 3px 3px 0"}}/>}
-                  <n.icon size={18} style={{flexShrink:0,opacity:active?1:0.5}}/>
+                  <n.icon size={17} style={{flexShrink:0,opacity:active?1:0.5}}/>
                   {!sideCollapsed&&(
                     <div style={{overflow:"hidden"}}>
-                      <div style={{fontWeight:active?700:500,fontSize:13,whiteSpace:"nowrap",color:active?"white":"#94a3b8"}}>{n.label}</div>
-                      <div style={{fontSize:10,color:active?"#bfdbfe":"#475569",marginTop:1,whiteSpace:"nowrap"}}>{n.desc}</div>
+                      <div style={{fontWeight:active?700:500,fontSize:12.5,whiteSpace:"nowrap",color:active?"white":"#94a3b8"}}>{n.label}</div>
+                      <div style={{fontSize:9.5,color:active?"#bfdbfe":"#475569",marginTop:1,whiteSpace:"nowrap"}}>{n.desc}</div>
                     </div>
                   )}
                   {active&&!sideCollapsed&&<div style={{marginLeft:"auto",width:6,height:6,background:"#60a5fa",borderRadius:99,flexShrink:0}}/>}
@@ -975,7 +975,7 @@ function ModAdmin({usuario,setUsuario,logout,G,rerender,recargar,showToast,lastS
         </div>
 
         {/* CONTENIDO */}
-        <div style={{flex:1,padding:24,overflowY:"auto",minWidth:0}}>
+        <div style={{flex:1,padding:20,overflowY:"auto",minWidth:0,background:"#e8ecf3"}}>
 
           <BannerVencimiento G={G}/>
           {view==="inventario"&&<VInventario {...props}/>}
@@ -1147,7 +1147,7 @@ function VInventario({G,rerender,showToast,usuario}){
             <Button variant="outline" onClick={()=>{setEditForm({nombre:G.inventario.nombre,obs:G.inventario.obs||""});setModalEdit(true);}}><Pencil size={15}/> Editar</Button>
             <Button variant="outline" className="text-destructive border-red-200 hover:bg-red-50 hover:text-destructive" onClick={()=>setModalEliminar(true)}><Trash2 size={15}/> Eliminar</Button>
           </div>
-          {G.inventario.obs&&<div className="mb-3 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-muted-foreground"><FileText size={15} className="shrink-0"/> {G.inventario.obs}</div>}
+          {G.inventario.obs&&<div className="mb-3 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-1.5 text-sm text-muted-foreground"><FileText size={15} className="shrink-0"/> {G.inventario.obs}</div>}
           {G.productos.length===0&&<div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-700"><AlertTriangle size={15} className="shrink-0"/> La base de productos está vacía. Ve a "Base de datos" y carga el Excel del cliente antes de programar conteos.</div>}
           {G.productos.length>0&&<div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm font-semibold text-green-700"><CheckCircle size={15} className="shrink-0"/> Base lista: {G.productos.length} productos disponibles. Puedes programar los conteos.</div>}
         </>
@@ -1232,6 +1232,8 @@ function VUbicaciones({G,rerender,showToast}){
   const [newLocTipo,setNewLocTipo]=useState("");
   const [editLoc,setEditLoc]=useState(null); // localización en edición
   const [editForm,setEditFormLoc]=useState({nro:"",observacion:""});
+  const [verTipos,setVerTipos]=useState(false);     // panel de tipos, oculto por defecto (libera pantalla)
+  const [verRecuperar,setVerRecuperar]=useState(false); // panel de recuperar, oculto por defecto
 
   const siguienteNro=()=>{
     if(!form.ubicacion||!form.localizacion)return "";
@@ -1368,47 +1370,55 @@ function VUbicaciones({G,rerender,showToast}){
         countLabel="localizaciones"
       />
 
-      {(G.conteos.length>0||(G.historial||[]).length>0)&&(
-        <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 flex-wrap">
-          <div className="text-sm text-amber-800"><b>¿Se perdieron ubicaciones?</b> Puedes reconstruirlas desde los conteos de tus inventarios (sin duplicar las que ya tengas).</div>
-          <Button variant="outline" size="sm" className="border-amber-300 text-amber-800 hover:bg-amber-100 shrink-0" onClick={recuperarDesdeConteos}><RefreshCw size={14}/> Recuperar desde conteos</Button>
+      {/* Barra de acciones: tipos y recuperar quedan OCULTOS por defecto para liberar pantalla */}
+      <div className="mb-3 flex gap-2 flex-wrap">
+        <Button variant="outline" size="sm" onClick={()=>setVerTipos(v=>!v)}><Settings size={14}/> Gestionar tipos {verTipos?<ChevronUp size={14}/>:<ChevronDown size={14}/>}</Button>
+        {(G.conteos.length>0||(G.historial||[]).length>0)&&(
+          <Button variant="outline" size="sm" onClick={()=>setVerRecuperar(v=>!v)}><RefreshCw size={14}/> Recuperar ubicaciones {verRecuperar?<ChevronUp size={14}/>:<ChevronDown size={14}/>}</Button>
+        )}
+      </div>
+
+      {verRecuperar&&(
+        <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2 flex-wrap">
+          <div className="flex items-center gap-2 text-[12.5px] text-amber-800"><AlertTriangle size={14} className="shrink-0"/><span><b>¿Se perdieron ubicaciones?</b> Reconstrúyelas desde tus conteos (sin duplicar las que ya tengas).</span></div>
+          <Button variant="outline" size="sm" className="h-7 border-amber-300 text-amber-800 hover:bg-amber-100 shrink-0" onClick={recuperarDesdeConteos}><RefreshCw size={13}/> Recuperar</Button>
         </div>
       )}
 
-      {/* Tipos */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-        <Card>
-          <CardContent className="p-5">
-            <div className="text-sm font-semibold text-slate-700 mb-3">Tipos de Ubicación</div>
-            <div className="flex flex-wrap gap-2 mb-3 min-h-[26px]">
-              {G.ubicacionesTipos.map(u=><UIBadge key={u} variant="secondary" className="bg-blue-100 text-blue-700">{u}</UIBadge>)}
-              {G.ubicacionesTipos.length===0&&<span className="text-xs text-muted-foreground">Sin tipos — agrega uno</span>}
+      {/* Tipos — panel compacto (dropdown) que solo aparece al tocar "Gestionar tipos" */}
+      {verTipos&&(
+        <Card className="mb-3">
+          <CardContent className="grid grid-cols-1 gap-x-6 gap-y-3 p-3.5 md:grid-cols-2">
+            <div>
+              <div className="mb-2 text-[12px] font-semibold text-slate-600">Tipos de Ubicación</div>
+              <div className="mb-2 flex min-h-[22px] flex-wrap gap-1.5">
+                {G.ubicacionesTipos.map(u=><UIBadge key={u} variant="secondary" className="bg-blue-100 text-blue-700">{u}</UIBadge>)}
+                {G.ubicacionesTipos.length===0&&<span className="text-xs text-muted-foreground">Sin tipos</span>}
+              </div>
+              <div className="flex gap-2">
+                <Input value={newUbicTipo} onChange={e=>setNewUbicTipo(e.target.value.toUpperCase())} placeholder="Nuevo tipo…" onKeyDown={e=>e.key==="Enter"&&agregarUbicTipo()} className="h-8"/>
+                <Button size="icon" className="h-8 w-8 shrink-0" onClick={agregarUbicTipo}><Plus size={16}/></Button>
+              </div>
             </div>
-            <div className="flex gap-2">
-              <Input value={newUbicTipo} onChange={e=>setNewUbicTipo(e.target.value.toUpperCase())} placeholder="Ej: BODEGA, SALA DE VENTAS…" onKeyDown={e=>e.key==="Enter"&&agregarUbicTipo()}/>
-              <Button size="icon" className="shrink-0" onClick={agregarUbicTipo}><Plus size={18}/></Button>
+            <div>
+              <div className="mb-2 text-[12px] font-semibold text-slate-600">Tipos de Localización</div>
+              <div className="mb-2 flex min-h-[22px] flex-wrap gap-1.5">
+                {G.localizacionTipos.map(l=><UIBadge key={l} variant="secondary" className="bg-amber-100 text-amber-700">{l}</UIBadge>)}
+                {G.localizacionTipos.length===0&&<span className="text-xs text-muted-foreground">Sin tipos</span>}
+              </div>
+              <div className="flex gap-2">
+                <Input value={newLocTipo} onChange={e=>setNewLocTipo(e.target.value.toUpperCase())} placeholder="Nuevo tipo…" onKeyDown={e=>e.key==="Enter"&&agregarLocTipo()} className="h-8"/>
+                <Button size="icon" className="h-8 w-8 shrink-0" onClick={agregarLocTipo}><Plus size={16}/></Button>
+              </div>
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-5">
-            <div className="text-sm font-semibold text-slate-700 mb-3">Tipos de Localización</div>
-            <div className="flex flex-wrap gap-2 mb-3 min-h-[26px]">
-              {G.localizacionTipos.map(l=><UIBadge key={l} variant="secondary" className="bg-amber-100 text-amber-700">{l}</UIBadge>)}
-              {G.localizacionTipos.length===0&&<span className="text-xs text-muted-foreground">Sin tipos — agrega uno</span>}
-            </div>
-            <div className="flex gap-2">
-              <Input value={newLocTipo} onChange={e=>setNewLocTipo(e.target.value.toUpperCase())} placeholder="Ej: MUEBLE, NEVERA, LINEAL…" onKeyDown={e=>e.key==="Enter"&&agregarLocTipo()}/>
-              <Button size="icon" className="shrink-0" onClick={agregarLocTipo}><Plus size={18}/></Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      )}
 
       {/* Agregar */}
-      <Card className="mb-4">
-        <CardContent className="p-5">
-          <div className="text-sm font-semibold text-slate-700 mb-4">Agregar nueva localización</div>
+      <Card className="mb-3">
+        <CardContent className="p-4">
+          <div className="text-[13px] font-semibold text-slate-700 mb-3">Agregar nueva localización</div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_auto] gap-3 items-end">
             <div className="space-y-1.5">
               <Label>Ubicación</Label>
@@ -1430,7 +1440,7 @@ function VUbicaciones({G,rerender,showToast}){
             </div>
             <div className="space-y-1.5">
               <Label>N° (auto: {siguienteNro()||"—"})</Label>
-              <Input value={form.nro} onChange={e=>setForm(p=>({...p,nro:e.target.value.toUpperCase()}))} placeholder={siguienteNro()||"Auto"}/>
+              <Input value={form.nro} onChange={e=>setForm(p=>({...p,nro:e.target.value.toUpperCase()}))} placeholder={siguienteNro()||"Automático"}/>
             </div>
             <div className="space-y-1.5">
               <Label>Observación</Label>
@@ -1443,8 +1453,8 @@ function VUbicaciones({G,rerender,showToast}){
 
       {/* Tabla */}
       <Card>
-        <CardContent className="p-5">
-          <div className="text-sm font-semibold text-slate-700 mb-4">
+        <CardContent className="p-4">
+          <div className="mb-3 text-[13px] font-semibold text-slate-700">
             Localizaciones registradas ({G.localizaciones.length})
           </div>
           {G.localizaciones.length===0?(
@@ -1456,22 +1466,22 @@ function VUbicaciones({G,rerender,showToast}){
             <div className="overflow-x-auto rounded-lg border">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-slate-900 text-white">
-                    {["Ubicación","Localización","N° Localización","Observación","Acciones"].map(h=><th key={h} className="px-4 py-2.5 text-left font-semibold whitespace-nowrap">{h}</th>)}
+                  <tr className="bg-slate-50 text-slate-600 border-b border-slate-200">
+                    {["Ubicación","Localización","N° Localización","Observación","Acciones"].map(h=><th key={h} className="px-4 py-1.5 text-left font-semibold whitespace-nowrap">{h}</th>)}
                   </tr>
                 </thead>
                 <tbody>
                   {G.localizaciones.map((l)=>(
                     <tr key={l.id} className="border-b last:border-0 hover:bg-slate-50 transition-colors">
-                      <td className="px-4 py-2.5 font-bold text-primary whitespace-nowrap">{l.ubicacion}</td>
-                      <td className="px-4 py-2.5 text-muted-foreground">{l.localizacion}</td>
-                      <td className="px-4 py-2.5 font-semibold">{l.nro}</td>
-                      <td className="px-4 py-2.5 text-muted-foreground">{l.observacion||"—"}</td>
-                      <td className="px-4 py-2.5">
+                      <td className="px-4 py-1.5 font-bold text-primary whitespace-nowrap">{l.ubicacion}</td>
+                      <td className="px-4 py-1.5 text-muted-foreground">{l.localizacion}</td>
+                      <td className="px-4 py-1.5 font-semibold">{l.nro}</td>
+                      <td className="px-4 py-1.5 text-muted-foreground">{l.observacion||"—"}</td>
+                      <td className="px-4 py-1.5">
                         <div className="flex gap-2 items-center">
                           <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100 hover:text-blue-700" onClick={()=>imprimirEtiqueta(l)}><Printer size={11}/> Etiqueta</Button>
                           <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100" onClick={()=>{setEditLoc(l);setEditFormLoc({nro:l.nro,observacion:l.observacion||"",ubicacion:l.ubicacion,localizacion:l.localizacion});}}><Pencil size={11}/> Editar</Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive hover:bg-red-50" onClick={()=>eliminar(l.id)}><X size={15}/></Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive hover:bg-red-50" onClick={()=>eliminar(l.id)} title="Eliminar"><Trash2 size={14}/></Button>
                         </div>
                       </td>
                     </tr>
@@ -1803,9 +1813,9 @@ function VBaseDatos({G,rerender,showToast}){
             <div className="overflow-auto max-h-[500px]">
               <table className="w-full text-xs">
                 <thead className="sticky top-0 z-10">
-                  <tr className="bg-slate-900 text-white">
+                  <tr className="bg-slate-50 text-slate-600 border-b border-slate-200">
                     {["Código","EAN","Nombre","Referencia","Categoría","Proveedor","Saldo","Costo"].map(h=>(
-                      <th key={h} className="px-3 py-2.5 text-left font-semibold whitespace-nowrap">{h}</th>
+                      <th key={h} className="px-3 py-1.5 text-left font-semibold whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -1942,9 +1952,9 @@ function VConteos({G,rerender,showToast,usuario}){
           <div className="overflow-x-auto">
             <table className="w-full text-[13px] min-w-[800px]">
               <thead>
-                <tr className="bg-slate-900 text-white">
+                <tr className="bg-slate-50 text-slate-600 border-b border-slate-200">
                   {["Nombre","Ubicación","Tipo","C1","Estado C1","C2","Estado C2","C3","Estado C3","Estado","Acciones"].map(h=>(
-                    <th key={h} className="px-3 py-2.5 text-left font-semibold whitespace-nowrap text-[11px]">{h}</th>
+                    <th key={h} className="px-3 py-1.5 text-left font-semibold whitespace-nowrap text-[11px]">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -1957,27 +1967,27 @@ function VConteos({G,rerender,showToast,usuario}){
                   const c3Caps=getCapsRonda(c.id,"C3").length;
                   return(
                     <tr key={c.id} className="border-b last:border-0 hover:bg-slate-50 align-middle">
-                      <td className="px-3 py-2.5">
+                      <td className="px-3 py-1.5">
                         <div className="font-bold text-slate-900">{c.nombre}</div>
                         {c.obs&&<div className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1"><FileText size={10}/> {c.obs}</div>}
                       </td>
-                      <td className="px-3 py-2.5 text-xs text-muted-foreground">{c.locLabel}</td>
-                      <td className="px-3 py-2.5"><UIBadge className="border-transparent" style={{background:(c.tipo==="2conteos"?"#2563eb":"#16a34a")+"22",color:c.tipo==="2conteos"?"#2563eb":"#16a34a"}}>{c.tipo==="2conteos"?"2 Conteos":"1 Conteo"}</UIBadge></td>
-                      <td className="px-3 py-2.5 font-semibold text-primary">{c.usuarioC1||"—"}</td>
-                      <td className="px-3 py-2.5">
+                      <td className="px-3 py-1.5 text-xs text-muted-foreground">{c.locLabel}</td>
+                      <td className="px-3 py-1.5"><UIBadge className="border-transparent" style={{background:(c.tipo==="2conteos"?"#2563eb":"#16a34a")+"22",color:c.tipo==="2conteos"?"#2563eb":"#16a34a"}}>{c.tipo==="2conteos"?"2 Conteos":"1 Conteo"}</UIBadge></td>
+                      <td className="px-3 py-1.5 font-semibold text-primary">{c.usuarioC1||"—"}</td>
+                      <td className="px-3 py-1.5">
                         <button onClick={()=>c1Cerrado&&setModalCaps({conteoId:c.id,ronda:"C1",nombre:c.nombre})} title={c1Cerrado?"Ver capturas C1":""} disabled={!c1Cerrado}
                           className={`inline-flex items-center justify-center gap-1 min-w-[40px] h-6 rounded-md px-2 text-[10px] font-extrabold text-white ${c1Cerrado?"bg-green-600 hover:bg-green-700 cursor-pointer":"bg-slate-400 cursor-default"}`}>
                           {c1Cerrado?<>OK <Eye size={11}/></>:"?"}
                         </button>
                       </td>
-                      <td className="px-3 py-2.5 font-semibold text-green-600">
+                      <td className="px-3 py-1.5 font-semibold text-green-600">
                         {c.tipo==="2conteos"?(
                           c.usuarioC2?c.usuarioC2:(
                             <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs text-amber-700 border-amber-300 bg-amber-50 hover:bg-amber-100 hover:text-amber-700" onClick={()=>{setEditC2(c.id);setC2Val("");}}><Plus size={12}/> Asignar</Button>
                           )
                         ):<span className="text-slate-300">N/A</span>}
                       </td>
-                      <td className="px-3 py-2.5">
+                      <td className="px-3 py-1.5">
                         {c.tipo==="2conteos"&&c.usuarioC2?(
                           <button onClick={()=>c2Cerrado&&setModalCaps({conteoId:c.id,ronda:"C2",nombre:c.nombre})} title={c2Cerrado?"Ver capturas C2":""} disabled={!c2Cerrado}
                             className={`inline-flex items-center justify-center gap-1 min-w-[40px] h-6 rounded-md px-2 text-[10px] font-extrabold text-white ${c2Cerrado?"bg-green-600 hover:bg-green-700 cursor-pointer":"bg-slate-400 cursor-default"}`}>
@@ -1985,12 +1995,12 @@ function VConteos({G,rerender,showToast,usuario}){
                           </button>
                         ):<span className="text-slate-300 text-[11px]">—</span>}
                       </td>
-                      <td className="px-3 py-2.5 font-semibold text-purple-600">
+                      <td className="px-3 py-1.5 font-semibold text-purple-600">
                         {c.usuarioC3?c.usuarioC3:(
                           c.estado==="diferencia"?<span className="text-destructive text-[11px] font-bold">Por asignar</span>:<span className="text-slate-300 text-[11px]">—</span>
                         )}
                       </td>
-                      <td className="px-3 py-2.5">
+                      <td className="px-3 py-1.5">
                         {c.usuarioC3?(
                           <button onClick={()=>c3Caps>0&&setModalCaps({conteoId:c.id,ronda:"C3",nombre:c.nombre})} title="Ver capturas C3" disabled={c3Caps===0}
                             className={`inline-flex items-center justify-center gap-1 min-w-[40px] h-6 rounded-md px-2 text-[10px] font-extrabold text-white ${c.estado==="completado"?"bg-green-600 hover:bg-green-700":"bg-purple-600"} ${c3Caps>0?"cursor-pointer":"cursor-default"}`}>
@@ -1998,8 +2008,8 @@ function VConteos({G,rerender,showToast,usuario}){
                           </button>
                         ):<span className="text-slate-300 text-[11px]">—</span>}
                       </td>
-                      <td className="px-3 py-2.5"><UIBadge className="border-transparent" style={{background:estCol+"22",color:estCol}}>{stL[c.estado]||c.estado}</UIBadge></td>
-                      <td className="px-3 py-2.5 whitespace-nowrap">
+                      <td className="px-3 py-1.5"><UIBadge className="border-transparent" style={{background:estCol+"22",color:estCol}}>{stL[c.estado]||c.estado}</UIBadge></td>
+                      <td className="px-3 py-1.5 whitespace-nowrap">
                         <div className="flex gap-1.5 items-center">
                           <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" onClick={()=>{setModalMod(c);setModForm({obs:c.obs||"",usuarioC1:c.usuarioC1,usuarioC2:c.usuarioC2||""});}}>Modificar</Button>
                           {rondasReabribles(c).length>0&&(
@@ -2161,7 +2171,7 @@ function VConteos({G,rerender,showToast,usuario}){
               <Input value={busqCaps} onChange={e=>setBusqCaps(e.target.value)} placeholder="Buscar por código de barras o nombre…" autoFocus className="border-primary"/>
               <div className="max-h-[460px] overflow-y-auto rounded-lg border">
                 <table className="w-full text-xs">
-                  <thead><tr className="bg-slate-900 text-white sticky top-0">{["Código","Nombre","Referencia","Total","Estado","Usuario"].map(h=><th key={h} className="px-2.5 py-2 text-left font-semibold">{h}</th>)}</tr></thead>
+                  <thead><tr className="bg-slate-50 text-slate-600 border-b border-slate-200 sticky top-0">{["Código","Nombre","Referencia","Total","Estado","Usuario"].map(h=><th key={h} className="px-2.5 py-2 text-left font-semibold">{h}</th>)}</tr></thead>
                   <tbody>
                     {lista.length===0?(<tr><td colSpan={6} className="p-5 text-center text-muted-foreground">{q?`No se encontró "${busqCaps}"`:"Sin capturas"}</td></tr>):lista.map((c,i)=>(
                       <tr key={i} className="border-b last:border-0 hover:bg-slate-50">
@@ -2207,7 +2217,7 @@ function VConteos({G,rerender,showToast,usuario}){
               <Input value={busqComp} onChange={e=>setBusqComp(e.target.value)} placeholder="Buscar por código o nombre…" className="border-purple-500"/>
               <div className="max-h-[460px] overflow-y-auto rounded-lg border">
                 <table className="w-full text-xs">
-                  <thead><tr className="bg-slate-900 text-white sticky top-0">{["Código","Nombre","C1","C2","C3","Dif"].map(h=><th key={h} className={`px-2.5 py-2 font-semibold ${h==="Código"||h==="Nombre"?"text-left":"text-center"}`}>{h}</th>)}</tr></thead>
+                  <thead><tr className="bg-slate-50 text-slate-600 border-b border-slate-200 sticky top-0">{["Código","Nombre","C1","C2","C3","Dif"].map(h=><th key={h} className={`px-2.5 py-2 font-semibold ${h==="Código"||h==="Nombre"?"text-left":"text-center"}`}>{h}</th>)}</tr></thead>
                   <tbody>
                     {lista.length===0?(<tr><td colSpan={6} className="p-5 text-center text-muted-foreground">{q?`No se encontró "${busqComp}"`:"Sin capturas"}</td></tr>):lista.map((f,i)=>(
                       <tr key={i} className={`border-b last:border-0 ${f.difiere?"bg-red-50":"hover:bg-slate-50"}`}>
@@ -2416,7 +2426,7 @@ function VProcesos({G,rerender,showToast,usuario}){
           <Input value={busqCaps} onChange={e=>setBusqCaps(e.target.value)} placeholder="Buscar por código de barras o nombre…" autoFocus className="border-primary"/>
           <div className="max-h-[480px] overflow-y-auto rounded-lg border">
             <table className="w-full text-xs">
-              <thead><tr className="bg-slate-900 text-white sticky top-0">
+              <thead><tr className="bg-slate-50 text-slate-600 border-b border-slate-200 sticky top-0">
                 {["Código","Nombre","Referencia","Total","Estado","Obs","Usuario"].map(h=>(
                   <th key={h} className="px-2.5 py-2 text-left font-semibold">{h}</th>
                 ))}
@@ -2491,20 +2501,24 @@ function VProcesos({G,rerender,showToast,usuario}){
         right={<div className="text-right"><div className="text-3xl font-extrabold leading-none">{pct}%</div><div className="text-[11px] text-white/80 mt-1">completado</div></div>}
       />
 
-      {/* Tarjetas KPI */}
-      <div className="grid gap-3 mb-4" style={{gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))"}}>
+      {/* Tarjetas KPI — mismos colores de marca; ícono mini junto al texto (variante C) */}
+      <div className="grid gap-3 mb-4" style={{gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))"}}>
         {[
-          {l:"Productos",v:total,c:"#2563eb",bg:"#eff6ff",icon:Package},
-          {l:"Total conteos",v:totalConteos,c:"#475569",bg:"#f8fafc",icon:ClipboardList},
-          {l:"Completados",v:conteosCompletos,c:"#16a34a",bg:"#f0fdf4",icon:CheckCircle},
-          {l:"En progreso",v:totalConteos-conteosCompletos,c:"#0891b2",bg:"#ecfeff",icon:Settings},
-          {l:"Con diferencia",v:G.conteos.filter(c=>c.tipo==="2conteos"&&getDifsConteo(c).length>0).length,c:"#dc2626",bg:"#fef2f2",icon:AlertTriangle},
-          {l:"Alertas",v:nAlertas+totalPend,c:"#7c3aed",bg:"#faf5ff",icon:Bell,onClick:()=>setVerAlertas(v=>!v)},
+          {l:"Productos",v:total,c:"#2563eb",icon:Package},
+          {l:"Total conteos",v:totalConteos,c:"#475569",icon:ClipboardList},
+          {l:"Completados",v:conteosCompletos,total:totalConteos,c:"#16a34a",icon:CheckCircle},
+          {l:"En progreso",v:totalConteos-conteosCompletos,total:totalConteos,c:"#0891b2",icon:Settings},
+          {l:"Con diferencia",v:G.conteos.filter(c=>c.tipo==="2conteos"&&getDifsConteo(c).length>0).length,c:"#dc2626",icon:AlertTriangle},
+          {l:"Alertas",v:nAlertas+totalPend,c:"#7c3aed",icon:Bell,onClick:()=>setVerAlertas(v=>!v)},
         ].map(s=>(
-          <Card key={s.l} onClick={s.onClick} className={`p-4 ${s.onClick?"cursor-pointer hover:shadow-md transition-shadow":""}`} style={{background:s.bg,borderColor:s.c+"22"}}>
-            <s.icon size={20} style={{color:s.c}} className="mb-1.5"/>
-            <div className="text-[26px] font-black leading-none" style={{color:s.c}}>{s.v}</div>
-            <div className="text-[11px] text-muted-foreground mt-1 font-semibold">{s.l}{s.onClick&&<span className="ml-1 text-slate-400">›</span>}</div>
+          <Card key={s.l} onClick={s.onClick} className={`rounded-2xl border bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${s.onClick?"cursor-pointer":""}`} style={{borderColor:"#eaecf1"}}>
+            <div className="flex items-center gap-1.5 text-[12.5px] font-semibold text-slate-500">
+              <s.icon size={14} style={{color:s.c}}/>
+              {s.l}{s.onClick&&<span className="ml-0.5 text-slate-400">›</span>}
+            </div>
+            <div className="mt-1.5 text-[26px] font-black leading-none tabular-nums" style={{color:s.c}}>
+              {s.v}{s.total!==undefined&&<span className="ml-0.5 text-base font-bold text-slate-400">/{s.total}</span>}
+            </div>
           </Card>
         ))}
       </div>
@@ -2576,7 +2590,7 @@ function VProcesos({G,rerender,showToast,usuario}){
                       const faltaC3=c.estado==="diferencia"&&!c.usuarioC3;
                       const accionable=faltaC2||faltaC3;
                       return(
-                      <div key={c.id} className="rounded-lg border border-amber-200 bg-white px-3.5 py-2.5 text-xs shadow-sm">
+                      <div key={c.id} className="rounded-lg border border-amber-200 bg-white px-3.5 py-1.5 text-xs shadow-sm">
                         <div onClick={()=>accionable&&setPendForm(abierto?null:{id:c.id,tipo:faltaC2?"c2":"c3",val:""})} className={accionable?"cursor-pointer":"cursor-default"}>
                           <div className="font-bold text-slate-900 flex justify-between items-center gap-2">
                             <span>{c.nombre}</span>
@@ -2609,7 +2623,7 @@ function VProcesos({G,rerender,showToast,usuario}){
                     {locSinConteo.map(l=>{
                       const abierto=pendForm&&pendForm.locId===l.id;
                       return(
-                      <div key={l.id} className="rounded-lg border border-blue-200 bg-white px-3.5 py-2.5 text-xs shadow-sm">
+                      <div key={l.id} className="rounded-lg border border-blue-200 bg-white px-3.5 py-1.5 text-xs shadow-sm">
                         <div onClick={()=>setPendForm(abierto?null:{locId:l.id,tipo:"crear",nombre:`${l.localizacion} ${l.nro}`,c1:"",c2:""})} className="cursor-pointer">
                           <div className="font-bold text-blue-800 flex justify-between items-center gap-2">
                             <span>{l.ubicacion} › {l.localizacion} › {l.nro}</span>
@@ -2650,13 +2664,19 @@ function VProcesos({G,rerender,showToast,usuario}){
 
       {/* TABLA CENTRAL */}
       {G.conteos.length===0?(
-        <Card className="text-center p-9 text-muted-foreground">No hay conteos programados.</Card>
+        <Card className="flex flex-col items-center justify-center rounded-xl py-14 text-center" style={{borderColor:"#e7e9ee"}}>
+          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
+            <ClipboardList size={24} className="text-slate-400"/>
+          </div>
+          <div className="text-[15px] font-bold text-slate-700">Aún no hay conteos programados</div>
+          <div className="mt-1 max-w-xs text-[13px] text-slate-500">Crea un conteo para empezar a registrar las rondas de este inventario.</div>
+        </Card>
       ):(
         <Card className="overflow-hidden mb-4">
           <div className="overflow-x-auto">
             <table className="w-full text-[11px] min-w-[900px]">
               <thead>
-                <tr className="bg-slate-900 text-white">
+                <tr className="bg-slate-50 text-slate-600 border-b border-slate-200">
                   {["Ubicación","Localización","N° Local.","Observación","Usuarios","Conteo 1","Obs C1","Conteo 2","Obs C2","Diferencia","Obs Dif","C3","Validador","Acciones"].map(h=>(
                     <th key={h} className="px-2 py-1.5 text-left font-semibold whitespace-nowrap text-[10px]">{h}</th>
                   ))}
@@ -2696,14 +2716,14 @@ function VProcesos({G,rerender,showToast,usuario}){
                     <span style={{color:"white",fontWeight:800,fontSize:16}}>?</span>;
 
                   return(
-                    <tr key={c.id} className="border-b-2 border-slate-200 align-top hover:bg-slate-50">
-                      <td className="px-2.5 py-2.5 font-bold text-blue-800">{c.ubicacion}</td>
-                      <td className="px-2.5 py-2.5 text-muted-foreground">{c.localizacion}</td>
-                      <td className="px-2.5 py-2.5 font-semibold">{c.nro}</td>
-                      <td className="px-2.5 py-2.5 text-muted-foreground text-[11px]">{c.obs||"—"}</td>
+                    <tr key={c.id} className="border-b border-slate-100 align-top hover:bg-slate-50">
+                      <td className="px-2.5 py-1.5 font-bold text-blue-800">{c.ubicacion}</td>
+                      <td className="px-2.5 py-1.5 text-muted-foreground">{c.localizacion}</td>
+                      <td className="px-2.5 py-1.5 font-semibold">{c.nro}</td>
+                      <td className="px-2.5 py-1.5 text-muted-foreground text-[11px]">{c.obs||"—"}</td>
 
                       {/* Usuarios */}
-                      <td className="px-2.5 py-2.5 min-w-[120px]">
+                      <td className="px-2.5 py-1.5 min-w-[120px]">
                         <div className="flex flex-col gap-1 items-start">
                           {todosUsuarios.map(u=>(
                             <div key={u} className="flex items-center gap-1">
@@ -2718,7 +2738,7 @@ function VProcesos({G,rerender,showToast,usuario}){
                       </td>
 
                       {/* Conteo 1 — clickeable */}
-                      <td className="px-2.5 py-2.5 min-w-[120px]">
+                      <td className="px-2.5 py-1.5 min-w-[120px]">
                         <div className="text-[11px] font-semibold text-primary mb-1">{c.usuarioC1||"—"}</div>
                         <div className="bg-slate-200 rounded-full h-[5px] mb-1"><div className="bg-primary rounded-full h-full" style={{width:p1+"%"}}/></div>
                         <div className="text-[10px] text-muted-foreground mb-1">{new Set(c1s.map(x=>x.productoId)).size}/{total} · {p1}%</div>
@@ -2727,7 +2747,7 @@ function VProcesos({G,rerender,showToast,usuario}){
                           {c1Cerrado?<>OK <Eye size={11}/></>:"?"}
                         </button>
                       </td>
-                      <td className="px-2.5 py-2.5 text-[11px]">
+                      <td className="px-2.5 py-1.5 text-[11px]">
                         {(()=>{
                           const undTotal=c1s.reduce((a,x)=>a+(Number(x.cantidad)||0),0);
                           return undTotal>0?<div className="whitespace-nowrap font-bold text-primary">{undTotal} und</div>:<span className="text-slate-300">—</span>;
@@ -2735,7 +2755,7 @@ function VProcesos({G,rerender,showToast,usuario}){
                       </td>
 
                       {/* Conteo 2 — clickeable */}
-                      <td className="px-2.5 py-2.5 min-w-[120px]">
+                      <td className="px-2.5 py-1.5 min-w-[120px]">
                         {c.tipo==="2conteos"?(
                           c.usuarioC2?(
                             <>
@@ -2752,7 +2772,7 @@ function VProcesos({G,rerender,showToast,usuario}){
                           )
                         ):<span className="text-slate-300 text-[11px]">N/A</span>}
                       </td>
-                      <td className="px-2.5 py-2.5 text-[11px]">
+                      <td className="px-2.5 py-1.5 text-[11px]">
                         {(()=>{
                           const undTotal=c2s.reduce((a,x)=>a+(Number(x.cantidad)||0),0);
                           return undTotal>0?<div className="whitespace-nowrap font-bold text-green-600">{undTotal} und</div>:<span className="text-slate-300">—</span>;
@@ -2760,7 +2780,7 @@ function VProcesos({G,rerender,showToast,usuario}){
                       </td>
 
                       {/* Diferencia — solo si ambos cerrados */}
-                      <td className="px-2.5 py-2.5 min-w-[70px] text-center">
+                      <td className="px-2.5 py-1.5 min-w-[70px] text-center">
                         {c.tipo==="2conteos"&&c1Cerrado&&c2Cerrado?(
                           difs.length>0?(
                             <div>
@@ -2774,7 +2794,7 @@ function VProcesos({G,rerender,showToast,usuario}){
                       </td>
 
                       {/* Obs Dif — PDF solo si hay diferencia */}
-                      <td className="px-2.5 py-2.5 text-[11px] text-muted-foreground">
+                      <td className="px-2.5 py-1.5 text-[11px] text-muted-foreground">
                         {difs.length>0&&c1Cerrado&&c2Cerrado&&(
                           <button onClick={()=>expPDF(difs,c.nombre)}
                             className="inline-flex items-center gap-1 rounded-md bg-red-100 text-destructive px-2.5 py-1 text-[11px] font-bold hover:bg-red-200">
@@ -2784,7 +2804,7 @@ function VProcesos({G,rerender,showToast,usuario}){
                       </td>
 
                       {/* C3 — solo si hay diferencia */}
-                      <td className="px-2.5 py-2.5 min-w-[90px]">
+                      <td className="px-2.5 py-1.5 min-w-[90px]">
                         {c.estado==="diferencia"&&!c.usuarioC3?(
                           <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs text-purple-700 border-purple-300 bg-purple-50 hover:bg-purple-100 hover:text-purple-700" onClick={()=>setModalAsignar({conteoId:c.id,tipo:"C3"})}><Plus size={12}/> Asignar C3</Button>
                         ):c.usuarioC3?(
@@ -2800,7 +2820,7 @@ function VProcesos({G,rerender,showToast,usuario}){
                       </td>
 
                       {/* Validador */}
-                      <td className="px-2.5 py-2.5 text-center min-w-[80px]">
+                      <td className="px-2.5 py-1.5 text-center min-w-[80px]">
                         <div onClick={()=>puedeAsignarC3&&setModalAsignar({conteoId:c.id,tipo:"C3"})}
                           className="w-11 h-11 rounded-full flex items-center justify-center mx-auto shadow-md" style={{background:validColor,cursor:puedeAsignarC3?"pointer":"default",opacity:c3Terminado?0.7:1}}>
                           {validContent}
@@ -2811,7 +2831,7 @@ function VProcesos({G,rerender,showToast,usuario}){
                       </td>
 
                       {/* Acciones */}
-                      <td className="px-2.5 py-2.5 whitespace-nowrap">
+                      <td className="px-2.5 py-1.5 whitespace-nowrap">
                         <div className="flex gap-1.5 items-center">
                           <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" title="Imprimir documento de esta ubicación" onClick={()=>imprimirConteo(c)}><Printer size={12}/> Imprimir</Button>
                           {["cerradoC1","cerradoC2","completado","diferencia","enC3"].includes(c.estado)&&(
@@ -2904,32 +2924,37 @@ function VReportes({G,showToast,usuario}){
   const contadoIds=new Set(caps.map(c=>c.productoId));
   const sinConteo=G.productos.filter(p=>!contadoIds.has(p.id));
 
-  const capFinal=G.productos.map(p=>{
-    const misC=caps.filter(c=>c.productoId===p.id);
-    if(!misC.length)return null;
-    // Agrupar por ronda sumando
-    const sumC1=misC.filter(c=>c.ronda==="C1").reduce((s,c)=>s+c.cantidad,0);
-    const sumC2=misC.filter(c=>c.ronda==="C2").reduce((s,c)=>s+c.cantidad,0);
-    const sumC3=misC.filter(c=>c.ronda==="C3").reduce((s,c)=>s+c.cantidad,0);
-    const final=finalAjustado(misC,sumC3||sumC2||sumC1);
+  // REPORTE DE CAPTURA — una fila por (producto + ESTADO). Si un producto se
+  // capturó en varios estados (ej. BUENO y VENCIDO), sale un renglón por cada
+  // estado con sus C1/C2/C3 sumados. Solo rondas de conteo (no el ajuste).
+  const capFinal=G.productos.flatMap(p=>{
+    const misC=caps.filter(c=>c.productoId===p.id&&["C1","C2","C3"].includes(c.ronda));
+    if(!misC.length)return [];
     const last=misC[misC.length-1];
-    // Find conteo info
-    const conteoId=last.conteoId;
-    const conteo=G.conteos.find(c=>c.id===conteoId);
-    return{
-      ...p,
-      ubicacion:conteo?.ubicacion||"",
-      localizacion:conteo?.localizacion||"",
-      nro:conteo?.nro||"",
-      c1:sumC1||"",c2:sumC2||"",c3:sumC3||"",
-      cantFinal:final,
-      diferencia:final-p.saldo,
-      valDif:(final-p.saldo)*p.costo,
-      estado:last.estado||"",
-      obs:last.obs||"",
-      usuario:last.usuario,
-    };
-  }).filter(Boolean);
+    const conteo=G.conteos.find(c=>c.id===last.conteoId);
+    const estados=[...new Set(misC.map(c=>(c.estado||"BUENO")))];
+    return estados.map(est=>{
+      const ce=misC.filter(c=>(c.estado||"BUENO")===est);
+      const sumC1=ce.filter(c=>c.ronda==="C1").reduce((s,c)=>s+c.cantidad,0);
+      const sumC2=ce.filter(c=>c.ronda==="C2").reduce((s,c)=>s+c.cantidad,0);
+      const sumC3=ce.filter(c=>c.ronda==="C3").reduce((s,c)=>s+c.cantidad,0);
+      const final=sumC3||sumC2||sumC1;
+      const le=ce[ce.length-1];
+      return{
+        ...p,
+        ubicacion:conteo?.ubicacion||"",
+        localizacion:conteo?.localizacion||"",
+        nro:conteo?.nro||"",
+        c1:sumC1||"",c2:sumC2||"",c3:sumC3||"",
+        cantFinal:final,
+        diferencia:final-(p.saldo||0),
+        valDif:(final-(p.saldo||0))*(p.costo||0),
+        estado:est,
+        obs:le?.obs||"",
+        usuario:le?.usuario||"",
+      };
+    });
+  });
 
   // BASE COMPLETA: recorre TODOS los productos de la base de datos.
   // Los no contados cuentan como físico = 0 (faltante total).
@@ -2991,7 +3016,7 @@ function VReportes({G,showToast,usuario}){
       <div className="grid gap-4" style={{gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))"}}>
 
         {/* Diferencias de Conteos — expandible */}
-        <Card className="p-5" style={{borderColor:"#fecaca"}}>
+        <Card className="p-4">
           <div className="flex items-center gap-2.5 mb-3">
             <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{background:"#fef2f2"}}><RefreshCw size={20} style={{color:"#dc2626"}}/></div>
             <div>
@@ -2999,14 +3024,14 @@ function VReportes({G,showToast,usuario}){
               <div className="text-[11px] text-muted-foreground">C1 ≠ C2 — por conteo</div>
             </div>
           </div>
-          <div className="rounded-lg py-2.5 text-[28px] font-black text-center mb-3" style={{background:"#fef2f2",color:"#dc2626"}}>{totalDifs}</div>
+          <div className="mb-2.5 text-[32px] font-black leading-none tabular-nums" style={{color:"#dc2626"}}>{totalDifs}</div>
           <Button className="w-full" style={{background:"#dc2626"}} onClick={()=>setVerDifs(v=>!v)}>{verDifs?"Ocultar diferencias":"Ver diferencias"}</Button>
           {verDifs&&(
             <div className="mt-3">
               {conteosDifs.length===0?(
-                <div className="flex items-center gap-1.5 rounded-lg bg-green-50 px-3.5 py-2.5 text-[13px] font-semibold text-green-700"><CheckCircle size={14}/> Ningún conteo presentó diferencias</div>
+                <div className="flex items-center gap-1.5 rounded-lg bg-green-50 px-3.5 py-1.5 text-[13px] font-semibold text-green-700"><CheckCircle size={14}/> Ningún conteo presentó diferencias</div>
               ):conteosDifs.map(({conteo:c,difs},i)=>(
-                <div key={i} className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 mb-2.5">
+                <div key={i} className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-1.5 mb-2.5">
                   <div className="flex justify-between items-center mb-2 gap-2">
                     <div>
                       <div className="font-bold text-[13px] text-destructive">{c.nombre}</div>
@@ -3045,44 +3070,44 @@ function VReportes({G,showToast,usuario}){
         </Card>
 
         {/* Sin Conteo */}
-        <Card className="p-5" style={{borderColor:"#fed7aa"}}>
+        <Card className="p-4">
           <div className="flex items-center gap-2.5 mb-3">
             <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{background:"#fffbeb"}}><Circle size={20} style={{color:"#d97706"}}/></div>
             <div><div className="font-bold text-sm text-slate-900">Sin Conteo</div><div className="text-[11px] text-muted-foreground">Productos no inventariados</div></div>
           </div>
-          <div className="rounded-lg py-2.5 text-[28px] font-black text-center mb-3" style={{background:"#fffbeb",color:"#d97706"}}>{sinConteo.length}</div>
-          <Button className="w-full" style={{background:"#d97706"}} onClick={()=>expXLSX(sinConteo.map(p=>[p.codigo,p.nombre,p.referencia,p.categoria,p.subcategoria,p.subgrupo,p.saldo,p.costo,p.nit,p.proveedor]),["CODIGO","NOMBRE","REFERENCIA","CATEGORIA","SUBCATEGORIA","SUBGRUPO","SALDO","COSTO","NIT","PROVEEDOR"],"sin_conteo.xlsx","REPORTE SIN CONTEOS")}><Download size={15}/> Exportar Excel</Button>
+          <div className="mb-2.5 text-[32px] font-black leading-none tabular-nums" style={{color:"#d97706"}}>{sinConteo.length}</div>
+          <Button className="w-full" onClick={()=>expXLSX(sinConteo.map(p=>[p.codigo,p.nombre,p.referencia,p.categoria,p.subcategoria,p.subgrupo,p.saldo,p.costo,p.nit,p.proveedor]),["CODIGO","NOMBRE","REFERENCIA","CATEGORIA","SUBCATEGORIA","SUBGRUPO","SALDO","COSTO","NIT","PROVEEDOR"],"sin_conteo.xlsx","REPORTE SIN CONTEOS")}><Download size={15}/> Exportar Excel</Button>
         </Card>
 
         {/* Diferencia Inventario */}
-        <Card className="p-5" style={{borderColor:"#bfdbfe"}}>
+        <Card className="p-4">
           <div className="flex items-center gap-2.5 mb-3">
             <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{background:"#eff6ff"}}><Scale size={20} style={{color:"#2563eb"}}/></div>
             <div><div className="font-bold text-sm text-slate-900">Diferencia Inventario</div><div className="text-[11px] text-muted-foreground">Físico vs Sistema · base completa</div></div>
           </div>
-          <div className="rounded-lg py-2.5 text-[28px] font-black text-center mb-3" style={{background:"#eff6ff",color:"#2563eb"}}>{baseCompleta.length}</div>
-          <Button className="w-full" onClick={()=>expXLSX(baseCompleta.map(c=>[c.codigo,c.nombre,c.referencia,c.costo||0,c.saldo,c.cantFinal,c.diferencia,Math.round(c.valDif),c.estado||"",c.categoria||"",c.subcategoria||"",c.subgrupo||"",c.nit||"",c.proveedor||""]),["CODIGO","NOMBRE","REFERENCIA","COSTO","SALDO","CANTIDAD","DIFERENCIA","VALOR_DIF","ESTADO","CATEGORIA","SUBCATEGORIA","SUBGRUPO","NIT","PROVEEDOR"],"diferencia_inventario.xlsx","DIFERENCIA INVENTARIOS")} disabled={baseCompleta.length===0}><Download size={15}/> Exportar Excel</Button>
+          <div className="mb-2.5 text-[32px] font-black leading-none tabular-nums" style={{color:"#2563eb"}}>{baseCompleta.length}</div>
+          <Button className="w-full" onClick={()=>expXLSX(baseCompleta.map(c=>[c.codigo,c.nombre,c.referencia,c.costo||0,c.saldo,c.cantFinal,c.diferencia,Math.round(c.valDif),c.categoria||"",c.subcategoria||"",c.subgrupo||"",c.nit||"",c.proveedor||""]),["CODIGO","NOMBRE","REFERENCIA","COSTO","SALDO","CANTIDAD","DIFERENCIA","VALOR_DIF","CATEGORIA","SUBCATEGORIA","SUBGRUPO","NIT","PROVEEDOR"],"diferencia_inventario.xlsx","DIFERENCIA INVENTARIOS")} disabled={baseCompleta.length===0}><Download size={15}/> Exportar Excel</Button>
         </Card>
 
         {/* Ajuste */}
-        <Card className="p-5" style={{borderColor:"#bbf7d0"}}>
+        <Card className="p-4">
           <div className="flex items-center gap-2.5 mb-3">
             <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{background:"#f0fdf4"}}><Wrench size={20} style={{color:"#16a34a"}}/></div>
             <div><div className="font-bold text-sm text-slate-900">Ajuste de Inventario</div><div className="text-[11px] text-muted-foreground">Código · Cantidad · Fecha · base completa</div></div>
           </div>
-          <div className="rounded-lg py-2.5 text-[28px] font-black text-center mb-3" style={{background:"#f0fdf4",color:"#16a34a"}}>{baseCompleta.length}</div>
-          <Button className="w-full" style={{background:"#16a34a"}} onClick={()=>expXLSX(baseCompleta.map(c=>[c.codigo,c.cantFinal,c.saldo,c.diferencia,TODAY(),c.ubicacion||"BODEGA"]),["CODIGO","CANTIDAD","SALDO","DIFERENCIA","FECH_CORTE","BODEGA"],"ajuste_inventario.xlsx","AJUSTE INVENTARIO")} disabled={baseCompleta.length===0}><Download size={15}/> Exportar Excel</Button>
+          <div className="mb-2.5 text-[32px] font-black leading-none tabular-nums" style={{color:"#16a34a"}}>{baseCompleta.length}</div>
+          <Button className="w-full" onClick={()=>expXLSX(baseCompleta.map(c=>[c.codigo,c.cantFinal,c.saldo,c.diferencia,TODAY(),c.ubicacion||"BODEGA"]),["CODIGO","CANTIDAD","SALDO","DIFERENCIA","FECH_CORTE","BODEGA"],"ajuste_inventario.xlsx","AJUSTE INVENTARIO")} disabled={baseCompleta.length===0}><Download size={15}/> Exportar Excel</Button>
           <Button className="w-full mt-2" variant="outline" onClick={expSiigo} disabled={baseCompleta.length===0}><Download size={15}/> Formato Siigo</Button>
         </Card>
 
         {/* Reporte de Captura */}
-        <Card className="p-5" style={{borderColor:"#ddd6fe"}}>
+        <Card className="p-4">
           <div className="flex items-center gap-2.5 mb-3">
             <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{background:"#faf5ff"}}><FileText size={20} style={{color:"#7c3aed"}}/></div>
-            <div><div className="font-bold text-sm text-slate-900">Reporte de Captura</div><div className="text-[11px] text-muted-foreground">C1·C2·C3 en columnas · con ubicación</div></div>
+            <div><div className="font-bold text-sm text-slate-900">Reporte de Captura</div><div className="text-[11px] text-muted-foreground">C1·C2·C3 · una fila por estado</div></div>
           </div>
-          <div className="rounded-lg py-2.5 text-[28px] font-black text-center mb-3" style={{background:"#faf5ff",color:"#7c3aed"}}>{capFinal.length}</div>
-          <Button className="w-full" style={{background:"#7c3aed"}} onClick={()=>expXLSX(
+          <div className="mb-2.5 text-[32px] font-black leading-none tabular-nums" style={{color:"#7c3aed"}}>{capFinal.length}</div>
+          <Button className="w-full" onClick={()=>expXLSX(
             capFinal.map(c=>[c.ean,c.codigo,c.nombre,c.referencia,c.categoria,c.subcategoria,c.subgrupo,c.ubicacion,c.localizacion,c.nro,c.c1||"",c.c2||"",c.c3||"",c.cantFinal,c.costo,c.fecha||TODAY(),c.estado,c.obs||"",c.usuario,c.nit,c.proveedor]),
             ["EAN","CODIGO","NOMBRE","REFERENCIA","CATEGORIA","SUBCATEGORIA","SUBGRUPO","UBICACION","LOCALIZACION","N_LOCAL","CONTEO_1","CONTEO_2","CONTEO_3","CANTIDAD_FINAL","COSTO","FECHA","ESTADO","OBS","USUARIO","NIT","PROVEEDOR"],
             "captura_inventario.xlsx","CAPTURA INVENTARIO"
@@ -3103,6 +3128,12 @@ function VUsuarios({usuario,G,rerender,showToast}){
   const [previewUsuarios,setPreviewUsuarios]=useState(null);
   const [credCreada,setCredCreada]=useState(null); // credencial recién creada/reseteada para compartir
   const [busy,setBusy]=useState(false);
+  const [busqUser,setBusqUser]=useState(""); // filtro de la tabla de usuarios
+  const usuariosFiltrados=G.usuarios.filter(u=>{
+    const q=busqUser.trim().toLowerCase();
+    if(!q)return true;
+    return (u.nombre||"").toLowerCase().includes(q)||(u.correo||"").toLowerCase().includes(q)||(u.telefono||"").includes(q)||(u.rol||"").toLowerCase().includes(q);
+  });
 
   // Generar contraseña automática: primeras 3 letras del nombre + últimos 4 del teléfono
   const generarPass=(nombre,telefono)=>{
@@ -3237,38 +3268,45 @@ function VUsuarios({usuario,G,rerender,showToast}){
         count={G.usuarios.length}
         countLabel="usuarios"
       />
-      <div className="flex gap-2.5 mb-4 flex-wrap">
+      <div className="flex gap-2.5 mb-3 flex-wrap items-center">
         <Button onClick={()=>{setForm({nombre:"",pass:"",rol:"capturador",correo:"",telefono:"",editId:null});setModal(true);}}><UserPlus size={16}/> Crear Usuario</Button>
         <Button variant="outline" onClick={()=>setModalImport(true)}><Upload size={15}/> Importar desde Excel</Button>
+        <div className="relative ml-auto w-full sm:w-64">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/>
+          <Input value={busqUser} onChange={e=>setBusqUser(e.target.value)} placeholder="Buscar usuario, correo, rol…" className="pl-9"/>
+        </div>
       </div>
 
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead><tr className="bg-slate-900 text-white">
+            <thead><tr className="bg-slate-50 text-slate-600 border-b border-slate-200">
               {["Usuario","Contraseña","Contacto","Rol","Creado","Estado","Acciones"].map(h=>(
-                <th key={h} className="px-3.5 py-2.5 text-left font-semibold whitespace-nowrap">{h}</th>
+                <th key={h} className="px-3.5 py-1.5 text-left font-semibold whitespace-nowrap">{h}</th>
               ))}
             </tr></thead>
             <tbody>
-              {G.usuarios.map((u)=>(
+              {usuariosFiltrados.length===0&&(
+                <tr><td colSpan={7} className="px-3.5 py-8 text-center text-sm text-slate-400">Sin usuarios que coincidan con “{busqUser}”.</td></tr>
+              )}
+              {usuariosFiltrados.map((u)=>(
                 <tr key={u.id} className="border-b last:border-0 hover:bg-slate-50 transition-colors">
-                  <td className="px-3.5 py-2.5">
+                  <td className="px-3.5 py-1.5">
                     <div className="flex items-center gap-2">
                       <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-extrabold shrink-0 ${u.rol==="admin"?"bg-blue-700":u.rol==="gerente"?"bg-purple-600":"bg-green-600"}`}>{u.nombre[0]}</div>
                       <b>{u.nombre}</b>
                     </div>
                   </td>
-                  <td className="px-3.5 py-2.5 font-mono text-xs text-muted-foreground">{u.pass||"—"}</td>
-                  <td className="px-3.5 py-2.5 text-xs text-muted-foreground">
+                  <td className="px-3.5 py-1.5 font-mono text-xs text-muted-foreground">{u.pass||"—"}</td>
+                  <td className="px-3.5 py-1.5 text-xs text-muted-foreground">
                     {u.correo&&<div className="flex items-center gap-1"><Mail size={11}/> {u.correo}</div>}
                     {u.telefono&&<div className="flex items-center gap-1"><Smartphone size={11}/> {u.telefono}</div>}
                     {!u.correo&&!u.telefono&&<span className="text-slate-300">—</span>}
                   </td>
-                  <td className="px-3.5 py-2.5"><UIBadge variant="secondary" className={u.rol==="admin"?"bg-blue-100 text-blue-700":u.rol==="gerente"?"bg-purple-100 text-purple-700":"bg-green-100 text-green-700"}>{u.rol==="admin"?"ADMIN":u.rol==="gerente"?"GERENTE":"CAPTURADOR"}</UIBadge></td>
-                  <td className="px-3.5 py-2.5 text-muted-foreground whitespace-nowrap">{u.creado}</td>
-                  <td className="px-3.5 py-2.5"><UIBadge variant={u.activo?"success":"destructive"}>{u.activo?"ACTIVO":"INACTIVO"}</UIBadge></td>
-                  <td className="px-3.5 py-2.5">
+                  <td className="px-3.5 py-1.5"><UIBadge variant="secondary" className={u.rol==="admin"?"bg-blue-100 text-blue-700":u.rol==="gerente"?"bg-purple-100 text-purple-700":"bg-green-100 text-green-700"}>{u.rol==="admin"?"ADMIN":u.rol==="gerente"?"GERENTE":"CAPTURADOR"}</UIBadge></td>
+                  <td className="px-3.5 py-1.5 text-muted-foreground whitespace-nowrap">{u.creado}</td>
+                  <td className="px-3.5 py-1.5"><UIBadge variant={u.activo?"success":"destructive"}>{u.activo?"ACTIVO":"INACTIVO"}</UIBadge></td>
+                  <td className="px-3.5 py-1.5">
                     <div className="flex gap-1.5 flex-wrap">
                       <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" onClick={()=>{setForm({nombre:u.nombre,pass:"",rol:u.rol,correo:u.correo||"",telefono:u.telefono||"",editId:u.id});setModal(true);}}>Editar</Button>
                       <Button size="sm" className="h-7 px-2.5 text-xs bg-[#25d366] hover:bg-[#1da851]" onClick={()=>copiarAcceso(u)}><ClipboardList size={11}/> Copiar</Button>
@@ -3339,7 +3377,7 @@ function VUsuarios({usuario,G,rerender,showToast}){
                 ))}
               </div>
             </div>
-            <div className="flex items-start gap-2 rounded-lg bg-green-50 px-3 py-2.5 text-xs text-green-800">
+            <div className="flex items-start gap-2 rounded-lg bg-green-50 px-3 py-1.5 text-xs text-green-800">
               <ClipboardList size={14} className="shrink-0 mt-0.5"/><span>Después de crear el usuario usa el botón <b>Copiar</b> para enviarle los datos por WhatsApp.</span>
             </div>
             <Button className="w-full" onClick={guardar} disabled={busy}>{busy?"Guardando…":form.editId?"Actualizar":"Crear Usuario"}</Button>
@@ -3383,7 +3421,7 @@ function VUsuarios({usuario,G,rerender,showToast}){
               </div>
               <div className="max-h-[320px] overflow-y-auto mb-4 rounded-lg border">
                 <table className="w-full text-xs">
-                  <thead><tr className="bg-slate-900 text-white sticky top-0">
+                  <thead><tr className="bg-slate-50 text-slate-600 border-b border-slate-200 sticky top-0">
                     {["Nombre","Contraseña","Correo","Teléfono","Rol"].map(h=>(
                       <th key={h} className="px-2.5 py-2 text-left font-semibold">{h}</th>
                     ))}
@@ -3503,7 +3541,7 @@ function VHistorial({G,showToast,usuario}){
         <Card className="overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
-              <thead><tr className="bg-slate-900 text-white">
+              <thead><tr className="bg-slate-50 text-slate-600 border-b border-slate-200">
                 {cardDetalle.cols.map(h=><th key={h} className="px-3 py-2 text-left font-semibold">{h}</th>)}
               </tr></thead>
               <tbody>
@@ -4092,7 +4130,7 @@ function VClienteDetalle({t,showToast,onBack,onChanged}){
         <div className="px-5 pt-4 pb-2 font-bold text-slate-900 flex items-center gap-2"><FileText size={16}/> Historial de pagos <span className="text-xs font-normal text-muted-foreground">({pagos.length})</span></div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead><tr className="bg-slate-900 text-white">{["Fecha","Monto","Periodo","Método","Nota",""].map(h=><th key={h} className="px-3 py-2 text-left font-semibold text-xs whitespace-nowrap">{h}</th>)}</tr></thead>
+            <thead><tr className="bg-slate-50 text-slate-600 border-b border-slate-200">{["Fecha","Monto","Periodo","Método","Nota",""].map(h=><th key={h} className="px-3 py-2 text-left font-semibold text-xs whitespace-nowrap">{h}</th>)}</tr></thead>
             <tbody>
               {pagos.length===0?(<tr><td colSpan={6} className="px-3 py-6 text-center text-muted-foreground text-sm">Sin pagos registrados.</td></tr>):pagos.map(p=>(
                 <tr key={p.id} className="border-b last:border-0 hover:bg-slate-50">
@@ -4116,7 +4154,7 @@ function VClienteDetalle({t,showToast,onBack,onChanged}){
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead><tr className="bg-slate-900 text-white">{["Usuario","Rol","Email de acceso","Estado","Acciones"].map(h=><th key={h} className="px-3 py-2 text-left font-semibold text-xs whitespace-nowrap">{h}</th>)}</tr></thead>
+            <thead><tr className="bg-slate-50 text-slate-600 border-b border-slate-200">{["Usuario","Rol","Email de acceso","Estado","Acciones"].map(h=><th key={h} className="px-3 py-2 text-left font-semibold text-xs whitespace-nowrap">{h}</th>)}</tr></thead>
             <tbody>
               {loading?(<tr><td colSpan={5} className="px-3 py-6 text-center text-muted-foreground">Cargando…</td></tr>):users.length===0?(<tr><td colSpan={5} className="px-3 py-6 text-center text-muted-foreground">Sin usuarios.</td></tr>):users.map(u=>(
                 <tr key={u.id} className="border-b last:border-0 hover:bg-slate-50">
@@ -4264,18 +4302,18 @@ function VClientes({G,rerender,recargar,showToast,focusTenant,clearFocus,initFil
         <Card className="overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead><tr className="bg-slate-900 text-white">{["Empresa","NIT","Plan","Estado","Pago","Vence","Acciones"].map(h=><th key={h} className="px-3 py-2.5 text-left font-semibold whitespace-nowrap text-xs">{h}</th>)}</tr></thead>
+              <thead><tr className="bg-slate-50 text-slate-600 border-b border-slate-200">{["Empresa","NIT","Plan","Estado","Pago","Vence","Acciones"].map(h=><th key={h} className="px-3 py-1.5 text-left font-semibold whitespace-nowrap text-xs">{h}</th>)}</tr></thead>
               <tbody>
                 {filtered.length===0&&<tr><td colSpan={7} className="px-3 py-8 text-center text-sm text-muted-foreground">Ninguna empresa coincide con la búsqueda.</td></tr>}
                 {filtered.map(t=>(
                   <tr key={t.id} className="border-b last:border-0 hover:bg-slate-50">
-                    <td className="px-3 py-2.5 font-bold text-slate-900">{t.nombre}<div className="font-mono text-[10px] font-normal text-slate-400">{t.slug||"—"}</div></td>
-                    <td className="px-3 py-2.5 text-xs text-muted-foreground">{t.nit||"—"}</td>
-                    <td className="px-3 py-2.5"><UIBadge variant="secondary">{t.plan||"basico"}</UIBadge></td>
-                    <td className="px-3 py-2.5">{t.activo?<UIBadge variant="success">Activa</UIBadge>:<UIBadge variant="destructive">Inactiva</UIBadge>}</td>
-                    <td className="px-3 py-2.5">{pagoBadge(t)}</td>
-                    <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">{fmtFechaCorta(t.vence)}</td>
-                    <td className="px-3 py-2.5">
+                    <td className="px-3 py-1.5 font-bold text-slate-900">{t.nombre}<div className="font-mono text-[10px] font-normal text-slate-400">{t.slug||"—"}</div></td>
+                    <td className="px-3 py-1.5 text-xs text-muted-foreground">{t.nit||"—"}</td>
+                    <td className="px-3 py-1.5"><UIBadge variant="secondary">{t.plan||"basico"}</UIBadge></td>
+                    <td className="px-3 py-1.5">{t.activo?<UIBadge variant="success">Activa</UIBadge>:<UIBadge variant="destructive">Inactiva</UIBadge>}</td>
+                    <td className="px-3 py-1.5">{pagoBadge(t)}</td>
+                    <td className="px-3 py-1.5 text-xs text-muted-foreground whitespace-nowrap">{fmtFechaCorta(t.vence)}</td>
+                    <td className="px-3 py-1.5">
                       <div className="flex gap-1.5">
                         <Button size="sm" className="h-7 px-2.5 text-xs" onClick={()=>setSel(t)}><ChevronRight size={13}/> Ingresar</Button>
                         <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" onClick={()=>toggleActivo(t)}>{t.activo?"Desactivar":"Activar"}</Button>
@@ -4295,7 +4333,7 @@ function VClientes({G,rerender,recargar,showToast,focusTenant,clearFocus,initFil
           <div className="space-y-3.5">
             <div className="space-y-1.5"><Label>Nombre de la empresa</Label><Input value={form.nombre} onChange={e=>setForm(p=>({...p,nombre:e.target.value}))} placeholder="Ej: Supermercado La 14"/></div>
             <div className="space-y-1.5"><Label>NIT</Label><Input value={form.nit} onChange={e=>setForm(p=>({...p,nit:e.target.value}))} placeholder="900.123.456-7"/>{form.nit.trim()&&<p className="text-xs text-slate-400">Identificador del equipo: <span className="font-mono text-slate-600">{slugify(form.nit)}</span></p>}</div>
-            <div className="rounded-lg bg-indigo-50 px-3 py-2.5 text-xs text-indigo-800">Se crea la cuenta de <b>administrador</b> de esta empresa (entra con <b>email + clave</b> en la pestaña «Administrador»). La empresa queda activa de inmediato.</div>
+            <div className="rounded-lg bg-indigo-50 px-3 py-1.5 text-xs text-indigo-800">Se crea la cuenta de <b>administrador</b> de esta empresa (entra con <b>email + clave</b> en la pestaña «Administrador»). La empresa queda activa de inmediato.</div>
             <div className="space-y-1.5"><Label>Nombre del admin <span className="text-slate-400 font-normal">(opcional)</span></Label><Input value={form.adminNombre} onChange={e=>setForm(p=>({...p,adminNombre:e.target.value}))} placeholder="Ej: Juan Pérez"/></div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5"><Label>Email del admin</Label><Input type="email" value={form.adminEmail} onChange={e=>setForm(p=>({...p,adminEmail:e.target.value}))} placeholder="admin@empresa.com"/></div>
@@ -4442,18 +4480,18 @@ function VPagos({G,showToast}){
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead><tr className="bg-slate-900 text-white">{["Empresa","Fecha","Monto","Periodo","Método","Nota"].map(h=><th key={h} className="px-3 py-2.5 text-left font-semibold text-xs whitespace-nowrap">{h}</th>)}</tr></thead>
+            <thead><tr className="bg-slate-50 text-slate-600 border-b border-slate-200">{["Empresa","Fecha","Monto","Periodo","Método","Nota"].map(h=><th key={h} className="px-3 py-1.5 text-left font-semibold text-xs whitespace-nowrap">{h}</th>)}</tr></thead>
             <tbody>
               {loading?(<tr><td colSpan={6} className="px-3 py-8 text-center text-muted-foreground text-sm">Cargando…</td></tr>):
                filtered.length===0?(<tr><td colSpan={6} className="px-3 py-8 text-center text-muted-foreground text-sm">{pagos.length===0?"Aún no hay pagos registrados.":"Ningún pago coincide con la búsqueda."}</td></tr>):
                filtered.map(p=>(
                 <tr key={p.id} className="border-b last:border-0 hover:bg-slate-50">
-                  <td className="px-3 py-2.5 font-bold text-slate-900 whitespace-nowrap">{tName(p.tenant_id)}</td>
-                  <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">{fmtFechaCorta(p.fecha)}</td>
-                  <td className="px-3 py-2.5 font-semibold text-emerald-700 whitespace-nowrap">{money(p.monto)}</td>
-                  <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">{p.periodo_desde?`${fmtFechaCorta(p.periodo_desde)} → ${fmtFechaCorta(p.periodo_hasta)}`:"—"}</td>
-                  <td className="px-3 py-2.5 text-xs">{p.metodo||"—"}</td>
-                  <td className="px-3 py-2.5 text-xs text-muted-foreground">{p.nota||"—"}</td>
+                  <td className="px-3 py-1.5 font-bold text-slate-900 whitespace-nowrap">{tName(p.tenant_id)}</td>
+                  <td className="px-3 py-1.5 text-xs text-muted-foreground whitespace-nowrap">{fmtFechaCorta(p.fecha)}</td>
+                  <td className="px-3 py-1.5 font-semibold text-emerald-700 whitespace-nowrap">{money(p.monto)}</td>
+                  <td className="px-3 py-1.5 text-xs text-muted-foreground whitespace-nowrap">{p.periodo_desde?`${fmtFechaCorta(p.periodo_desde)} → ${fmtFechaCorta(p.periodo_hasta)}`:"—"}</td>
+                  <td className="px-3 py-1.5 text-xs">{p.metodo||"—"}</td>
+                  <td className="px-3 py-1.5 text-xs text-muted-foreground">{p.nota||"—"}</td>
                 </tr>
               ))}
             </tbody>
@@ -4496,25 +4534,25 @@ function VLeads({G,showToast}){
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead><tr className="bg-slate-900 text-white">{["Recibido","Nombre","Email","Teléfono","Mensaje","Estado",""].map(h=><th key={h} className="px-3 py-2.5 text-left font-semibold text-xs whitespace-nowrap">{h}</th>)}</tr></thead>
+            <thead><tr className="bg-slate-50 text-slate-600 border-b border-slate-200">{["Recibido","Nombre","Email","Teléfono","Mensaje","Estado",""].map(h=><th key={h} className="px-3 py-1.5 text-left font-semibold text-xs whitespace-nowrap">{h}</th>)}</tr></thead>
             <tbody>
               {loading?(<tr><td colSpan={7} className="px-3 py-8 text-center text-muted-foreground text-sm">Cargando…</td></tr>):
                filtered.length===0?(<tr><td colSpan={7} className="px-3 py-8 text-center text-muted-foreground text-sm">{leads.length===0?"Aún no llegan prospectos desde la web.":"Ningún lead coincide con la búsqueda."}</td></tr>):
                filtered.map(l=>(
                 <tr key={l.id} className="border-b last:border-0 hover:bg-slate-50 align-top">
-                  <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">{(l.created_at||"").slice(0,10)}</td>
-                  <td className="px-3 py-2.5 font-bold text-slate-900 whitespace-nowrap">{l.nombre||"—"}</td>
-                  <td className="px-3 py-2.5 text-xs">{l.email||"—"}</td>
-                  <td className="px-3 py-2.5 text-xs whitespace-nowrap">{l.telefono||"—"}</td>
-                  <td className="px-3 py-2.5 text-xs text-muted-foreground max-w-[220px]">{l.mensaje||"—"}</td>
-                  <td className="px-3 py-2.5">
+                  <td className="px-3 py-1.5 text-xs text-muted-foreground whitespace-nowrap">{(l.created_at||"").slice(0,10)}</td>
+                  <td className="px-3 py-1.5 font-bold text-slate-900 whitespace-nowrap">{l.nombre||"—"}</td>
+                  <td className="px-3 py-1.5 text-xs">{l.email||"—"}</td>
+                  <td className="px-3 py-1.5 text-xs whitespace-nowrap">{l.telefono||"—"}</td>
+                  <td className="px-3 py-1.5 text-xs text-muted-foreground max-w-[220px]">{l.mensaje||"—"}</td>
+                  <td className="px-3 py-1.5">
                     <select value={l.estado||"nuevo"} onChange={e=>cambiarEstado(l,e.target.value)} className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700">
                       <option value="nuevo">Nuevo</option>
                       <option value="contactado">Contactado</option>
                       <option value="descartado">Descartado</option>
                     </select>
                   </td>
-                  <td className="px-3 py-2.5"><button onClick={()=>borrar(l.id)} className="text-red-500 hover:text-red-700"><Trash2 size={14}/></button></td>
+                  <td className="px-3 py-1.5"><button onClick={()=>borrar(l.id)} className="text-red-500 hover:text-red-700"><Trash2 size={14}/></button></td>
                 </tr>
               ))}
             </tbody>
@@ -4560,11 +4598,11 @@ function PanelDueno({usuario,setUsuario,logout,G,rerender,recargar,showToast}){
           <div className="px-3 pt-1 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">Gestión</div>
           {nav.map(n=>{const active=view===n.id;return(
             <button key={n.id} onClick={()=>irA(n.id)}
-              className={`flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm text-left transition-colors ${active?"bg-indigo-50 text-indigo-700 font-semibold":"text-slate-600 hover:bg-slate-50"}`}>
+              className={`flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm text-left transition-colors ${active?"bg-indigo-50 text-indigo-700 font-semibold":"text-slate-600 hover:bg-slate-50"}`}>
               <n.icon size={17} className={active?"text-indigo-600":"text-slate-400"}/> {n.label}
             </button>
           );})}
-          <div className="mt-auto rounded-lg bg-slate-50 border border-slate-100 px-3 py-2.5">
+          <div className="mt-auto rounded-lg bg-slate-50 border border-slate-100 px-3 py-1.5">
             <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Panel del Dueño</div>
             <div className="text-xs text-slate-500 mt-0.5">v2.2</div>
           </div>
@@ -5542,6 +5580,41 @@ function ModGerente({usuario,setUsuario,logout,G,rerender,recargar,showToast}){
   const pct=G.conteos.length>0?Math.round(G.conteos.filter(c=>c.estado==="completado").length/G.conteos.length*100):0;
   const notasInv=G.notas.filter(n=>n.inventarioId===(G.inventario?.id||""));
 
+  // ── Métricas financieras del inventario (tablero gerencial) ──
+  const _caps=Object.values(G.capturas);
+  const _fmtCOP=(n)=>new Intl.NumberFormat("es-CO",{style:"currency",currency:"COP",maximumFractionDigits:0}).format(Math.round(n||0));
+  const analisis=G.productos.map(p=>{
+    const misC=_caps.filter(c=>c.productoId===p.id&&["C1","C2","C3"].includes(c.ronda));
+    if(!misC.length)return null;
+    const s1=misC.filter(c=>c.ronda==="C1").reduce((s,c)=>s+c.cantidad,0);
+    const s2=misC.filter(c=>c.ronda==="C2").reduce((s,c)=>s+c.cantidad,0);
+    const s3=misC.filter(c=>c.ronda==="C3").reduce((s,c)=>s+c.cantidad,0);
+    const fisico=s3||s2||s1;
+    const fr=s3>0?"C3":s2>0?"C2":"C1"; // ronda final: no sumar rondas repetidas
+    let eBueno=0,eVencido=0,eAveriado=0;
+    misC.filter(c=>c.ronda===fr).forEach(c=>{const e=(c.estado||"BUENO").toUpperCase(); if(e==="BUENO")eBueno+=c.cantidad; else if(e==="VENCIDO")eVencido+=c.cantidad; else eAveriado+=c.cantidad;});
+    const dif=fisico-(p.saldo||0);
+    return {...p,fisico,dif,valDif:dif*(p.costo||0),eBueno,eVencido,eAveriado,riesgoVal:(eVencido+eAveriado)*(p.costo||0)};
+  }).filter(Boolean);
+  const contados=analisis.length;
+  const cobertura=G.productos.length?Math.round(contados/G.productos.length*100):0;
+  const valorAjuste=analisis.reduce((s,a)=>s+a.valDif,0);
+  const valorFisico=analisis.reduce((s,a)=>s+a.fisico*(a.costo||0),0);
+  const valorTeorico=analisis.reduce((s,a)=>s+(a.saldo||0)*(a.costo||0),0);
+  const costoRiesgo=analisis.reduce((s,a)=>s+a.riesgoVal,0);
+  const ere=valorTeorico>0?Math.max(0,(1-Math.abs(valorAjuste)/valorTeorico)*100):100;
+  const conDif=analisis.filter(a=>a.dif!==0).length;
+  const top5=[...analisis].filter(a=>a.dif!==0).sort((a,b)=>Math.abs(b.valDif)-Math.abs(a.valDif)).slice(0,5);
+  const top5Max=Math.max(1,...top5.map(a=>Math.abs(a.valDif)));
+  // Sanidad del stock: unidades por estado (ronda final)
+  const salud={bueno:analisis.reduce((s,a)=>s+a.eBueno,0),vencido:analisis.reduce((s,a)=>s+a.eVencido,0),averiado:analisis.reduce((s,a)=>s+a.eAveriado,0)};
+  const saludTotal=salud.bueno+salud.vencido+salud.averiado;
+  // Diferencia por categoría (valor)
+  const porCat={};
+  analisis.forEach(a=>{const k=a.categoria||"Sin categoría"; porCat[k]=(porCat[k]||0)+a.valDif;});
+  const cats=Object.entries(porCat).map(([cat,val])=>({cat,val})).filter(c=>c.val!==0).sort((a,b)=>Math.abs(b.val)-Math.abs(a.val)).slice(0,6);
+  const catMax=Math.max(1,...cats.map(c=>Math.abs(c.val)));
+
   return(
     <div style={{minHeight:"100vh",background:"#f0f4f8",fontFamily:"system-ui,sans-serif"}}>
       {/* Topbar */}
@@ -5597,37 +5670,97 @@ function ModGerente({usuario,setUsuario,logout,G,rerender,recargar,showToast}){
                 </div>
               ):(
                 <>
-                  {/* KPIs */}
-                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:12,marginBottom:16}}>
+                  {/* Bloque financiero — impacto en dinero (lo primero para el gerente) */}
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(210px,1fr))",gap:14,marginBottom:16}}>
                     {[
-                      {icon:Package,      l:"Productos",v:G.productos.length,c:"#2563eb",bg:"#eff6ff"},
-                      {icon:ClipboardList,l:"Conteos",v:G.conteos.length,c:"#475569",bg:"#f8fafc"},
-                      {icon:CheckCircle,  l:"Completados",v:G.conteos.filter(c=>c.estado==="completado").length,c:"#16a34a",bg:"#f0fdf4"},
-                      {icon:AlertTriangle,l:"Diferencias",v:G.conteos.filter(c=>c.estado==="diferencia").length,c:"#dc2626",bg:"#fef2f2"},
-                      {icon:FileText,     l:"Notas",v:notasInv.length,c:"#7c3aed",bg:"#faf5ff"},
-                    ].map(s=>(
-                      <div key={s.l} style={{background:s.bg,borderRadius:14,padding:"14px 16px",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",border:`1px solid ${s.c}22`}}>
-                        <s.icon size={20} color={s.c} style={{marginBottom:6}}/>
-                        <div style={{fontSize:26,fontWeight:900,color:s.c,lineHeight:1}}>{s.v}</div>
-                        <div style={{fontSize:11,color:"#64748b",marginTop:4,fontWeight:600}}>{s.l}</div>
+                      {l:"Valor de Ajuste",v:_fmtCOP(valorAjuste),c:valorAjuste<0?"#dc2626":valorAjuste>0?"#16a34a":"#475569",sub:`${conDif} producto${conDif===1?"":"s"} con diferencia`,top:valorAjuste<0?"#dc2626":valorAjuste>0?"#16a34a":"#94a3b8"},
+                      {l:"Valor Físico Real",v:_fmtCOP(valorFisico),c:"#2563eb",sub:`Teórico: ${_fmtCOP(valorTeorico)}`,top:"#2563eb"},
+                      {l:"Costo en Riesgo",v:_fmtCOP(costoRiesgo),c:costoRiesgo>0?"#d97706":"#16a34a",sub:"Vencidos + averiados",top:costoRiesgo>0?"#d97706":"#16a34a"},
+                      {l:"Exactitud (ERE)",v:ere.toFixed(1)+"%",c:ere>=95?"#16a34a":ere>=85?"#d97706":"#dc2626",sub:"Valor físico vs sistema",top:ere>=95?"#16a34a":ere>=85?"#d97706":"#dc2626"},
+                    ].map(k=>(
+                      <div key={k.l} style={{position:"relative",background:"white",borderRadius:14,padding:"18px 18px 15px",boxShadow:"0 2px 8px rgba(15,23,42,0.06)",border:"1px solid #e8ecf1",overflow:"hidden"}}>
+                        <div style={{position:"absolute",top:0,left:0,right:0,height:4,background:k.top}}/>
+                        <div style={{fontSize:11,color:"#64748b",fontWeight:700,textTransform:"uppercase",letterSpacing:0.4}}>{k.l}</div>
+                        <div style={{fontSize:23,fontWeight:900,color:k.c,margin:"8px 0 4px",fontVariantNumeric:"tabular-nums"}}>{k.v}</div>
+                        <div style={{fontSize:11.5,color:"#94a3b8"}}>{k.sub}</div>
                       </div>
                     ))}
                   </div>
-                  {/* Barra avance */}
-                  <div style={{background:"white",borderRadius:14,padding:"18px 20px",marginBottom:16,boxShadow:"0 1px 4px rgba(0,0,0,0.06)",border:"1px solid #e2e8f0"}}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+
+                  {/* Cobertura del inventario */}
+                  <div style={{background:"white",borderRadius:14,padding:"16px 20px",marginBottom:16,boxShadow:"0 2px 8px rgba(15,23,42,0.06)",border:"1px solid #e8ecf1"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,flexWrap:"wrap",gap:8}}>
                       <div>
-                        <div style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>Avance del inventario</div>
-                        <div style={{fontSize:11,color:"#64748b",marginTop:1}}>{G.conteos.filter(c=>c.estado==="completado").length} de {G.conteos.length} conteos completados</div>
+                        <div style={{fontSize:13,fontWeight:800,color:"#0f172a"}}>Cobertura del inventario</div>
+                        <div style={{fontSize:11.5,color:"#64748b",marginTop:1}}><b>{contados}</b> de <b>{G.productos.length}</b> productos contados · {G.inventario.apertura} {G.inventario.horaApertura||""}{G.inventario.cierre?` → ${G.inventario.cierre} ${G.inventario.horaCierre||""}`:" · en curso"}</div>
                       </div>
-                      <div style={{background:"linear-gradient(135deg,#7c3aed,#4f46e5)",borderRadius:10,padding:"6px 14px"}}>
-                        <span style={{fontSize:18,fontWeight:900,color:"white"}}>{pct}%</span>
-                      </div>
+                      <div style={{background:"linear-gradient(135deg,#7c3aed,#4f46e5)",borderRadius:10,padding:"6px 14px"}}><span style={{fontSize:18,fontWeight:900,color:"white"}}>{cobertura}%</span></div>
                     </div>
-                    <div style={{background:"#e2e8f0",borderRadius:99,height:14,overflow:"hidden"}}>
-                      <div style={{width:pct+"%",background:"linear-gradient(90deg,#7c3aed,#4f46e5,#2563eb)",borderRadius:99,height:"100%",transition:"width 0.6s ease"}}/>
+                    <div style={{background:"#e2e8f0",borderRadius:99,height:12,overflow:"hidden"}}>
+                      <div style={{width:cobertura+"%",background:"linear-gradient(90deg,#7c3aed,#4f46e5,#2563eb)",borderRadius:99,height:"100%",transition:"width 0.6s ease"}}/>
                     </div>
                   </div>
+
+                  {/* Gráficas: dona de sanidad + barras top descuadres */}
+                  {contados>0&&(
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(320px,1fr))",gap:14,marginBottom:16}}>
+                    <div style={{background:"white",borderRadius:14,padding:"16px 18px",boxShadow:"0 2px 8px rgba(15,23,42,0.06)",border:"1px solid #e8ecf1"}}>
+                      <div style={{fontSize:13,fontWeight:800,color:"#0f172a",marginBottom:12}}>Sanidad del stock</div>
+                      <div style={{display:"flex",alignItems:"center",gap:20,flexWrap:"wrap"}}>
+                        {(()=>{const r=52,C=2*Math.PI*r,T=saludTotal||1;let acc=0;const segs=[{v:salud.bueno,c:"#16a34a"},{v:salud.vencido,c:"#dc2626"},{v:salud.averiado,c:"#d97706"}];return(
+                          <div style={{position:"relative",width:130,height:130,flexShrink:0}}>
+                            <svg width="130" height="130" viewBox="0 0 130 130">
+                              <circle cx="65" cy="65" r={r} fill="none" stroke="#eef1f5" strokeWidth="15"/>
+                              {segs.map((s,i)=>{const len=(s.v/T)*C;const off=-acc;acc+=len;return <circle key={i} cx="65" cy="65" r={r} fill="none" stroke={s.c} strokeWidth="15" strokeDasharray={`${len} ${C}`} strokeDashoffset={off} strokeLinecap="butt" transform="rotate(-90 65 65)"/>;})}
+                            </svg>
+                            <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
+                              <div style={{fontSize:20,fontWeight:900,color:"#16a34a"}}>{saludTotal?Math.round(salud.bueno/saludTotal*100):0}%</div>
+                              <div style={{fontSize:10,color:"#94a3b8",fontWeight:700}}>BUENO</div>
+                            </div>
+                          </div>
+                        );})()}
+                        <div style={{display:"flex",flexDirection:"column",gap:9}}>
+                          {[{l:"Bueno",v:salud.bueno,c:"#16a34a"},{l:"Vencido",v:salud.vencido,c:"#dc2626"},{l:"Averiado",v:salud.averiado,c:"#d97706"}].map(x=>(
+                            <div key={x.l} style={{display:"flex",alignItems:"center",gap:8,fontSize:12.5}}>
+                              <span style={{width:10,height:10,borderRadius:3,background:x.c}}/>
+                              <span style={{color:"#475569",fontWeight:600}}>{x.l}</span>
+                              <b style={{color:"#0f172a",marginLeft:2}}>{x.v}</b>
+                              <span style={{color:"#94a3b8",fontSize:11}}>({saludTotal?Math.round(x.v/saludTotal*100):0}%)</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{background:"white",borderRadius:14,padding:"16px 18px",boxShadow:"0 2px 8px rgba(15,23,42,0.06)",border:"1px solid #e8ecf1"}}>
+                      <div style={{fontSize:13,fontWeight:800,color:"#0f172a",marginBottom:12,display:"flex",alignItems:"center",gap:7}}><AlertTriangle size={14} color="#dc2626"/> Top descuadres (impacto en $)</div>
+                      {top5.length===0?<div style={{fontSize:12.5,color:"#94a3b8",padding:"8px 0"}}>Sin diferencias todavía.</div>:top5.map((a,i)=>{const w=Math.round(Math.abs(a.valDif)/top5Max*100);const neg=a.valDif<0;return(
+                        <div key={i} style={{marginBottom:10}}>
+                          <div style={{display:"flex",justifyContent:"space-between",gap:8,fontSize:12,marginBottom:3}}>
+                            <span style={{fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{a.nombre}</span>
+                            <span style={{fontWeight:800,color:neg?"#dc2626":"#16a34a",whiteSpace:"nowrap"}}>{_fmtCOP(a.valDif)}</span>
+                          </div>
+                          <div style={{background:"#eef1f5",borderRadius:6,height:8,overflow:"hidden"}}><div style={{width:w+"%",height:"100%",borderRadius:6,background:neg?"#dc2626":"#16a34a"}}/></div>
+                        </div>
+                      );})}
+                    </div>
+                  </div>
+                  )}
+
+                  {/* Barras: diferencia por categoría */}
+                  {cats.length>0&&(
+                    <div style={{background:"white",borderRadius:14,padding:"16px 18px",boxShadow:"0 2px 8px rgba(15,23,42,0.06)",border:"1px solid #e8ecf1",marginBottom:16}}>
+                      <div style={{fontSize:13,fontWeight:800,color:"#0f172a",marginBottom:12}}>Diferencia por categoría (valor)</div>
+                      {cats.map((c,i)=>{const w=Math.round(Math.abs(c.val)/catMax*100);const neg=c.val<0;return(
+                        <div key={i} style={{marginBottom:10}}>
+                          <div style={{display:"flex",justifyContent:"space-between",gap:8,fontSize:12,marginBottom:3}}>
+                            <span style={{fontWeight:600}}>{c.cat}</span>
+                            <span style={{fontWeight:800,color:neg?"#dc2626":"#16a34a"}}>{_fmtCOP(c.val)}</span>
+                          </div>
+                          <div style={{background:"#eef1f5",borderRadius:6,height:8,overflow:"hidden"}}><div style={{width:w+"%",height:"100%",borderRadius:6,background:neg?"#dc2626":"#16a34a"}}/></div>
+                        </div>
+                      );})}
+                    </div>
+                  )}
                   {/* Tabla conteos */}
                   <div style={{background:"white",borderRadius:14,overflow:"hidden",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",border:"1px solid #e2e8f0"}}>
                     <div style={{padding:"14px 18px",borderBottom:"1px solid #f1f5f9",fontWeight:700,fontSize:13,color:"#0f172a"}}>Estado de conteos</div>
