@@ -3601,10 +3601,10 @@ function VHistorial({G,showToast,usuario}){
         <div className="grid gap-3 mb-5" style={{gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))"}}>
           {stCards.map((s,i)=>(
             <Card key={i} onClick={()=>setCardDetalle({titulo:s.l,lista:s.lista,cols:s.cols})}
-              className="px-4 py-3 cursor-pointer hover:shadow-md transition-shadow" style={{borderTop:`3px solid ${s.c}`}}>
-              <div className="font-extrabold" style={{color:s.c,fontSize:typeof s.v==="string"&&s.v.length>8?14:20}}>{s.v}</div>
-              <div className="text-[11px] text-muted-foreground mt-0.5">{s.l}</div>
-              <div className="text-[10px] text-slate-400 mt-1 flex items-center gap-0.5">Clic para ver detalle <ChevronRight size={10}/></div>
+              className="relative px-4 py-3.5 cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md" style={{borderTop:`3px solid ${s.c}`}}>
+              <ChevronRight size={14} className="absolute right-3 top-3 text-slate-300"/>
+              <div className="font-extrabold" style={{color:s.c,fontSize:typeof s.v==="string"&&s.v.length>8?14:22}}>{s.v}</div>
+              <div className="text-[11px] text-slate-500 mt-1 font-medium">{s.l}</div>
             </Card>
           ))}
         </div>
