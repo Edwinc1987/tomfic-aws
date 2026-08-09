@@ -3564,6 +3564,16 @@ function VHistorial({G,showToast,usuario}){
   if(invSel){
     const inv=invSel;
     const st=getSt(inv);
+    // Datos para las gráficas del detalle (por unidades: sirven con o sin costo cargado)
+    const invP=inv.productos||[];
+    const analH=st.resumen.map(r=>{const p=invP.find(x=>x.id===r.productoId);const dif=r.cantFinal-(p?.saldo||0);return{...r,dif};});
+    const topDH=[...analH].filter(a=>a.dif!==0).sort((a,b)=>Math.abs(b.dif)-Math.abs(a.dif)).slice(0,5);
+    const topDHMax=Math.max(1,...topDH.map(a=>Math.abs(a.dif)));
+    const saludH={bueno:st.buenos.reduce((s,r)=>s+r.cantFinal,0),vencido:st.vencidos.reduce((s,r)=>s+r.cantFinal,0),averiado:st.averiados.reduce((s,r)=>s+r.cantFinal,0)};
+    const saludHTot=saludH.bueno+saludH.vencido+saludH.averiado;
+    const catHMap={};analH.forEach(a=>{const k=a.categoria||"Sin categoría";catHMap[k]=(catHMap[k]||0)+a.dif;});
+    const catsH=Object.entries(catHMap).map(([cat,val])=>({cat,val})).filter(c=>c.val!==0).sort((a,b)=>Math.abs(b.val)-Math.abs(a.val)).slice(0,6);
+    const catHMax=Math.max(1,...catsH.map(c=>Math.abs(c.val)));
     const stCards=[
       {l:"Valor físico total",v:fmt(st.totalFisico),c:"#16a34a",
        lista:st.resumen.map(r=>[r.codigo,r.nombre,r.referencia,r.cantFinal,r.costo>0?fmt(r.cantFinal*r.costo):"—"]),
@@ -3608,6 +3618,58 @@ function VHistorial({G,showToast,usuario}){
             </Card>
           ))}
         </div>
+
+        {/* Dashboard visual: dona de sanidad + barras de descuadres */}
+        {st.contados>0&&(
+        <div className="grid gap-3 mb-4" style={{gridTemplateColumns:"repeat(auto-fit,minmax(320px,1fr))"}}>
+          <Card className="p-4">
+            <div className="text-[13px] font-bold text-slate-900 mb-3">Sanidad del stock</div>
+            <div className="flex items-center gap-5 flex-wrap">
+              {(()=>{const r=52,C=2*Math.PI*r,T=saludHTot||1;let acc=0;const segs=[{v:saludH.bueno,c:"#16a34a"},{v:saludH.vencido,c:"#dc2626"},{v:saludH.averiado,c:"#d97706"}];return(
+                <div className="relative shrink-0" style={{width:126,height:126}}>
+                  <svg width="126" height="126" viewBox="0 0 126 126">
+                    <circle cx="63" cy="63" r={r} fill="none" stroke="#eef1f5" strokeWidth="15"/>
+                    {segs.map((s,i)=>{const len=(s.v/T)*C;const off=-acc;acc+=len;return <circle key={i} cx="63" cy="63" r={r} fill="none" stroke={s.c} strokeWidth="15" strokeDasharray={`${len} ${C}`} strokeDashoffset={off} strokeLinecap="butt" transform="rotate(-90 63 63)"/>;})}
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <div className="text-[19px] font-black text-green-600">{saludHTot?Math.round(saludH.bueno/saludHTot*100):0}%</div>
+                    <div className="text-[10px] text-slate-400 font-bold">BUENO</div>
+                  </div>
+                </div>
+              );})()}
+              <div className="flex flex-col gap-2">
+                {[{l:"Bueno",v:saludH.bueno,c:"#16a34a"},{l:"Vencido",v:saludH.vencido,c:"#dc2626"},{l:"Averiado",v:saludH.averiado,c:"#d97706"}].map(x=>(
+                  <div key={x.l} className="flex items-center gap-2 text-[12.5px]">
+                    <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{background:x.c}}/>
+                    <span className="text-slate-600 font-medium">{x.l}</span><b className="text-slate-900 ml-0.5">{x.v}</b>
+                    <span className="text-slate-400 text-[11px]">({saludHTot?Math.round(x.v/saludHTot*100):0}%)</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Card>
+          <Card className="p-4">
+            <div className="text-[13px] font-bold text-slate-900 mb-3 flex items-center gap-1.5"><AlertTriangle size={14} className="text-red-600"/> Top descuadres (unidades)</div>
+            {topDH.length===0?<div className="text-[12.5px] text-slate-400 py-2">Sin diferencias.</div>:topDH.map((a,i)=>{const w=Math.round(Math.abs(a.dif)/topDHMax*100);const neg=a.dif<0;return(
+              <div key={i} className="mb-2.5">
+                <div className="flex justify-between gap-2 text-xs mb-1"><span className="font-semibold truncate">{a.nombre}</span><span className="font-extrabold whitespace-nowrap" style={{color:neg?"#dc2626":"#2563eb"}}>{a.dif>0?"+":""}{a.dif} und</span></div>
+                <div className="h-2 rounded bg-slate-100 overflow-hidden"><div className="h-full rounded" style={{width:w+"%",background:neg?"#dc2626":"#2563eb"}}/></div>
+              </div>
+            );})}
+          </Card>
+        </div>
+        )}
+        {catsH.length>0&&(
+          <Card className="p-4 mb-4">
+            <div className="text-[13px] font-bold text-slate-900 mb-3">Diferencia por categoría (unidades)</div>
+            {catsH.map((c,i)=>{const w=Math.round(Math.abs(c.val)/catHMax*100);const neg=c.val<0;return(
+              <div key={i} className="mb-2.5">
+                <div className="flex justify-between gap-2 text-xs mb-1"><span className="font-semibold">{c.cat}</span><span className="font-extrabold" style={{color:neg?"#dc2626":"#2563eb"}}>{c.val>0?"+":""}{c.val} und</span></div>
+                <div className="h-2 rounded bg-slate-100 overflow-hidden"><div className="h-full rounded" style={{width:w+"%",background:neg?"#dc2626":"#2563eb"}}/></div>
+              </div>
+            );})}
+          </Card>
+        )}
         <div className="flex gap-2.5 flex-wrap">
           <Button onClick={()=>expXLSX(
             st.resumen.map(r=>{const p=(inv.productos||[]).find(x=>x.id===r.productoId);return[r.ean||"",r.codigo,r.nombre,r.referencia,r.totalC1||"",r.totalC2||"",r.totalC3||"",r.cantFinal,r.estado||"",p?.saldo||0,r.costo>0?fmt(r.cantFinal*r.costo):"—",r.usuario];}),
