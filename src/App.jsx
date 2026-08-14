@@ -20,7 +20,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import Landing from "@/Landing";
 import { mergeLanding } from "@/landingContent";
-import { supabase, SB, TODAY, HOUR, ID, slugify, memberEmail, ISO_HOY, diasHasta, addDias, fmtFechaCorta, GRACIA_DIAS, AVISO_DIAS, exportSheet, SIIGO_AJUSTE_COLS, CAT_C, catC, inp, card } from "@/lib/data";
+import { supabase, SB, G, STORAGE_KEY, CONFIG_KEY, capsDeConteo, serConteo, deserConteo, serInv, prodCols, userCols, cfgKey, saveLocalConfig, loadLocalConfig, DEF_LOC_TIPOS, resetTenantConfig, conteoCompleto, conteosReales, conteoAjusteActivo, todosConteosCerrados, finalAjustado, saveLocalCache, TODAY, HOUR, ID, slugify, memberEmail, ISO_HOY, diasHasta, addDias, fmtFechaCorta, GRACIA_DIAS, AVISO_DIAS, exportSheet, SIIGO_AJUSTE_COLS, CAT_C, catC, inp, card } from "@/lib/data";
 
 // (cliente supabase movido a src/lib/data.js)
 
@@ -28,38 +28,7 @@ import { supabase, SB, TODAY, HOUR, ID, slugify, memberEmail, ISO_HOY, diasHasta
 
 // (vencimiento/exportSheet/SIIGO_AJUSTE_COLS movidos a src/lib/data.js)
 
-// ─────────────────────────────────────────
-// ESTADO GLOBAL
-// ─────────────────────────────────────────
-let G = {
-  productos: [],
-  usuarios: [
-    {id:"u1",nombre:"ADMIN",pass:"admin123",rol:"admin",activo:true,creado:TODAY()},
-    {id:"u2",nombre:"JUAN",pass:"123",rol:"capturador",activo:true,creado:TODAY()},
-    {id:"u3",nombre:"MARIA",pass:"123",rol:"capturador",activo:true,creado:TODAY()},
-    {id:"u4",nombre:"CARLOS",pass:"123",rol:"capturador",activo:true,creado:TODAY()},
-  ],
-  // Jerarquía de ubicaciones: { id, ubicacion, localizacion, nroLocalizacion, observacion }
-  localizaciones: [
-    {id:"l1",ubicacion:"BODEGA",localizacion:"MUEBLE",nro:"MUEBLE 1",observacion:"DETERGENTES"},
-    {id:"l2",ubicacion:"BODEGA",localizacion:"MUEBLE",nro:"MUEBLE 2",observacion:"ALIMENTOS"},
-    {id:"l3",ubicacion:"BODEGA",localizacion:"NEVERA",nro:"NEVERA 1",observacion:"LÁCTEOS"},
-    {id:"l4",ubicacion:"BODEGA",localizacion:"LINEAL",nro:"LINEAL 1",observacion:""},
-    {id:"l5",ubicacion:"SALA DE VENTAS",localizacion:"LINEAL",nro:"LINEAL 1",observacion:"BEBIDAS"},
-    {id:"l6",ubicacion:"SALA DE VENTAS",localizacion:"PUNTA",nro:"PUNTA 1",observacion:"PROMOCIONES"},
-  ],
-  ubicacionesTipos: ["BODEGA","SALA DE VENTAS"],
-  localizacionTipos: ["MUEBLE","LINEAL","NEVERA","PUNTA","JAULA","CAVA"],
-  inventario: null,
-  conteos: [],
-  capturas: {},
-  alertas: [],
-  historial: [],
-  notas: [], // {id, texto, fotos:[], usuario, rol, fecha, hora, inventarioId}
-  tenantId: null,   // empresa (tenant) del usuario logueado; null = dueño/super-admin
-  tenant: null,     // datos de la empresa del usuario (plan, precio, vence) para avisos
-  tenants: [],      // lista de empresas (solo la carga el dueño)
-};
+// (estado global G movido a src/lib/data.js)
 
 // (CAT_C/catC movidos a src/lib/data.js)
 
@@ -127,60 +96,11 @@ function CamScanner({onDetect,onClose,color="#2563eb"}){
 // ─────────────────────────────────────────
 // PERSISTENCIA: SUPABASE (nube) + localStorage (caché local)
 // ─────────────────────────────────────────
-const STORAGE_KEY = "tomfic_data_v1";
-const CONFIG_KEY  = "tomfic_config_v1";
-
-// --- Serialización ---
-const capsDeConteo=(cid)=>{const o={};Object.entries(G.capturas).forEach(([k,v])=>{if(v.conteoId===cid)o[k]=v;});return o;};
-const serConteo=(c,invId)=>({
-  id:c.id, tenant_id:G.tenantId||null, inventario_id:invId||(G.inventario?G.inventario.id:"")||"",
-  nombre:c.nombre||"", obs:c.obs||"", tipo:c.tipo||"",
-  usuario_c1:c.usuarioC1||"", usuario_c2:c.usuarioC2||"", usuario_c3:c.usuarioC3||"",
-  estado:c.estado||"", loc_label:c.locLabel||"", localizacion_id:c.locId||"",
-  ubicacion:c.ubicacion||"", localizacion_tipo:c.localizacion||"", nro:c.nro||"",
-  fecha_creacion:c.fechaCreacion||TODAY(),
-  rondas_cerradas:JSON.stringify(c.rondasCerradas||[]),
-  capturas_data:JSON.stringify(capsDeConteo(c.id)),
-});
-const deserConteo=(r)=>{
-  const c={id:r.id,nombre:r.nombre,obs:r.obs,tipo:r.tipo,usuarioC1:r.usuario_c1,usuarioC2:r.usuario_c2,usuarioC3:r.usuario_c3,estado:r.estado,locLabel:r.loc_label,locId:r.localizacion_id,ubicacion:r.ubicacion,localizacion:r.localizacion_tipo,nro:r.nro,fechaCreacion:r.fecha_creacion,rondasCerradas:r.rondas_cerradas?JSON.parse(r.rondas_cerradas):[]};
-  let caps={};try{caps=r.capturas_data?JSON.parse(r.capturas_data):{};}catch(e){}
-  return {c,caps};
-};
-const serInv=(inv,estado)=>({
-  id:inv.id,tenant_id:G.tenantId||null,nombre:inv.nombre||"",fecha:inv.fecha||"",estado,tipo:inv.tipo||"",obs:inv.obs||"",
-  apertura:inv.apertura||"",hora_apertura:inv.horaApertura||"",usuario_apertura:inv.usuarioApertura||"",
-  cierre:inv.cierre||"",hora_cierre:inv.horaCierre||"",usuario_cierre:inv.usuarioCierre||"",
-  conteos_snapshot:inv.conteos?JSON.stringify(inv.conteos):null,
-  capturas_snapshot:inv.capturas?JSON.stringify(inv.capturas):null,
-  productos_snapshot:inv.productos?JSON.stringify(inv.productos):null,
-});
-const prodCols=(p)=>({id:p.id,tenant_id:G.tenantId||null,ean:p.ean||"",codigo:p.codigo||"",nombre:p.nombre||"",referencia:p.referencia||"",categoria:p.categoria||"",subcategoria:p.subcategoria||"",subgrupo:p.subgrupo||"",determinada:p.determinada||"",localizacion:p.localizacion||"",ubicacion:p.ubicacion||"",observacion:p.observacion||"",saldo:p.saldo||0,costo:p.costo||0,nit:p.nit||"",proveedor:p.proveedor||""});
-const userCols=(u)=>({id:u.id,tenant_id:u.tenant_id||G.tenantId||null,nombre:u.nombre,pass:u.pass,rol:u.rol,activo:u.activo,creado:u.creado||TODAY(),correo:u.correo||"",telefono:u.telefono||"",cargo:u.cargo||"",turno:u.turno||"",zona:u.zona||"",obs:u.obs||""});
+// (STORAGE_KEY/CONFIG_KEY + serializers movidos a src/lib/data.js)
 
 // (objeto SB movido a src/lib/data.js)
 
-// --- Config local (localizaciones, tipos, alertas) ---
-// La config de ubicaciones es POR EMPRESA: la clave de localStorage se separa por tenant
-// para que el caché de una empresa nunca se mezcle con el de otra.
-const cfgKey=()=>CONFIG_KEY+(G.tenantId?(":"+G.tenantId):"");
-const saveLocalConfig=()=>{try{localStorage.setItem(cfgKey(),JSON.stringify({localizaciones:G.localizaciones,ubicacionesTipos:G.ubicacionesTipos,localizacionTipos:G.localizacionTipos,alertas:G.alertas}));}catch(e){}};
-const loadLocalConfig=()=>{try{const raw=localStorage.getItem(cfgKey());if(!raw)return;const d=JSON.parse(raw);if(d.localizaciones)G.localizaciones=d.localizaciones;if(d.ubicacionesTipos&&d.ubicacionesTipos.length)G.ubicacionesTipos=d.ubicacionesTipos;if(d.localizacionTipos&&d.localizacionTipos.length)G.localizacionTipos=d.localizacionTipos;if(d.alertas)G.alertas=d.alertas;}catch(e){}};
-// Config con la que arranca una empresa recién creada: vacía de ubicaciones/tipos propios
-// (el cliente crea los suyos). Los tipos de localización se dejan como catálogo genérico de arranque.
-const DEF_LOC_TIPOS=["MUEBLE","LINEAL","NEVERA","PUNTA","JAULA","CAVA"];
-const resetTenantConfig=()=>{G.localizaciones=[];G.ubicacionesTipos=[];G.localizacionTipos=[...DEF_LOC_TIPOS];G.alertas=[];G.notas=[];};
-// ¿El conteo quedó completo/cerrado? (misma lógica que estadoConteo: null = completo)
-const conteoCompleto=(c)=>c.estado==="completado"||c.estado==="cerradoC2"||(c.estado==="cerradoC1"&&c.tipo!=="2conteos");
-// Conteos "reales" = excluye el conteo de ajuste (tipo "ajuste"), que no cuenta como ronda normal.
-const conteosReales=()=>G.conteos.filter(c=>c.tipo!=="ajuste");
-const conteoAjusteActivo=()=>G.conteos.find(c=>c.tipo==="ajuste")||null;
-// Habilita "Sube saldos" / crear ajuste: debe haber conteos reales y estar TODOS cerrados.
-const todosConteosCerrados=()=>{const r=conteosReales();return r.length>0&&r.every(conteoCompleto);};
-// Cantidad final definitiva de un producto: si tiene ajuste (ronda "AJU"), ese valor ABSOLUTO
-// manda sobre la suma de conteos; si no, se usa la suma normal (sumC3||sumC2||sumC1).
-const finalAjustado=(prodCaps,sumFinal)=>{const a=prodCaps.filter(c=>c.ronda==="AJU");return a.length?a[a.length-1].cantidad:sumFinal;};
-const saveLocalCache=()=>{try{localStorage.setItem(STORAGE_KEY,JSON.stringify({productos:G.productos,usuarios:G.usuarios,inventario:G.inventario,conteos:G.conteos,capturas:G.capturas,historial:G.historial,savedAt:new Date().toISOString()}));}catch(e){}};
+// (config local + domain helpers + saveLocalCache movidos a src/lib/data.js)
 
 // --- Snapshot para sincronización por diferencias ---
 let _snap={u:{},c:{},inv:"",hist:{},prods:{},cfg:""};

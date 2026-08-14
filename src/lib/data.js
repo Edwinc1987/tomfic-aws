@@ -95,3 +95,81 @@ export const catC = c => CAT_C[c?.trim()] || "#6b7280";
 // Estilos base inline (se migran a Tailwind incrementalmente).
 export const inp = {width:"100%",padding:"9px 12px",border:"1.5px solid #e2e8f0",borderRadius:8,fontSize:14,boxSizing:"border-box",outline:"none",background:"white",color:"#0f172a"};
 export const card = {background:"white",borderRadius:14,padding:20,boxShadow:"0 2px 8px rgba(0,0,0,0.06)",border:"1px solid #f1f5f9"};
+
+// ─────────────────────────────────────────
+// ESTADO GLOBAL + capa de datos (movido de App.jsx en Fase 2.2c).
+// G es un singleton mutable: se muta por propiedades (G.x=...), nunca se reasigna
+// entero, por eso `const` es seguro y funciona compartido entre módulos.
+// ─────────────────────────────────────────
+export const STORAGE_KEY = "tomfic_data_v1";
+export const CONFIG_KEY  = "tomfic_config_v1";
+
+export const G = {
+  productos: [],
+  usuarios: [
+    {id:"u1",nombre:"ADMIN",pass:"admin123",rol:"admin",activo:true,creado:TODAY()},
+    {id:"u2",nombre:"JUAN",pass:"123",rol:"capturador",activo:true,creado:TODAY()},
+    {id:"u3",nombre:"MARIA",pass:"123",rol:"capturador",activo:true,creado:TODAY()},
+    {id:"u4",nombre:"CARLOS",pass:"123",rol:"capturador",activo:true,creado:TODAY()},
+  ],
+  localizaciones: [
+    {id:"l1",ubicacion:"BODEGA",localizacion:"MUEBLE",nro:"MUEBLE 1",observacion:"DETERGENTES"},
+    {id:"l2",ubicacion:"BODEGA",localizacion:"MUEBLE",nro:"MUEBLE 2",observacion:"ALIMENTOS"},
+    {id:"l3",ubicacion:"BODEGA",localizacion:"NEVERA",nro:"NEVERA 1",observacion:"LÁCTEOS"},
+    {id:"l4",ubicacion:"BODEGA",localizacion:"LINEAL",nro:"LINEAL 1",observacion:""},
+    {id:"l5",ubicacion:"SALA DE VENTAS",localizacion:"LINEAL",nro:"LINEAL 1",observacion:"BEBIDAS"},
+    {id:"l6",ubicacion:"SALA DE VENTAS",localizacion:"PUNTA",nro:"PUNTA 1",observacion:"PROMOCIONES"},
+  ],
+  ubicacionesTipos: ["BODEGA","SALA DE VENTAS"],
+  localizacionTipos: ["MUEBLE","LINEAL","NEVERA","PUNTA","JAULA","CAVA"],
+  inventario: null,
+  conteos: [],
+  capturas: {},
+  alertas: [],
+  historial: [],
+  notas: [],
+  tenantId: null,
+  tenant: null,
+  tenants: [],
+};
+
+// --- Serialización ---
+export const capsDeConteo=(cid)=>{const o={};Object.entries(G.capturas).forEach(([k,v])=>{if(v.conteoId===cid)o[k]=v;});return o;};
+export const serConteo=(c,invId)=>({
+  id:c.id, tenant_id:G.tenantId||null, inventario_id:invId||(G.inventario?G.inventario.id:"")||"",
+  nombre:c.nombre||"", obs:c.obs||"", tipo:c.tipo||"",
+  usuario_c1:c.usuarioC1||"", usuario_c2:c.usuarioC2||"", usuario_c3:c.usuarioC3||"",
+  estado:c.estado||"", loc_label:c.locLabel||"", localizacion_id:c.locId||"",
+  ubicacion:c.ubicacion||"", localizacion_tipo:c.localizacion||"", nro:c.nro||"",
+  fecha_creacion:c.fechaCreacion||TODAY(),
+  rondas_cerradas:JSON.stringify(c.rondasCerradas||[]),
+  capturas_data:JSON.stringify(capsDeConteo(c.id)),
+});
+export const deserConteo=(r)=>{
+  const c={id:r.id,nombre:r.nombre,obs:r.obs,tipo:r.tipo,usuarioC1:r.usuario_c1,usuarioC2:r.usuario_c2,usuarioC3:r.usuario_c3,estado:r.estado,locLabel:r.loc_label,locId:r.localizacion_id,ubicacion:r.ubicacion,localizacion:r.localizacion_tipo,nro:r.nro,fechaCreacion:r.fecha_creacion,rondasCerradas:r.rondas_cerradas?JSON.parse(r.rondas_cerradas):[]};
+  let caps={};try{caps=r.capturas_data?JSON.parse(r.capturas_data):{};}catch(e){}
+  return {c,caps};
+};
+export const serInv=(inv,estado)=>({
+  id:inv.id,tenant_id:G.tenantId||null,nombre:inv.nombre||"",fecha:inv.fecha||"",estado,tipo:inv.tipo||"",obs:inv.obs||"",
+  apertura:inv.apertura||"",hora_apertura:inv.horaApertura||"",usuario_apertura:inv.usuarioApertura||"",
+  cierre:inv.cierre||"",hora_cierre:inv.horaCierre||"",usuario_cierre:inv.usuarioCierre||"",
+  conteos_snapshot:inv.conteos?JSON.stringify(inv.conteos):null,
+  capturas_snapshot:inv.capturas?JSON.stringify(inv.capturas):null,
+  productos_snapshot:inv.productos?JSON.stringify(inv.productos):null,
+});
+export const prodCols=(p)=>({id:p.id,tenant_id:G.tenantId||null,ean:p.ean||"",codigo:p.codigo||"",nombre:p.nombre||"",referencia:p.referencia||"",categoria:p.categoria||"",subcategoria:p.subcategoria||"",subgrupo:p.subgrupo||"",determinada:p.determinada||"",localizacion:p.localizacion||"",ubicacion:p.ubicacion||"",observacion:p.observacion||"",saldo:p.saldo||0,costo:p.costo||0,nit:p.nit||"",proveedor:p.proveedor||""});
+export const userCols=(u)=>({id:u.id,tenant_id:u.tenant_id||G.tenantId||null,nombre:u.nombre,pass:u.pass,rol:u.rol,activo:u.activo,creado:u.creado||TODAY(),correo:u.correo||"",telefono:u.telefono||"",cargo:u.cargo||"",turno:u.turno||"",zona:u.zona||"",obs:u.obs||""});
+
+// --- Config local / dominio ---
+export const cfgKey=()=>CONFIG_KEY+(G.tenantId?(":"+G.tenantId):"");
+export const saveLocalConfig=()=>{try{localStorage.setItem(cfgKey(),JSON.stringify({localizaciones:G.localizaciones,ubicacionesTipos:G.ubicacionesTipos,localizacionTipos:G.localizacionTipos,alertas:G.alertas}));}catch(e){}};
+export const loadLocalConfig=()=>{try{const raw=localStorage.getItem(cfgKey());if(!raw)return;const d=JSON.parse(raw);if(d.localizaciones)G.localizaciones=d.localizaciones;if(d.ubicacionesTipos&&d.ubicacionesTipos.length)G.ubicacionesTipos=d.ubicacionesTipos;if(d.localizacionTipos&&d.localizacionTipos.length)G.localizacionTipos=d.localizacionTipos;if(d.alertas)G.alertas=d.alertas;}catch(e){}};
+export const DEF_LOC_TIPOS=["MUEBLE","LINEAL","NEVERA","PUNTA","JAULA","CAVA"];
+export const resetTenantConfig=()=>{G.localizaciones=[];G.ubicacionesTipos=[];G.localizacionTipos=[...DEF_LOC_TIPOS];G.alertas=[];G.notas=[];};
+export const conteoCompleto=(c)=>c.estado==="completado"||c.estado==="cerradoC2"||(c.estado==="cerradoC1"&&c.tipo!=="2conteos");
+export const conteosReales=()=>G.conteos.filter(c=>c.tipo!=="ajuste");
+export const conteoAjusteActivo=()=>G.conteos.find(c=>c.tipo==="ajuste")||null;
+export const todosConteosCerrados=()=>{const r=conteosReales();return r.length>0&&r.every(conteoCompleto);};
+export const finalAjustado=(prodCaps,sumFinal)=>{const a=prodCaps.filter(c=>c.ronda==="AJU");return a.length?a[a.length-1].cantidad:sumFinal;};
+export const saveLocalCache=()=>{try{localStorage.setItem(STORAGE_KEY,JSON.stringify({productos:G.productos,usuarios:G.usuarios,inventario:G.inventario,conteos:G.conteos,capturas:G.capturas,historial:G.historial,savedAt:new Date().toISOString()}));}catch(e){}};
