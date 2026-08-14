@@ -8,7 +8,7 @@ import {
   Settings, Pencil, Trash2, FileText, Calendar, Scale, Wrench, Download,
   Upload, Printer, Search, Lightbulb, DollarSign, Clock, Cloud, Menu,
   ChevronRight, LogOut, Key, Smartphone, BarChart, TrendingDown, Circle,
-  AlertCircle, XCircle, Plus, Minus, X, Mail, UserPlus, Lock, ChevronDown, ChevronUp, ChevronLeft, Camera, CornerDownLeft, Globe, Sun, Moon,
+  AlertCircle, XCircle, Target, Percent, Plus, Minus, X, Mail, UserPlus, Lock, ChevronDown, ChevronUp, ChevronLeft, Camera, CornerDownLeft, Globe, Sun, Moon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,36 +21,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import Landing from "@/Landing";
 import { mergeLanding } from "@/landingContent";
+import { TODAY, HOUR, ID, slugify, memberEmail, ISO_HOY, diasHasta, addDias, fmtFechaCorta, GRACIA_DIAS, AVISO_DIAS, exportSheet, SIIGO_AJUSTE_COLS, CAT_C, catC, inp, card } from "@/lib/data";
 
 const supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_KEY);
 
-const TODAY = () => new Date().toLocaleDateString("es-CO");
-const HOUR  = () => new Date().toLocaleTimeString("es-CO");
-const ID    = () => Date.now().toString(36) + Math.random().toString(36).slice(2,5);
-// Slug: minúsculas, sin acentos, [^a-z0-9]→'-'. DEBE coincidir con slugify() en el SQL.
-const slugify = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"");
-// Email sintético de un miembro de empresa (capturador/gerente/admin migrado).
-const memberEmail = (nombre, slug) => `${slugify(nombre)}@${slugify(slug)}.tomfic.app`;
+// (helpers puros TODAY/HOUR/ID/slugify/memberEmail movidos a src/lib/data.js)
 
-// --- Vencimiento de planes ---
-// Fecha de hoy en ISO (YYYY-MM-DD) y días desde hoy hasta una fecha ISO (negativo = ya pasó).
-const ISO_HOY = () => new Date().toISOString().slice(0,10);
-const diasHasta = (iso) => iso ? Math.round((new Date(iso.slice(0,10)+"T00:00:00") - new Date(ISO_HOY()+"T00:00:00")) / 86400000) : null;
-const addDias = (iso, n) => { const d = new Date((iso||ISO_HOY()).slice(0,10)+"T00:00:00"); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); };
-const fmtFechaCorta = (iso) => { if(!iso) return "—"; const [y,m,d] = iso.slice(0,10).split("-"); return `${d}/${m}/${y}`; };
-const GRACIA_DIAS = 3; // días de gracia tras el vencimiento antes de bloquear el acceso del cliente
-const AVISO_DIAS  = 7; // días de anticipación con que se le avisa al cliente que su plan vence
-
-// Exporta filas crudas a XLSX (encabezado + datos, sin filas de título). Sirve
-// para plantillas y para importaciones externas como el ajuste de Siigo.
-const exportSheet = (rows, header, fname, sheetName = "Datos") => {
-  const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, sheetName);
-  XLSX.writeFile(wb, fname);
-};
-// Encabezados del formato "Importación de comprobante de ajuste" de Siigo.
-const SIIGO_AJUSTE_COLS = ["Código del producto (Obligatorio)", "Nombre del producto / Servicio", "Referencia de fábrica", "Aumenta/Disminuye (Obligatorio)", "Cantidad", "Costo Unitario"];
+// (vencimiento/exportSheet/SIIGO_AJUSTE_COLS movidos a src/lib/data.js)
 
 // ─────────────────────────────────────────
 // ESTADO GLOBAL
@@ -85,14 +62,12 @@ let G = {
   tenants: [],      // lista de empresas (solo la carga el dueño)
 };
 
-const CAT_C = {"CARNES FRIAS":"#dc2626","CONGELADOS":"#2563eb","SALSAS Y CONSERVAS":"#d97706","LACTEOS Y DERIVADOS":"#0891b2","REPOSTERIA":"#db2777","PANADERIA":"#c2410c","ADOBOS":"#65a30d","CHAMPIÑONES":"#78350f","ACEITES":"#92400e","HARINAS":"#ca8a04","PERECEDEROS":"#16a34a","APANADOS":"#7c2d12"};
-const catC = c => CAT_C[c?.trim()] || "#6b7280";
+// (CAT_C/catC movidos a src/lib/data.js)
 
 // ─────────────────────────────────────────
 // ESTILOS BASE
 // ─────────────────────────────────────────
-const inp = {width:"100%",padding:"9px 12px",border:"1.5px solid #e2e8f0",borderRadius:8,fontSize:14,boxSizing:"border-box",outline:"none",background:"white",color:"#0f172a"};
-const card = {background:"white",borderRadius:14,padding:20,boxShadow:"0 2px 8px rgba(0,0,0,0.06)",border:"1px solid #f1f5f9"};
+// (inp/card movidos a src/lib/data.js)
 
 function EstBadge({e}){
   const m={BUENO:["#dcfce7","#166534"],VENCIDO:["#fee2e2","#dc2626"],AVERIADO:["#fef3c7","#92400e"],"NO APTO VENTA":["#fee2e2","#991b1b"],BAJAS:["#fef9c3","#854d0e"],"SIN REVISAR":["#f1f5f9","#475569"]};
@@ -3574,6 +3549,20 @@ function VHistorial({G,showToast,usuario}){
     const catHMap={};analH.forEach(a=>{const k=a.categoria||"Sin categoría";catHMap[k]=(catHMap[k]||0)+a.dif;});
     const catsH=Object.entries(catHMap).map(([cat,val])=>({cat,val})).filter(c=>c.val!==0).sort((a,b)=>Math.abs(b.val)-Math.abs(a.val)).slice(0,6);
     const catHMax=Math.max(1,...catsH.map(c=>Math.abs(c.val)));
+    // ── KPIs de gerencia (calculados de datos que ya se capturan) ──
+    const nU=(n)=>(Math.round(n*100)/100).toLocaleString("es-CO");
+    const coincide=st.resumen.filter(r=>{const p=invP.find(x=>x.id===r.productoId);return p&&r.cantFinal===(p.saldo||0);}).length;
+    const exactitud=st.contados?Math.round(coincide/st.contados*1000)/10:0;
+    const cobertura=st.totalProductos?Math.round(st.contados/st.totalProductos*1000)/10:0;
+    const noContados=invP.filter(p=>!st.resumen.some(r=>r.productoId===p.id));
+    const es2=inv.tipo==="2conteos";
+    const conC2=st.resumen.filter(r=>(r.totalC2||0)>0);
+    const coincC1C2=conC2.filter(r=>(r.totalC1||0)===(r.totalC2||0)).length;
+    const desempates=st.resumen.filter(r=>(r.totalC3||0)>0);
+    const precision=conC2.length?Math.round(coincC1C2/conC2.length*1000)/10:0;
+    let sobU=0,falU=0,sobV=0,falV=0;
+    analH.forEach(a=>{const p=invP.find(x=>x.id===a.productoId);const c=p?.costo||0;if(a.dif>0){sobU+=a.dif;sobV+=a.dif*c;}else if(a.dif<0){falU+=-a.dif;falV+=-a.dif*c;}});
+    const hayCosto=st.totalFisico>0||st.totalSistema>0;
     const stCards=[
       {l:"Valor físico total",v:fmt(st.totalFisico),c:"#16a34a",
        lista:st.resumen.map(r=>[r.codigo,r.nombre,r.referencia,r.cantFinal,r.costo>0?fmt(r.cantFinal*r.costo):"—"]),
@@ -3608,6 +3597,70 @@ function VHistorial({G,showToast,usuario}){
           <UIBadge className="border-transparent" style={{background:(inv.tipo==="2conteos"?"#2563eb":"#16a34a")+"22",color:inv.tipo==="2conteos"?"#2563eb":"#16a34a"}}>{inv.tipo==="2conteos"?"2 CONTEOS":"1 CONTEO"}</UIBadge>
         </div>
         <div className="text-xs text-muted-foreground mb-4 flex items-center gap-1"><Calendar size={12}/> {inv.apertura} {inv.horaApertura} → {inv.cierre} {inv.horaCierre} · Por: {inv.usuarioApertura}</div>
+
+        {/* ── RESULTADO DEL INVENTARIO: KPIs de gerencia ── */}
+        {st.contados>0&&(<>
+        <div className="text-[11px] font-extrabold tracking-wider uppercase text-slate-400 mb-2.5">Resultado del inventario</div>
+        <div className="grid gap-3 mb-4" style={{gridTemplateColumns:"repeat(auto-fit,minmax(214px,1fr))"}}>
+          {/* Exactitud */}
+          <Card onClick={()=>setCardDetalle({titulo:"Productos con diferencia (no coinciden con el sistema)",cols:["Código","Nombre","Saldo","Físico","Diferencia"],lista:st.conDif.map(r=>{const p=invP.find(x=>x.id===r.productoId);const d=r.cantFinal-(p?.saldo||0);return[r.codigo,r.nombre,p?.saldo||0,r.cantFinal,d>0?"+"+nU(d):nU(d)];})})}
+            className="px-4 py-3.5 cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="grid place-items-center rounded-lg shrink-0" style={{width:30,height:30,background:"#eff6ff",color:"#2563eb"}}><Target size={16}/></span>
+              <span className="text-[12px] font-bold text-slate-700 leading-tight">Exactitud del inventario</span>
+            </div>
+            <div className="text-[30px] font-extrabold leading-none tracking-tight" style={{color:"#2563eb"}}>{exactitud}%</div>
+            <div className="h-[7px] rounded-full bg-slate-100 overflow-hidden mt-2.5"><div className="h-full rounded-full" style={{width:exactitud+"%",background:"#2563eb"}}/></div>
+            <div className="text-[12px] text-slate-500 mt-2 font-semibold"><b className="font-extrabold text-slate-700">{coincide}</b> de {st.contados} coinciden · <b className="font-extrabold" style={{color:"#dc2626"}}>{st.conDif.length}</b> con diferencia</div>
+          </Card>
+          {/* Precisión C1=C2 (solo 2 conteos) */}
+          {es2&&conC2.length>0&&(
+          <Card onClick={()=>setCardDetalle({titulo:"Productos que fueron a desempate (C3)",cols:["Código","Nombre","C1","C2","C3","Final"],lista:desempates.map(r=>[r.codigo,r.nombre,r.totalC1||0,r.totalC2||0,r.totalC3||0,r.cantFinal])})}
+            className="px-4 py-3.5 cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="grid place-items-center rounded-lg shrink-0" style={{width:30,height:30,background:"#f0fdf4",color:"#16a34a"}}><Percent size={16}/></span>
+              <span className="text-[12px] font-bold text-slate-700 leading-tight">Precisión de conteo (C1 = C2)</span>
+            </div>
+            <div className="text-[30px] font-extrabold leading-none tracking-tight" style={{color:"#16a34a"}}>{precision}%</div>
+            <div className="h-[7px] rounded-full bg-slate-100 overflow-hidden mt-2.5"><div className="h-full rounded-full" style={{width:precision+"%",background:"#16a34a"}}/></div>
+            <div className="text-[12px] text-slate-500 mt-2 font-semibold"><b className="font-extrabold text-slate-700">{coincC1C2}</b> coincidieron · <b className="font-extrabold" style={{color:"#7c3aed"}}>{desempates.length}</b> a desempate C3</div>
+          </Card>
+          )}
+          {/* Cobertura */}
+          <Card onClick={()=>setCardDetalle({titulo:"Productos sin contar",cols:["Código","Nombre","Referencia","Saldo Sistema"],lista:noContados.map(p=>[p.codigo,p.nombre,p.referencia||"",p.saldo||0])})}
+            className="px-4 py-3.5 cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="grid place-items-center rounded-lg shrink-0" style={{width:30,height:30,background:"#ecfeff",color:"#0891b2"}}><Package size={16}/></span>
+              <span className="text-[12px] font-bold text-slate-700 leading-tight">Cobertura del conteo</span>
+            </div>
+            <div className="text-[30px] font-extrabold leading-none tracking-tight" style={{color:"#0891b2"}}>{cobertura}%</div>
+            <div className="h-[7px] rounded-full bg-slate-100 overflow-hidden mt-2.5"><div className="h-full rounded-full" style={{width:cobertura+"%",background:"#0891b2"}}/></div>
+            <div className="text-[12px] text-slate-500 mt-2 font-semibold"><b className="font-extrabold text-slate-700">{st.contados}</b>/{st.totalProductos} · faltan <b className="font-extrabold" style={{color:"#d97706"}}>{noContados.length}</b></div>
+          </Card>
+          {/* Ajuste: sobrante vs faltante */}
+          <Card className="px-4 py-3.5">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="grid place-items-center rounded-lg shrink-0" style={{width:30,height:30,background:"#f5f0ff",color:"#7c3aed"}}><Scale size={16}/></span>
+              <span className="text-[12px] font-bold text-slate-700 leading-tight">Ajuste: sobrante vs faltante</span>
+            </div>
+            <div className="flex items-stretch gap-3 mt-1">
+              <div className="flex-1 min-w-0">
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Sobrante</div>
+                <div className="text-[18px] font-extrabold leading-tight truncate" style={{color:"#16a34a"}}>+{nU(sobU)}<span className="text-[11px] text-slate-400 font-bold"> und</span></div>
+                {hayCosto&&<div className="text-[11px] font-bold truncate" style={{color:"#16a34a"}}>{fmt(sobV)}</div>}
+              </div>
+              <div className="w-px bg-slate-200"/>
+              <div className="flex-1 min-w-0">
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Faltante</div>
+                <div className="text-[18px] font-extrabold leading-tight truncate" style={{color:"#dc2626"}}>−{nU(falU)}<span className="text-[11px] text-slate-400 font-bold"> und</span></div>
+                {hayCosto&&<div className="text-[11px] font-bold truncate" style={{color:"#dc2626"}}>{fmt(falV)}</div>}
+              </div>
+            </div>
+            <div className="text-[12px] text-slate-500 mt-2.5 font-semibold">Neto <b className="font-extrabold" style={{color:(sobU-falU)>=0?"#16a34a":"#dc2626"}}>{(sobU-falU)>=0?"+":"−"}{nU(Math.abs(sobU-falU))} und</b>{hayCosto?` · ${(st.ajuste>=0?"+":"")+fmt(st.ajuste)}`:" · sin costos"}</div>
+          </Card>
+        </div>
+        <div className="text-[11px] font-extrabold tracking-wider uppercase text-slate-400 mb-2.5">Detalle <span className="normal-case font-semibold text-slate-400">· clic en una tarjeta para ver los productos</span></div>
+        </>)}
         <div className="grid gap-3 mb-5" style={{gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))"}}>
           {stCards.map((s,i)=>(
             <Card key={i} onClick={()=>setCardDetalle({titulo:s.l,lista:s.lista,cols:s.cols})}

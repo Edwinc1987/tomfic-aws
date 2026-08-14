@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>TOMFIC — Demo Re-skin</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          azul: "#2563eb", azulOsc: "#1e40af", cian: "#0891b2",
+          verde: "#16a34a", navy: "#0f172a", navy2: "#1e293b",
+        },
+        boxShadow: {
+          card:    "0 1px 2px rgba(15,23,42,0.05), 0 1px 3px rgba(15,23,42,0.08)",
+          "card-md": "0 2px 6px rgba(15,23,42,0.06), 0 8px 20px rgba(15,23,42,0.08)",
+          "card-lg": "0 4px 12px rgba(15,23,42,0.08), 0 16px 40px rgba(15,23,42,0.12)",
+          "card-hover": "0 6px 16px rgba(37,99,235,0.16), 0 12px 32px rgba(15,23,42,0.10)",
+        },
+      }
+    }
+  }
+</script>
+<style>
+  body { font-family: system-ui, "Segoe UI", sans-serif; background: #e8ecf3; }
+  .grad-brand  { background-image: linear-gradient(135deg, #2563eb, #0891b2); }
+  .grad-navy   { background-image: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); }
+  .grad-header { background-image: linear-gradient(to right, #1e293b, #0f172a); }
+  .grad-cta    { background-image: linear-gradient(135deg, #1e40af, #2563eb); }
+  .hover-card  { transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
+  .hover-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(37,99,235,0.16), 0 12px 32px rgba(15,23,42,0.10);
+    border-color: #bfdbfe;
+  }
+  .btn-press:active { transform: scale(.95); }
+  .fab-press:active { transform: scale(.92); }
+  .chk-group:hover .chk-arrow { transform: translateX(2px); opacity: 1; }
+  .chk-arrow { transition: transform .15s ease, opacity .15s ease; opacity: .4; }
+  @keyframes pulseDot { 0%,100%{opacity:1} 50%{opacity:.35} }
+  .pulse-dot { animation: pulseDot 2s infinite; }
+</style>
+</head>
+<body class="min-h-screen pb-24">
+
+  <!-- TOPBAR -->
+  <header class="grad-navy sticky top-0 z-50 shadow-lg">
+    <div class="flex items-center justify-between px-5 h-14 text-white">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 grad-brand rounded-lg flex items-center justify-center shadow-md">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="2" height="14" rx="0.5" fill="white"/><rect x="6" y="5" width="1" height="14" fill="white"/><rect x="8" y="5" width="3" height="14" rx="0.5" fill="white"/><rect x="12" y="5" width="1.5" height="14" fill="white"/><rect x="14.5" y="5" width="2" height="14" fill="white"/><rect x="17.5" y="5" width="1" height="14" fill="white"/><rect x="19.5" y="5" width="1.5" height="14" fill="white"/><line x1="2" y1="12" x2="22" y2="12" stroke="#f43f5e" stroke-width="1.2"/></svg>
+        </div>
+        <div>
+          <div class="font-extrabold tracking-tight leading-none">TOMFIC</div>
+          <div class="text-[9px] text-slate-400 uppercase tracking-widest mt-0.5">Demo re-skin · misma marca</div>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 text-[11px]">
+        <span class="flex items-center gap-1.5 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 px-3 py-1 font-bold">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 pulse-dot"></span> Inventario activo
+        </span>
+        <span class="flex items-center gap-1.5 bg-white/10 rounded-lg px-2.5 py-1.5 text-slate-200 font-semibold border border-white/10">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 11a8 8 0 1 0-9 8c1 .08 2-.4 2-1v-3"/><path d="M4 13c0 4 3 6 7 6"/></svg> Sync
+        </span>
+        <span class="flex items-center justify-center w-7 h-7 rounded-full grad-brand text-[11px] font-bold">E</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 mt-8">
+
+    <div class="rounded-2xl grad-header text-white px-5 py-4 shadow-md flex items-center justify-between gap-3">
+      <div class="flex items-center gap-3 min-w-0">
+        <div class="w-11 h-11 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        </div>
+        <div class="min-w-0">
+          <div class="text-[10px] font-semibold uppercase tracking-wider text-white/60">Demo visual</div>
+          <div class="text-lg font-bold tracking-tight leading-tight">Antes y después del re-skin</div>
+          <div class="text-[11px] text-white/70 mt-0.5">Misma paleta #2563EB · #0891B2 · #16A34A — más profundidad, consistencia y vida</div>
+        </div>
+      </div>
+      <div class="text-right shrink-0">
+        <div class="text-2xl font-extrabold leading-none">4</div>
+        <div class="text-[10px] text-white/70 mt-0.5">elementos</div>
+      </div>
+    </div>
+
+    <!-- 1 · TARJETAS DE MÉTRICA -->
+    <section class="mt-8">
+      <h2 class="text-sm font-extrabold uppercase tracking-wider text-slate-700 mb-3">1 · Tarjeta de métrica — Panel del Dueño</h2>
+      <div class="grid lg:grid-cols-2 gap-6">
+        <div>
+          <div class="inline-flex items-center gap-1.5 rounded-full bg-slate-200 text-slate-600 text-[10px] font-bold uppercase px-2.5 py-1 mb-2.5">Antes · plana</div>
+          <div class="bg-white rounded-xl border border-slate-200 p-4 text-left" style="box-shadow:0 1px 2px rgba(15,23,42,0.05),0 1px 3px rgba(15,23,42,0.08);">
+            <div class="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg>
+              <span>Empresas</span>
+            </div>
+            <div class="mt-2 text-2xl font-extrabold tracking-tight text-slate-900">12</div>
+            <div class="mt-1 text-[11px] text-slate-400">2 inactivas</div>
+          </div>
+          <p class="text-[11px] text-slate-500 mt-2 leading-snug">Sombra alpha 0.04 sobre fondo gris: la tarjeta se funde con la página. Sin señal visual de que es interactiva.</p>
+        </div>
+
+        <div>
+          <div class="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold uppercase px-2.5 py-1 mb-2.5">Después · elevada</div>
+          <button class="chk-group bg-white rounded-xl border border-slate-200 p-4 text-left w-full hover-card btn-press" style="box-shadow:0 2px 6px rgba(15,23,42,0.06),0 8px 20px rgba(15,23,42,0.08);">
+            <div class="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-blue-600">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg>
+              <span>Empresas</span>
+              <svg class="chk-arrow ml-auto" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 18l6-6-6-6"/></svg>
+            </div>
+            <div class="mt-2 text-2xl font-extrabold tracking-tight text-slate-900">12</div>
+            <div class="mt-1 text-[11px] text-slate-500">2 inactivas</div>
+          </button>
+          <p class="text-[11px] text-slate-500 mt-2 leading-snug">Sombra media real + halo azul y elevación al hover + flecha que avanza. <b>Pasa el cursor</b> (hover, sin JS).</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2 · TABLA DE PRODUCTOS -->
+    <section class="mt-10">
+      <h2 class="text-sm font-extrabold uppercase tracking-wider text-slate-700 mb-3">2 · Tabla de productos — Base de datos</h2>
+      <div class="grid lg:grid-cols-2 gap-6">
+        <div>
+          <div class="inline-flex items-center gap-1.5 rounded-full bg-slate-200 text-slate-600 text-[10px] font-bold uppercase px-2.5 py-1 mb-2.5">Antes · header gris</div>
+          <div class="bg-white rounded-xl overflow-hidden border border-slate-200" style="box-shadow:0 1px 2px rgba(15,23,42,0.05),0 1px 3px rgba(15,23,42,0.08);">
+            <table class="w-full text-[12px]">
+              <thead><tr class="bg-slate-100 text-slate-500 border-b border-slate-200">
+                <th class="px-3 py-2 text-left font-semibold whitespace-nowrap">Código</th>
+                <th class="px-3 py-2 text-left font-semibold">Nombre</th>
+                <th class="px-3 py-2 text-right font-semibold">Saldo</th>
+              </tr></thead>
+              <tbody>
+                <tr class="border-b last:border-0"><td class="px-3 py-2 font-mono font-bold text-blue-700">00009</td><td class="px-3 py-2 text-slate-700">HAMBURGUESA ZENU X 30 UND</td><td class="px-3 py-2 text-right text-slate-500">12</td></tr>
+                <tr class="border-b last:border-0"><td class="px-3 py-2 font-mono font-bold text-blue-700">00104</td><td class="px-3 py-2 text-slate-700">PAN MOLDE BIMBO 32 UND</td><td class="px-3 py-2 text-right text-slate-500">8</td></tr>
+                <tr class="border-b last:border-0"><td class="px-3 py-2 font-mono font-bold text-blue-700">00851</td><td class="px-3 py-2 text-slate-700">ARROZ DIANA X 5 KG</td><td class="px-3 py-2 text-right text-slate-500">0</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div>
+          <div class="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold uppercase px-2.5 py-1 mb-2.5">Después · marca + píldoras</div>
+          <div class="bg-white rounded-xl overflow-hidden border border-slate-200" style="box-shadow:0 2px 6px rgba(15,23,42,0.06),0 8px 20px rgba(15,23,42,0.08);">
+            <table class="w-full text-[12px]">
+              <thead><tr class="grad-header text-white">
+                <th class="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wider whitespace-nowrap">Código</th>
+                <th class="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wider">Nombre</th>
+                <th class="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-wider">Saldo</th>
+              </tr></thead>
+              <tbody>
+                <tr class="border-b last:border-0 hover:bg-blue-50/60 transition-colors"><td class="px-3 py-2 font-mono font-bold text-blue-700">00009</td><td class="px-3 py-2 text-slate-700">HAMBURGUESA ZENU X 30 UND</td><td class="px-3 py-2 text-right"><span class="inline-flex min-w-[34px] justify-center rounded-md bg-emerald-50 text-emerald-700 text-[11px] font-bold px-1.5 py-0.5">12</span></td></tr>
+                <tr class="border-b last:border-0 hover:bg-blue-50/60 transition-colors"><td class="px-3 py-2 font-mono font-bold text-blue-700">00104</td><td class="px-3 py-2 text-slate-700">PAN MOLDE BIMBO 32 UND</td><td class="px-3 py-2 text-right"><span class="inline-flex min-w-[34px] justify-center rounded-md bg-emerald-50 text-emerald-700 text-[11px] font-bold px-1.5 py-0.5">8</span></td></tr>
+                <tr class="border-b last:border-0 hover:bg-blue-50/60 transition-colors"><td class="px-3 py-2 font-mono font-bold text-blue-700">00851</td><td class="px-3 py-2 text-slate-700">ARROZ DIANA X 5 KG</td><td class="px-3 py-2 text-right"><span class="inline-flex min-w-[34px] justify-center rounded-md bg-slate-100 text-slate-500 text-[11px] font-bold px-1.5 py-0.5">0</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3 · ESTADO VACÍO -->
+    <section class="mt-10">
+      <h2 class="text-sm font-extrabold uppercase tracking-wider text-slate-700 mb-3">3 · Estado vacío — Conteos</h2>
+      <div class="grid lg:grid-cols-2 gap-6">
+        <div>
+          <div class="inline-flex items-center gap-1.5 rounded-full bg-slate-200 text-slate-600 text-[10px] font-bold uppercase px-2.5 py-1 mb-2.5">Antes · sin personalidad</div>
+          <div class="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-white py-12 px-5 text-center">
+            <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.6"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            <div class="mt-3 text-base font-bold text-slate-500">Sin conteos programados</div>
+            <div class="mt-1 text-sm text-slate-400">Crea el primer conteo para comenzar.</div>
+          </div>
+        </div>
+
+        <div>
+          <div class="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold uppercase px-2.5 py-1 mb-2.5">Después · acento + CTA</div>
+          <div class="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-blue-300 bg-gradient-to-b from-blue-50/80 to-white py-12 px-5 text-center">
+            <div class="w-14 h-14 grad-brand rounded-2xl flex items-center justify-center shadow-md">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            </div>
+            <div class="mt-4 text-base font-bold text-slate-900">Sin conteos programados</div>
+            <div class="mt-1 text-sm text-slate-500">Crea el primer conteo para comenzar.</div>
+            <button class="mt-4 inline-flex items-center gap-1.5 grad-cta text-white text-sm font-bold rounded-lg px-4 py-2 shadow-md hover:shadow-lg hover-card btn-press">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 5v14M5 12h14"/></svg>
+              Programar Conteo
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4 · TOAST + FAB -->
+    <section class="mt-10">
+      <h2 class="text-sm font-extrabold uppercase tracking-wider text-slate-700 mb-3">4 · Toast + botón flotante de notas</h2>
+      <div class="grid lg:grid-cols-2 gap-6">
+        <div>
+          <div class="inline-flex items-center gap-1.5 rounded-full bg-slate-200 text-slate-600 text-[10px] font-bold uppercase px-2.5 py-1 mb-2.5">Antes · emoji + sin feedback</div>
+          <div class="space-y-4">
+            <div class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 text-white text-[12px] font-semibold px-3.5 py-2.5 shadow-md">
+              ✓ 120 productos importados y guardados
+            </div>
+            <div>
+              <div class="w-12 h-12 grad-brand rounded-full flex items-center justify-center text-white text-xl font-bold shadow-lg">+</div>
+              <p class="text-[11px] text-slate-500 mt-1.5">El ✓ es un carácter de texto; el FAB no da feedback al presionar.</p>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold uppercase px-2.5 py-1 mb-2.5">Después · ícono lucide + micro-interacción</div>
+          <div class="space-y-4">
+            <div class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 text-white text-[12px] font-semibold px-3.5 py-2.5 shadow-md">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.4"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>
+              120 productos importados y guardados
+            </div>
+            <div>
+              <button class="w-12 h-12 grad-brand rounded-full flex items-center justify-center text-white shadow-[0_6px_16px_rgba(37,99,235,0.35)] hover:shadow-[0_8px_20px_rgba(37,99,235,0.45)] fab-press transition-all duration-150 focus:outline-none focus-visible:ring-2 ring-offset-2 ring-blue-500" title="Notas">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>
+              </button>
+              <p class="text-[11px] text-slate-500 mt-1.5">Ícono lucide, halo azul, <code>active:scale(0.95)</code> y focus ring. <b>Haz clic</b> en el FAB.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5 · SISTEMA DE SOMBRAS -->
+    <section class="mt-10">
+      <h2 class="text-sm font-extrabold uppercase tracking-wider text-slate-700 mb-3">5 · Sistema de elevación propuesto</h2>
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white rounded-xl border border-slate-200 p-4 text-center" style="box-shadow:0 1px 2px rgba(15,23,42,0.05),0 1px 3px rgba(15,23,42,0.08);">
+          <div class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">sm</div>
+          <div class="text-[11px] text-slate-400 mt-1">Tarjetas base</div>
+        </div>
+        <div class="bg-white rounded-xl border border-slate-200 p-4 text-center" style="box-shadow:0 2px 6px rgba(15,23,42,0.06),0 8px 20px rgba(15,23,42,0.08);">
+          <div class="text-[10px] font-extrabold uppercase tracking-wider text-blue-600">md</div>
+          <div class="text-[11px] text-slate-400 mt-1">Tarjetas clave / tablas</div>
+        </div>
+        <div class="bg-white rounded-xl border border-slate-200 p-4 text-center" style="box-shadow:0 4px 12px rgba(15,23,42,0.08),0 16px 40px rgba(15,23,42,0.12);">
+          <div class="text-[10px] font-extrabold uppercase tracking-wider text-blue-600">lg</div>
+          <div class="text-[11px] text-slate-400 mt-1">Modales / FAB</div>
+        </div>
+        <div class="bg-white rounded-xl border border-blue-200 p-4 text-center transition-all duration-150 hover:translate-y-[-2px]" style="box-shadow:0 6px 16px rgba(37,99,235,0.16),0 12px 32px rgba(15,23,42,0.10);">
+          <div class="text-[10px] font-extrabold uppercase tracking-wider text-blue-600">hover</div>
+          <div class="text-[11px] text-slate-400 mt-1">Halo azul de marca</div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="mt-12 text-center text-[11px] text-slate-500">
+      Demo visual del re-skin — los colores, radios y degradados de marca no cambian: solo ganan profundidad, consistencia y micro-interacciones.
+    </footer>
+  </main>
+
+</body>
+</html>
