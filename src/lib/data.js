@@ -96,6 +96,10 @@ export const catC = c => CAT_C[c?.trim()] || "#6b7280";
 export const inp = {width:"100%",padding:"9px 12px",border:"1.5px solid #e2e8f0",borderRadius:8,fontSize:14,boxSizing:"border-box",outline:"none",background:"white",color:"#0f172a"};
 export const card = {background:"white",borderRadius:14,padding:20,boxShadow:"0 2px 8px rgba(0,0,0,0.06)",border:"1px solid #f1f5f9"};
 
+// Helpers movidos de App.jsx (Fase 3 de la modularización)
+export const money=(n)=>"$"+Math.round(Number(n)||0).toLocaleString("es-CO");
+export const HOY=()=>new Date().toISOString().slice(0,10);
+
 // ─────────────────────────────────────────
 // ESTADO GLOBAL + capa de datos (movido de App.jsx en Fase 2.2c).
 // G es un singleton mutable: se muta por propiedades (G.x=...), nunca se reasigna
@@ -173,3 +177,33 @@ export const conteoAjusteActivo=()=>G.conteos.find(c=>c.tipo==="ajuste")||null;
 export const todosConteosCerrados=()=>{const r=conteosReales();return r.length>0&&r.every(conteoCompleto);};
 export const finalAjustado=(prodCaps,sumFinal)=>{const a=prodCaps.filter(c=>c.ronda==="AJU");return a.length?a[a.length-1].cantidad:sumFinal;};
 export const saveLocalCache=()=>{try{localStorage.setItem(STORAGE_KEY,JSON.stringify({productos:G.productos,usuarios:G.usuarios,inventario:G.inventario,conteos:G.conteos,capturas:G.capturas,historial:G.historial,savedAt:new Date().toISOString()}));}catch(e){}};
+
+// ─────────────────────────────────────────
+// Análisis de un inventario (historial). getStInv es PURO: analiza un snapshot
+// (objeto con `capturas` y `productos`) y devuelve totales, estados
+// bueno/vencido/averiado, con diferencia y el resumen por producto.
+// Movido de VHistorial (App.jsx) para que lo use también el dashboard del gerente.
+// ─────────────────────────────────────────
+export const nU=(n)=>(Math.round(n*100)/100).toLocaleString("es-CO");
+export const getStInv=(inv)=>{
+  const caps=Object.values(inv.capturas||{});
+  const prods=inv.productos||[];
+  const porProd={};
+  caps.forEach(c=>{
+    if(!porProd[c.productoId])porProd[c.productoId]={...c,totalC1:0,totalC2:0,totalC3:0};
+    if(c.ronda==="C1")porProd[c.productoId].totalC1+=c.cantidad;
+    if(c.ronda==="C2")porProd[c.productoId].totalC2+=c.cantidad;
+    if(c.ronda==="C3")porProd[c.productoId].totalC3+=c.cantidad;
+  });
+  const resumen=Object.values(porProd).map(r=>{
+    const final=r.totalC3||r.totalC2||r.totalC1;
+    return{...r,cantFinal:final};
+  });
+  const totalFisico=resumen.reduce((s,r)=>s+(r.cantFinal*(r.costo||0)),0);
+  const totalSistema=prods.reduce((s,p)=>s+(p.saldo*(p.costo||0)),0);
+  const buenos=resumen.filter(r=>{const last=caps.filter(c=>c.productoId===r.productoId).pop();return last?.estado==="BUENO";});
+  const vencidos=resumen.filter(r=>{const last=caps.filter(c=>c.productoId===r.productoId).pop();return last?.estado==="VENCIDO";});
+  const averiados=resumen.filter(r=>{const last=caps.filter(c=>c.productoId===r.productoId).pop();return["AVERIADO","NO APTO VENTA"].includes(last?.estado);});
+  const conDif=resumen.filter(r=>{const p=prods.find(x=>x.id===r.productoId);return p&&r.cantFinal!==p.saldo;});
+  return{totalFisico,totalSistema,ajuste:totalFisico-totalSistema,buenos,vencidos,averiados,conDif,resumen,contados:resumen.length,totalProductos:prods.length,caps};
+};

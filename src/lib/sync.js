@@ -1,0 +1,117 @@
+// ─────────────────────────────────────────
+// sync.js — Sincronización a la nube (Supabase).
+// Extraído de App.jsx (Fase 2.2 de la modularización).
+// ─────────────────────────────────────────
+import { G, SB, serConteo, serInv, prodCols, userCols, loadLocalConfig, resetTenantConfig, deserConteo } from "@/lib/data";
+
+// --- Snapshot para sincronización por diferencias ---
+export const initSnap=()=>{
+  _snap={u:{},c:{},inv:"",hist:{},prods:{},cfg:""};
+  G.usuarios.forEach(u=>{_snap.u[u.id]=JSON.stringify(userCols(u));});
+  G.productos.forEach(p=>{_snap.prods[p.id]=JSON.stringify(prodCols(p));});
+  _snap.inv=G.inventario?JSON.stringify(serInv(G.inventario,"abierto")):"";
+  G.historial.forEach(h=>{_snap.hist[h.id]=JSON.stringify(serInv(h,"cerrado"));});
+  G.conteos.forEach(c=>{_snap.c[c.id]=JSON.stringify(serConteo(c));});
+  _snap.cfg=JSON.stringify({localizaciones:G.localizaciones,ubicacionesTipos:G.ubicacionesTipos,localizacionTipos:G.localizacionTipos,alertas:G.alertas,notas:G.notas});
+};
+
+export let _snap={u:{},c:{},inv:"",hist:{},prods:{},cfg:""};
+let _syncing=false,_pending=false,_syncTimer=null;
+let _dirty=false;
+let _clearBase=false;
+let _busy=false;
+let _loadingTenant=false;
+
+export const getBusy=()=>_busy;
+export const setBusy=(v)=>{_busy=v;};
+export const setClearBase=(v)=>{_clearBase=v;};
+export const getDirty=()=>_dirty;
+export const getSyncing=()=>_syncing;
+
+const doSync=async()=>{
+  if(!G.tenantId||_loadingTenant)return;
+  if(_syncing){_pending=true;return;}
+  _syncing=true;_dirty=false;
+  try{
+    const curP={};G.productos.forEach(p=>{curP[p.id]=prodCols(p);});
+    const cambiados=[];for(const id in curP){const s=JSON.stringify(curP[id]);if(_snap.prods[id]!==s)cambiados.push(curP[id]);}
+    const eliminados=[];for(const id in _snap.prods){if(!curP[id])eliminados.push(id);}
+    if(eliminados.length && Object.keys(curP).length===0 && !_clearBase){
+      throw new Error("Sync cancelado: se intentó vaciar toda la base de productos sin orden explícita.");
+    }
+    if(cambiados.length)await SB.upsertProductosBulk(cambiados);
+    if(eliminados.length)await SB.deleteProductosByIds(eliminados);
+    for(const id in curP)_snap.prods[id]=JSON.stringify(curP[id]);
+    for(const id in _snap.prods){if(!curP[id])delete _snap.prods[id];}
+    _clearBase=false;
+    const invObj=G.inventario?serInv(G.inventario,"abierto"):null;
+    const invS=invObj?JSON.stringify(invObj):"";
+    if(invS!==_snap.inv){if(invObj)await SB.upsertInventario(invObj);_snap.inv=invS;}
+    const curH={};G.historial.forEach(h=>{curH[h.id]=serInv(h,"cerrado");});
+    for(const id in curH){const s=JSON.stringify(curH[id]);if(_snap.hist[id]!==s){await SB.upsertInventario(curH[id]);_snap.hist[id]=s;}}
+    for(const id in _snap.hist){if(!curH[id]){await SB.deleteInventario(id);delete _snap.hist[id];}}
+    const curC={};G.conteos.forEach(c=>{curC[c.id]=serConteo(c);});
+    for(const id in curC){const s=JSON.stringify(curC[id]);if(_snap.c[id]!==s){await SB.upsertConteo(curC[id]);_snap.c[id]=s;}}
+    for(const id in _snap.c){if(!curC[id]){await SB.deleteConteo(id);delete _snap.c[id];}}
+    if(G.tenantId){
+      const cfgObj={localizaciones:G.localizaciones,ubicacionesTipos:G.ubicacionesTipos,localizacionTipos:G.localizacionTipos,alertas:G.alertas,notas:G.notas};
+      const cfg=JSON.stringify(cfgObj);
+      if(cfg!==_snap.cfg){
+        let prevTeniaLoc=false;try{const pv=_snap.cfg?JSON.parse(_snap.cfg):null;prevTeniaLoc=!!(pv&&pv.localizaciones&&pv.localizaciones.length);}catch(e){}
+        const ahoraVacio=!cfgObj.localizaciones||cfgObj.localizaciones.length===0;
+        if(ahoraVacio&&prevTeniaLoc){console.warn("Sync: se evitó sobrescribir ubicaciones con config vacía.");}
+        else{await SB.setConfig(`tenant:${G.tenantId}:config`,cfgObj);_snap.cfg=cfg;}
+      }
+    }
+  }catch(e){_dirty=true;console.warn("Error de sincronización:",e);}
+  _syncing=false;
+  if(_pending){_pending=false;doSync();}
+};
+export { doSync };
+
+export const scheduleSync=()=>{_dirty=true;if(_syncTimer)clearTimeout(_syncTimer);_syncTimer=setTimeout(doSync,400);};
+
+if(typeof window!=="undefined"){
+  window.addEventListener("beforeunload",()=>{try{doSync();}catch(e){}});
+  window.addEventListener("online",()=>{if(_dirty){try{doSync();}catch(e){}}});
+}
+
+export const loadBootstrap=async()=>{
+  G.landingContent=await SB.getConfig("landing");
+};
+
+export const setLoadingTenant=(v)=>{_loadingTenant=v;};
+
+export const loadTenantData=async(tid)=>{
+ _loadingTenant=true;
+ try{
+  G.tenantId=tid;
+  resetTenantConfig();
+  const cfg=await SB.getConfig(`tenant:${tid}:config`);
+  if(cfg){
+    if(cfg.localizaciones)G.localizaciones=cfg.localizaciones;
+    if(cfg.ubicacionesTipos&&cfg.ubicacionesTipos.length)G.ubicacionesTipos=cfg.ubicacionesTipos;
+    if(cfg.localizacionTipos&&cfg.localizacionTipos.length)G.localizacionTipos=cfg.localizacionTipos;
+    if(cfg.alertas)G.alertas=cfg.alertas;
+    if(cfg.notas)G.notas=cfg.notas;
+  } else { loadLocalConfig(); }
+  const {usuarios,productos,inventarios,conteos}=await SB.loadAll(tid);
+  if(usuarios.length)G.usuarios=usuarios;
+  G.productos=productos||[];
+  const active=inventarios.find(i=>i.estado==="abierto");
+  if(active){
+    G.inventario={id:active.id,nombre:active.nombre,tipo:active.tipo,obs:active.obs,fecha:active.fecha,apertura:active.apertura,horaApertura:active.hora_apertura,usuarioApertura:active.usuario_apertura};
+    G.conteos=[];G.capturas={};
+    conteos.filter(r=>r.inventario_id===active.id).forEach(r=>{const{c,caps}=deserConteo(r);G.conteos.push(c);Object.assign(G.capturas,caps);});
+  } else {G.inventario=null;G.conteos=[];G.capturas={};}
+  G.historial=inventarios.filter(i=>i.estado==="cerrado").map(i=>{
+    const cs=i.conteos_snapshot?JSON.parse(i.conteos_snapshot):[];
+    const ca=i.capturas_snapshot?JSON.parse(i.capturas_snapshot):{};
+    const pr=i.productos_snapshot?JSON.parse(i.productos_snapshot):[];
+    return {id:i.id,nombre:i.nombre,tipo:i.tipo,obs:i.obs,fecha:i.fecha,apertura:i.apertura,horaApertura:i.hora_apertura,usuarioApertura:i.usuario_apertura,cierre:i.cierre,horaCierre:i.hora_cierre,usuarioCierre:i.usuario_cierre,conteos:cs,capturas:ca,productos:pr,totalProductos:pr.length,totalCapturas:Object.keys(ca).length};
+  }).sort((a,b)=>(b.cierre||"").localeCompare(a.cierre||""));
+  initSnap();
+ } finally { _loadingTenant=false; }
+};
+
+export const loadTenants=async()=>{const t=await SB.listTenants();G.tenants=t.data||[];};
