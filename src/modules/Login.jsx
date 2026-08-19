@@ -31,35 +31,12 @@ export function Login({lf,setLf,err,onLogin,lastSaved,onBack}){
         <div style={{position:"absolute",bottom:-60,right:-60,width:240,height:240,borderRadius:"50%",background:"rgba(16,163,74,0.07)",pointerEvents:"none"}}/>
         <div style={{position:"absolute",top:"40%",right:-40,width:180,height:180,borderRadius:"50%",background:"rgba(37,99,235,0.05)",pointerEvents:"none"}}/>
 
-        {/* Logo grande */}
-        <div style={{marginBottom:32,textAlign:"center"}}>
-          <svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <linearGradient id="grad1" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
-                <stop offset="0%" stopColor="#2563eb"/>
-                <stop offset="100%" stopColor="#0891b2"/>
-              </linearGradient>
-            </defs>
-            <rect width="100" height="100" rx="22" fill="url(#grad1)"/>
-            {/* Código de barras */}
-            <rect x="17" y="24" width="4" height="52" rx="1" fill="white"/>
-            <rect x="23" y="24" width="2" height="52" rx="1" fill="white"/>
-            <rect x="27" y="24" width="6" height="52" rx="1" fill="white"/>
-            <rect x="35" y="24" width="3" height="52" rx="1" fill="white"/>
-            <rect x="40" y="24" width="2" height="52" rx="1" fill="white"/>
-            <rect x="44" y="24" width="5" height="52" rx="1" fill="white"/>
-            <rect x="51" y="24" width="2" height="52" rx="1" fill="white"/>
-            <rect x="55" y="24" width="4" height="52" rx="1" fill="white"/>
-            <rect x="61" y="24" width="6" height="52" rx="1" fill="white"/>
-            <rect x="69" y="24" width="2" height="52" rx="1" fill="white"/>
-            <rect x="73" y="24" width="4" height="52" rx="1" fill="white"/>
-            <rect x="79" y="24" width="3" height="52" rx="1" fill="white"/>
-            {/* Línea de escaneo */}
-            <line x1="12" y1="50" x2="88" y2="50" stroke="#f43f5e" strokeWidth="2.5" strokeLinecap="round" opacity="0.9"/>
-          </svg>
+        {/* Logo grande — cubo (caja) de marca */}
+        <div style={{marginBottom:24,textAlign:"center"}}>
+          <Package size={78} color="#2563eb" strokeWidth={1.5}/>
         </div>
 
-        <h1 style={{fontSize:42,fontWeight:900,color:"white",margin:"0 0 8px",letterSpacing:-1,textAlign:"center"}}>TOMFIC</h1>
+        <h1 style={{fontSize:42,fontWeight:900,color:"white",margin:"0 0 8px",letterSpacing:-1.5,textAlign:"center"}}>tomfic</h1>
         <div style={{fontSize:15,color:"#93c5fd",fontWeight:600,marginBottom:8,textAlign:"center",letterSpacing:0.5}}>Tomas físicas de inventario</div>
 
         {/* Features */}
@@ -88,24 +65,8 @@ export function Login({lf,setLf,err,onLogin,lastSaved,onBack}){
           {/* Logo pequeño móvil */}
           <div style={{textAlign:"center",marginBottom:32}}>
             <div style={{display:"inline-flex",alignItems:"center",gap:10,marginBottom:8}}>
-              <svg width="46" height="46" viewBox="0 0 100 100" fill="none">
-                <defs><linearGradient id="grad2" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse"><stop offset="0%" stopColor="#2563eb"/><stop offset="100%" stopColor="#0891b2"/></linearGradient></defs>
-                <rect width="100" height="100" rx="22" fill="url(#grad2)"/>
-                <rect x="17" y="24" width="4" height="52" rx="1" fill="white"/>
-                <rect x="23" y="24" width="2" height="52" rx="1" fill="white"/>
-                <rect x="27" y="24" width="6" height="52" rx="1" fill="white"/>
-                <rect x="35" y="24" width="3" height="52" rx="1" fill="white"/>
-                <rect x="40" y="24" width="2" height="52" rx="1" fill="white"/>
-                <rect x="44" y="24" width="5" height="52" rx="1" fill="white"/>
-                <rect x="51" y="24" width="2" height="52" rx="1" fill="white"/>
-                <rect x="55" y="24" width="4" height="52" rx="1" fill="white"/>
-                <rect x="61" y="24" width="6" height="52" rx="1" fill="white"/>
-                <rect x="69" y="24" width="2" height="52" rx="1" fill="white"/>
-                <rect x="73" y="24" width="4" height="52" rx="1" fill="white"/>
-                <rect x="79" y="24" width="3" height="52" rx="1" fill="white"/>
-                <line x1="12" y1="50" x2="88" y2="50" stroke="#f43f5e" strokeWidth="2.5" strokeLinecap="round" opacity="0.9"/>
-              </svg>
-              <span style={{fontSize:24,fontWeight:900,backgroundImage:"linear-gradient(90deg,#0891b2,#16a34a)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text"}}>TOMFIC</span>
+              <Package size={30} color="#2563eb"/>
+              <span style={{fontSize:24,fontWeight:900,color:"#2563eb",letterSpacing:-1}}>tomfic</span>
             </div>
             <div style={{fontSize:13,color:"#64748b"}}>Bienvenido · Inicia sesión para continuar</div>
           </div>

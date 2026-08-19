@@ -28,7 +28,7 @@ export function PanelDueno({usuario,setUsuario,logout,G,rerender,recargar,showTo
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center"><Package size={18}/></div>
           <div>
-            <div className="font-extrabold text-sm leading-none">TOMFIC</div>
+            <div className="font-extrabold text-sm leading-none">tomfic</div>
             <div className="text-[9px] uppercase tracking-[0.2em] text-indigo-300">Panel del Dueño</div>
           </div>
         </div>

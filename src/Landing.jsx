@@ -156,19 +156,11 @@ function Logo({ size = 40 }) {
         </linearGradient>
       </defs>
       <rect width="100" height="100" rx="22" fill="url(#lgrad)" />
-      <rect x="17" y="24" width="4" height="52" rx="1" fill="white" />
-      <rect x="23" y="24" width="2" height="52" rx="1" fill="white" />
-      <rect x="27" y="24" width="6" height="52" rx="1" fill="white" />
-      <rect x="35" y="24" width="3" height="52" rx="1" fill="white" />
-      <rect x="40" y="24" width="2" height="52" rx="1" fill="white" />
-      <rect x="44" y="24" width="5" height="52" rx="1" fill="white" />
-      <rect x="51" y="24" width="2" height="52" rx="1" fill="white" />
-      <rect x="55" y="24" width="4" height="52" rx="1" fill="white" />
-      <rect x="61" y="24" width="6" height="52" rx="1" fill="white" />
-      <rect x="69" y="24" width="2" height="52" rx="1" fill="white" />
-      <rect x="73" y="24" width="4" height="52" rx="1" fill="white" />
-      <rect x="79" y="24" width="3" height="52" rx="1" fill="white" />
-      <line x1="12" y1="50" x2="88" y2="50" stroke="#f43f5e" strokeWidth="2.5" strokeLinecap="round" opacity="0.9" />
+      <g stroke="white" strokeWidth="4.5" strokeLinejoin="round" strokeLinecap="round" fill="none">
+        <path d="M50 26 L74 39 L74 65 L50 78 L26 65 L26 39 Z" />
+        <path d="M26 39 L50 52 L74 39" />
+        <path d="M50 52 L50 78" />
+      </g>
     </svg>
   );
 }
@@ -262,7 +254,7 @@ export default function Landing({ onEnter, onRegister, onLead, content, preview 
           <div className="flex items-center gap-2.5">
             <Logo size={46} />
             <div>
-              <div className="font-extrabold text-lg tracking-tight leading-none bg-gradient-to-r from-cyan-600 to-green-600 bg-clip-text text-transparent">TOMFIC</div>
+              <div className="font-extrabold text-lg tracking-tight leading-none bg-gradient-to-r from-cyan-600 to-green-600 bg-clip-text text-transparent">tomfic</div>
               <div className="text-[9px] uppercase tracking-[0.12em] text-slate-400 leading-tight">Tomas físicas de inventario</div>
             </div>
           </div>

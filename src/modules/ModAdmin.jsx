@@ -56,7 +56,7 @@ export function ModAdmin({usuario,setUsuario,logout,G,rerender,recargar,showToas
           <div style={{display:"flex",alignItems:"center",gap:8}}>
             <div style={{width:32,height:32,background:"linear-gradient(135deg,#2563eb,#0891b2)",borderRadius:9,display:"flex",alignItems:"center",justifyContent:"center"}}><Package size={18} color="white"/></div>
             <div>
-              <div style={{fontWeight:800,fontSize:15,letterSpacing:-0.5}}>TOMFIC</div>
+              <div style={{fontWeight:800,fontSize:15,letterSpacing:-0.5}}>tomfic</div>
               <div style={{fontSize:9,color:"#64748b",marginTop:-2,letterSpacing:1,textTransform:"uppercase"}}>Inventarios</div>
             </div>
           </div>

@@ -66,7 +66,7 @@ return()=>clearInterval(t);
         <div style={{display:"flex",alignItems:"center",gap:12}}>
           <div style={{width:32,height:32,background:"rgba(255,255,255,0.2)",borderRadius:9,display:"flex",alignItems:"center",justifyContent:"center"}}><Package size={18} color="white"/></div>
           <div>
-            <div style={{fontWeight:800,fontSize:15,letterSpacing:-0.5}}>TOMFIC</div>
+            <div style={{fontWeight:800,fontSize:15,letterSpacing:-0.5}}>tomfic</div>
             <div style={{fontSize:9,color:"rgba(255,255,255,0.6)",letterSpacing:1,textTransform:"uppercase"}}>Vista Gerente</div>
           </div>
           {G.inventario&&<div style={{background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.25)",fontSize:11,padding:"3px 12px",borderRadius:20,fontWeight:700}}>● {G.inventario.nombre}</div>}

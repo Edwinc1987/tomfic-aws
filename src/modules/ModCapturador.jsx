@@ -311,7 +311,7 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
         <div style={{background:"#0f172a",color:"white",padding:"0 16px",display:"flex",alignItems:"center",justifyContent:"space-between",height:52,position:"sticky",top:0,zIndex:100}}>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
             <Package size={20} color="white"/>
-            <span style={{fontWeight:800,fontSize:15}}>TOMFIC</span>
+            <span style={{fontWeight:800,fontSize:15}}>tomfic</span>
             {G.inventario&&<span style={{background:"#16a34a",fontSize:10,padding:"2px 10px",borderRadius:20,fontWeight:700}}>● {G.inventario.nombre}</span>}
           </div>
           <div style={{display:"flex",gap:10,alignItems:"center"}}>
@@ -435,7 +435,7 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
         <div style={{background:"#0f172a",color:"white",padding:"0 16px",display:"flex",alignItems:"center",justifyContent:"space-between",height:52,position:"sticky",top:0,zIndex:100}}>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
             <button onClick={()=>{setConteoActivo(null);setRondaActiva(null);}} style={{background:"transparent",border:"1px solid #334155",color:"#94a3b8",padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:3}}><ChevronLeft size={13}/> Mis conteos</button>
-            <span style={{fontWeight:800,fontSize:15,color:"white"}}>TOMFIC</span>
+            <span style={{fontWeight:800,fontSize:15,color:"white"}}>tomfic</span>
             <span style={{background:"#7c3aed",fontSize:10,padding:"2px 10px",borderRadius:20,fontWeight:700}}>AJUSTE</span>
           </div>
           <div style={{display:"flex",gap:10,alignItems:"center"}}>
