@@ -254,7 +254,7 @@ export default function Landing({ onEnter, onRegister, onLead, content, preview 
           <div className="flex items-center gap-2.5">
             <Logo size={46} />
             <div>
-              <div className="font-extrabold text-lg tracking-tight leading-none bg-gradient-to-r from-cyan-600 to-green-600 bg-clip-text text-transparent">tomfic</div>
+              <div className="font-extrabold text-lg tracking-tight leading-none bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">tomfic</div>
               <div className="text-[9px] uppercase tracking-[0.12em] text-slate-400 leading-tight">Tomas físicas de inventario</div>
             </div>
           </div>
