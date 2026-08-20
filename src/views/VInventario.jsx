@@ -166,8 +166,9 @@ export function VInventario({G,rerender,showToast,usuario}){
             </div>
           </div>
           {/* Acciones */}
-          <div className="flex gap-2.5 mb-4 flex-wrap">
-            <Button variant="destructive" onClick={intentarCerrar}><Lock size={15}/> Cerrar Inventario</Button>
+           <div className="flex gap-2.5 mb-4 flex-wrap">
+             <Button variant="outline" onClick={()=>setModal(true)}><Plus size={15}/> Nuevo inventario</Button>
+             <Button variant="destructive" onClick={intentarCerrar}><Lock size={15}/> Cerrar Inventario</Button>
             <Button variant="outline" onClick={()=>{setEditForm({nombre:G.inventario.nombre,obs:G.inventario.obs||""});setModalEdit(true);}}><Pencil size={15}/> Editar</Button>
             <Button variant="outline" className="text-destructive border-red-200 hover:bg-red-50 hover:text-destructive" onClick={()=>setModalEliminar(true)}><Trash2 size={15}/> Eliminar</Button>
           </div>

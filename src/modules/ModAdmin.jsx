@@ -99,7 +99,7 @@ export function ModAdmin({usuario,setUsuario,logout,G,rerender,recargar,showToas
             {nav.map(n=>{
               const active=view===n.id;
               return(
-<button key={n.id} onClick={()=>{setHSel(null);setView(n.id);}}
+ <button key={n.id} onClick={()=>setView(n.id)}
                   title={sideCollapsed?n.label:""}
                   style={{width:"100%",display:"flex",alignItems:"center",gap:9,padding:sideCollapsed?"9px":"8px 11px",background:active?"linear-gradient(135deg,#2563eb,#1d4ed8)":"transparent",color:active?"white":"#64748b",border:"none",cursor:"pointer",fontSize:12.5,textAlign:"left",borderRadius:9,transition:"all 0.15s",position:"relative",overflow:"hidden"}}>
                   {active&&<div style={{position:"absolute",left:0,top:"20%",bottom:"20%",width:3,background:"#60a5fa",borderRadius:"0 3px 3px 0"}}/>}
