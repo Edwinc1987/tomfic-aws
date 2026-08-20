@@ -70,15 +70,20 @@ export function VUsuarios({usuario,G,rerender,showToast}){
         if(error)throw error;
         await refresh();showToast("Actualizado ✓");
       }else{
-        const {data,error}=await SB.createMember(form.nombre.toUpperCase().trim(),form.pass,form.rol,form.correo,form.telefono);
+        const nombreCreado=form.nombre.toUpperCase().trim();
+        const {data,error}=await SB.createMember(nombreCreado,form.pass,form.rol,form.correo,form.telefono);
         if(error)throw error;
-        // La credencial queda vinculada al inventario seleccionado; el admin no.
-        if(data?.id&&G.inventario&&form.rol!=="admin"){
-          const {error:eInv}=await SB.updateUsuario(data.id,{inventario_id:G.inventario.id});
-          if(eInv)throw eInv;
-        }
+        // El RPC puede devolver solo la credencial. Recargamos el perfil para
+        // obtener su id real antes de vincularlo al inventario seleccionado.
         await refresh();
-        setCredCreada({nombre:data.nombre||form.nombre.toUpperCase().trim(),pass:data.pass||form.pass,email:data.email});
+        const creado=G.usuarios.find(u=>(u.nombre||"").toUpperCase()===nombreCreado)||data;
+        if(!creado?.id)throw new Error("El usuario fue creado, pero no se pudo vincular al inventario.");
+        if(G.inventario&&form.rol!=="admin"){
+          const {error:eInv}=await SB.updateUsuario(creado.id,{inventario_id:G.inventario.id});
+          if(eInv)throw eInv;
+          await refresh();
+        }
+        setCredCreada({nombre:creado.nombre||nombreCreado,pass:data?.pass||form.pass,email:data?.email||creado.email});
         showToast("Usuario creado ✓");
       }
       setModal(false);setForm({nombre:"",pass:"",rol:"capturador",correo:"",telefono:"",editId:null});
