@@ -81,14 +81,15 @@ export function VInventario({G,rerender,showToast,usuario}){
     const capsSnapshot=JSON.parse(JSON.stringify(G.capturas));
     const prodsSnapshot=JSON.parse(JSON.stringify(G.productos));
     const conteosSnapshot=JSON.parse(JSON.stringify(G.conteos));
+    const cerradoId=G.inventario.id;
     G.historial.unshift({
       ...G.inventario,cierre:TODAY(),horaCierre:HOUR(),usuarioCierre:usuario.nombre,
       conteos:conteosSnapshot,capturas:capsSnapshot,productos:prodsSnapshot,
       localizaciones:JSON.parse(JSON.stringify(G.localizaciones)),
       ubicacionesTipos:[...G.ubicacionesTipos],localizacionTipos:[...G.localizacionTipos],
+      notas:JSON.parse(JSON.stringify(G.notas.filter(n=>n.inventarioId===cerradoId))),
       totalProductos:G.productos.length,totalCapturas:Object.keys(G.capturas).length,
     });
-    const cerradoId=G.inventario.id;
     G.productos=G.productos.map(p=>{
       const caps=Object.values(G.capturas).filter(c=>c.productoId===p.id);
       const sumC3=caps.filter(c=>c.ronda==="C3").reduce((s,c)=>s+c.cantidad,0);

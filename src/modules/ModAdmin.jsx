@@ -11,7 +11,6 @@ import { VReportes } from "@/views/VReportes";
 import { VUsuarios } from "@/views/VUsuarios";
 import { VHistorial } from "@/views/VHistorial";
 import BannerVencimiento from "@/components/BannerVencimiento";
-import BtnNotas from "@/components/BtnNotas";
 import { saveLocalConfig, selectInventory } from "@/lib/data";
 import { scheduleSync } from "@/lib/sync";
 
@@ -138,7 +137,6 @@ export function ModAdmin({usuario,setUsuario,logout,G,rerender,recargar,showToas
         </div>
       </div>
 
-      <BtnNotas G={G} usuario={usuario} rerender={rerender} showToast={showToast}/>
       <ConfirmDialog
         open={modalSalir}
         onOpenChange={setModalSalir}

@@ -98,8 +98,13 @@ export const loadTenantData=async(tid,preferredInvId=null)=>{
    const previo=preferredInvId||G.inventario?.id;
    G.inventarios=activos;
    G._inventarioDatos={};
-   const configs=await Promise.all(activos.map(inv=>SB.getConfig(`tenant:${tid}:inventario:${inv.id}:config`)));
-   G.notas=activos.flatMap((inv,index)=>((configs[index]||((!index)?legacyCfg:null)||{}).notas||[]));
+    const configsTodos=await Promise.all(inventarios.map(inv=>SB.getConfig(`tenant:${tid}:inventario:${inv.id}:config`)));
+    const cfgById={};inventarios.forEach((inv,index)=>{cfgById[inv.id]=configsTodos[index]||null;});
+    const configs=activos.map((inv,index)=>cfgById[inv.id]||((!index)?legacyCfg:null)||{});
+    G.notas=inventarios.flatMap((inv,index)=>{
+      if(inv.notas_snapshot){try{return typeof inv.notas_snapshot==="string"?JSON.parse(inv.notas_snapshot):inv.notas_snapshot;}catch(e){}}
+      return (cfgById[inv.id]||((!index)?legacyCfg:null)||{}).notas||[];
+    });
    activos.forEach((inv,index)=>{
      const cfg=configs[index]||((!index)?legacyCfg:null)||{};
      const filas=productos||[];
@@ -118,8 +123,9 @@ export const loadTenantData=async(tid,preferredInvId=null)=>{
      const pr=i.productos_snapshot?JSON.parse(i.productos_snapshot):[];
      const loc=i.localizaciones_snapshot?(typeof i.localizaciones_snapshot==="string"?JSON.parse(i.localizaciones_snapshot):i.localizaciones_snapshot):[];
      const ubi=i.ubicaciones_tipos_snapshot?(typeof i.ubicaciones_tipos_snapshot==="string"?JSON.parse(i.ubicaciones_tipos_snapshot):i.ubicaciones_tipos_snapshot):[];
-     const ltip=i.localizacion_tipos_snapshot?(typeof i.localizacion_tipos_snapshot==="string"?JSON.parse(i.localizacion_tipos_snapshot):i.localizacion_tipos_snapshot):[];
-     return {id:i.id,nombre:i.nombre,tipo:i.tipo,obs:i.obs,fecha:i.fecha,apertura:i.apertura,horaApertura:i.hora_apertura,usuarioApertura:i.usuario_apertura,cierre:i.cierre,horaCierre:i.hora_cierre,usuarioCierre:i.usuario_cierre,conteos:cs,capturas:ca,productos:pr,localizaciones:loc,ubicacionesTipos:ubi,localizacionTipos:ltip,totalProductos:pr.length,totalCapturas:Object.keys(ca).length};
+      const ltip=i.localizacion_tipos_snapshot?(typeof i.localizacion_tipos_snapshot==="string"?JSON.parse(i.localizacion_tipos_snapshot):i.localizacion_tipos_snapshot):[];
+      const notas=i.notas_snapshot?(typeof i.notas_snapshot==="string"?JSON.parse(i.notas_snapshot):i.notas_snapshot):[];
+      return {id:i.id,nombre:i.nombre,tipo:i.tipo,obs:i.obs,fecha:i.fecha,apertura:i.apertura,horaApertura:i.hora_apertura,usuarioApertura:i.usuario_apertura,cierre:i.cierre,horaCierre:i.hora_cierre,usuarioCierre:i.usuario_cierre,conteos:cs,capturas:ca,productos:pr,localizaciones:loc,ubicacionesTipos:ubi,localizacionTipos:ltip,notas,totalProductos:pr.length,totalCapturas:Object.keys(ca).length};
   }).sort((a,b)=>(b.cierre||"").localeCompare(a.cierre||""));
   initSnap();
  } finally { _loadingTenant=false; }

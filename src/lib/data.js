@@ -166,6 +166,7 @@ export const serInv=(inv,estado)=>({
   localizaciones_snapshot:inv.localizaciones?JSON.stringify(inv.localizaciones):null,
   ubicaciones_tipos_snapshot:inv.ubicacionesTipos?JSON.stringify(inv.ubicacionesTipos):null,
   localizacion_tipos_snapshot:inv.localizacionTipos?JSON.stringify(inv.localizacionTipos):null,
+  notas_snapshot:inv.notas?JSON.stringify(inv.notas):null,
 });
 export const prodCols=(p,invId)=>({id:p.id,tenant_id:G.tenantId||null,inventario_id:invId||p.inventario_id||G.inventario?.id||null,ean:p.ean||"",codigo:p.codigo||"",nombre:p.nombre||"",referencia:p.referencia||"",categoria:p.categoria||"",subcategoria:p.subcategoria||"",subgrupo:p.subgrupo||"",determinada:p.determinada||"",localizacion:p.localizacion||"",ubicacion:p.ubicacion||"",observacion:p.observacion||"",saldo:p.saldo||0,costo:p.costo||0,nit:p.nit||"",proveedor:p.proveedor||""});
 export const userCols=(u)=>({id:u.id,tenant_id:u.tenant_id||G.tenantId||null,inventario_id:u.inventario_id||null,nombre:u.nombre,pass:u.pass,rol:u.rol,activo:u.activo,creado:u.creado||TODAY(),correo:u.correo||"",telefono:u.telefono||"",cargo:u.cargo||"",turno:u.turno||"",zona:u.zona||"",obs:u.obs||""});
