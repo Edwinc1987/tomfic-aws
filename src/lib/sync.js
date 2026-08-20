@@ -2,20 +2,21 @@
 // sync.js — Sincronización a la nube (Supabase).
 // Extraído de App.jsx (Fase 2.2 de la modularización).
 // ─────────────────────────────────────────
-import { G, SB, serConteo, serInv, prodCols, userCols, loadLocalConfig, resetTenantConfig, deserConteo } from "@/lib/data";
+import { G, SB, serConteo, serInv, prodCols, userCols, loadLocalConfig, resetTenantConfig, deserConteo, rememberSelectedInventory, selectInventory } from "@/lib/data";
 
 // --- Snapshot para sincronización por diferencias ---
 export const initSnap=()=>{
-  _snap={u:{},c:{},inv:"",hist:{},prods:{},cfg:""};
+  rememberSelectedInventory();
+  _snap={u:{},c:{},invs:{},hist:{},prods:{},cfg:""};
   G.usuarios.forEach(u=>{_snap.u[u.id]=JSON.stringify(userCols(u));});
   G.productos.forEach(p=>{_snap.prods[p.id]=JSON.stringify(prodCols(p));});
-  _snap.inv=G.inventario?JSON.stringify(serInv(G.inventario,"abierto")):"";
+  G.inventarios.forEach(inv=>{_snap.invs[inv.id]=JSON.stringify(serInv(inv,"abierto"));});
   G.historial.forEach(h=>{_snap.hist[h.id]=JSON.stringify(serInv(h,"cerrado"));});
-  G.conteos.forEach(c=>{_snap.c[c.id]=JSON.stringify(serConteo(c));});
+  G.inventarios.forEach(inv=>{const d=G._inventarioDatos[inv.id]||{conteos:[],capturas:{}};d.conteos.forEach(c=>{_snap.c[c.id]=JSON.stringify(serConteo(c,inv.id,d.capturas));});});
   _snap.cfg=JSON.stringify({localizaciones:G.localizaciones,ubicacionesTipos:G.ubicacionesTipos,localizacionTipos:G.localizacionTipos,alertas:G.alertas,notas:G.notas});
 };
 
-export let _snap={u:{},c:{},inv:"",hist:{},prods:{},cfg:""};
+export let _snap={u:{},c:{},invs:{},hist:{},prods:{},cfg:""};
 let _syncing=false,_pending=false,_syncTimer=null;
 let _dirty=false;
 let _clearBase=false;
@@ -44,13 +45,16 @@ const doSync=async()=>{
     for(const id in curP)_snap.prods[id]=JSON.stringify(curP[id]);
     for(const id in _snap.prods){if(!curP[id])delete _snap.prods[id];}
     _clearBase=false;
-    const invObj=G.inventario?serInv(G.inventario,"abierto"):null;
-    const invS=invObj?JSON.stringify(invObj):"";
-    if(invS!==_snap.inv){if(invObj)await SB.upsertInventario(invObj);_snap.inv=invS;}
+    rememberSelectedInventory();
+    const curInv={};
+    G.inventarios.forEach(inv=>{curInv[inv.id]=serInv(inv,"abierto");});
+    for(const id in curInv){const s=JSON.stringify(curInv[id]);if(_snap.invs[id]!==s){await SB.upsertInventario(curInv[id]);_snap.invs[id]=s;}}
+    for(const id in _snap.invs){if(!curInv[id]){await SB.deleteInventario(id);delete _snap.invs[id];}}
     const curH={};G.historial.forEach(h=>{curH[h.id]=serInv(h,"cerrado");});
     for(const id in curH){const s=JSON.stringify(curH[id]);if(_snap.hist[id]!==s){await SB.upsertInventario(curH[id]);_snap.hist[id]=s;}}
     for(const id in _snap.hist){if(!curH[id]){await SB.deleteInventario(id);delete _snap.hist[id];}}
-    const curC={};G.conteos.forEach(c=>{curC[c.id]=serConteo(c);});
+    const curC={};
+    G.inventarios.forEach(inv=>{const d=G._inventarioDatos[inv.id]||{conteos:[],capturas:{}};d.conteos.forEach(c=>{curC[c.id]=serConteo(c,inv.id,d.capturas);});});
     for(const id in curC){const s=JSON.stringify(curC[id]);if(_snap.c[id]!==s){await SB.upsertConteo(curC[id]);_snap.c[id]=s;}}
     for(const id in _snap.c){if(!curC[id]){await SB.deleteConteo(id);delete _snap.c[id];}}
     if(G.tenantId){
@@ -98,12 +102,18 @@ export const loadTenantData=async(tid)=>{
   const {usuarios,productos,inventarios,conteos}=await SB.loadAll(tid);
   if(usuarios.length)G.usuarios=usuarios;
   G.productos=productos||[];
-  const active=inventarios.find(i=>i.estado==="abierto");
-  if(active){
-    G.inventario={id:active.id,nombre:active.nombre,tipo:active.tipo,obs:active.obs,fecha:active.fecha,apertura:active.apertura,horaApertura:active.hora_apertura,usuarioApertura:active.usuario_apertura};
-    G.conteos=[];G.capturas={};
-    conteos.filter(r=>r.inventario_id===active.id).forEach(r=>{const{c,caps}=deserConteo(r);G.conteos.push(c);Object.assign(G.capturas,caps);});
-  } else {G.inventario=null;G.conteos=[];G.capturas={};}
+   const activos=inventarios.filter(i=>i.estado==="abierto").map(i=>({id:i.id,nombre:i.nombre,tipo:i.tipo,obs:i.obs,fecha:i.fecha,apertura:i.apertura,horaApertura:i.hora_apertura,usuarioApertura:i.usuario_apertura}));
+   const previo=G.inventario?.id;
+   G.inventarios=activos;
+   G._inventarioDatos={};
+   activos.forEach(inv=>{
+     const d={conteos:[],capturas:{}};
+     conteos.filter(r=>r.inventario_id===inv.id).forEach(r=>{const{c,caps}=deserConteo(r);d.conteos.push(c);Object.assign(d.capturas,caps);});
+     G._inventarioDatos[inv.id]=d;
+   });
+   const seleccionado=activos.find(i=>i.id===previo)||activos[0]||null;
+   G.inventario=null;G.conteos=[];G.capturas={};
+   if(seleccionado)selectInventory(seleccionado.id);
   G.historial=inventarios.filter(i=>i.estado==="cerrado").map(i=>{
     const cs=i.conteos_snapshot?JSON.parse(i.conteos_snapshot):[];
     const ca=i.capturas_snapshot?JSON.parse(i.capturas_snapshot):{};

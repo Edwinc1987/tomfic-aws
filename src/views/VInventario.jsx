@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import Section from "@/components/Section";
 import { setBusy, initSnap } from "@/lib/sync";
-import { G, TODAY, HOUR, ID, finalAjustado, supabase, SB } from "@/lib/data";
+import { G, TODAY, HOUR, ID, finalAjustado, supabase, SB, rememberSelectedInventory } from "@/lib/data";
 
 // ── INVENTARIO ──
 export function VInventario({G,rerender,showToast,usuario}){
@@ -38,8 +38,13 @@ export function VInventario({G,rerender,showToast,usuario}){
   const conteosIncompletos=()=>G.conteos.filter(c=>c.tipo!=="ajuste").map(c=>({c,razon:estadoConteo(c)})).filter(x=>x.razon!==null);
   const crear=()=>{
     if(!form.nombre.trim())return showToast("Ingresa un nombre","err");
-    if(G.inventario)return showToast("Ya hay un inventario activo","err");
-    G.inventario={id:ID(),nombre:form.nombre,tipo:form.tipo,obs:form.obs,fecha:form.fecha,apertura:TODAY(),horaApertura:HOUR(),usuarioApertura:usuario.nombre};
+    const limite=Math.max(1,Number(G.tenant?.limite_inventarios||1));
+    if(G.inventarios.length>=limite)return showToast(`Tu plan permite ${limite} inventario${limite===1?"":"s"} activo${limite===1?"":"s"}.` ,"err");
+    const inv={id:ID(),nombre:form.nombre,tipo:form.tipo,obs:form.obs,fecha:form.fecha,apertura:TODAY(),horaApertura:HOUR(),usuarioApertura:usuario.nombre};
+    rememberSelectedInventory();
+    G.inventarios=[...G.inventarios,inv];
+    G.inventario=inv;
+    G._inventarioDatos[inv.id]={conteos:[],capturas:{}};
     G.conteos=[];G.capturas={};G.alertas=[];
     setModal(false);setForm({nombre:"",tipo:"2conteos",obs:"",fecha:TODAY()});
     rerender();showToast("Inventario creado. Ahora carga la base de productos ✓");
@@ -47,6 +52,7 @@ export function VInventario({G,rerender,showToast,usuario}){
   const guardarEdit=()=>{
     if(!editForm.nombre.trim())return showToast("El nombre no puede estar vacío","err");
     G.inventario={...G.inventario,nombre:editForm.nombre,obs:editForm.obs};
+    G.inventarios=G.inventarios.map(i=>i.id===G.inventario.id?G.inventario:i);
     setModalEdit(false);rerender();showToast("Inventario actualizado ✓");
   };
   const intentarCerrar=()=>{
@@ -74,6 +80,7 @@ export function VInventario({G,rerender,showToast,usuario}){
       conteos:conteosSnapshot,capturas:capsSnapshot,productos:prodsSnapshot,
       totalProductos:G.productos.length,totalCapturas:Object.keys(G.capturas).length,
     });
+    const cerradoId=G.inventario.id;
     G.productos=G.productos.map(p=>{
       const caps=Object.values(G.capturas).filter(c=>c.productoId===p.id);
       const sumC3=caps.filter(c=>c.ronda==="C3").reduce((s,c)=>s+c.cantidad,0);
@@ -84,6 +91,10 @@ export function VInventario({G,rerender,showToast,usuario}){
       return (final>0||tieneAjuste)?{...p,saldo:final}:p; // un ajuste (aunque sea 0) siempre manda
     });
     G.inventario=null;G.conteos=[];G.capturas={};G.alertas=[];
+    G.inventarios=G.inventarios.filter(i=>i.id!==cerradoId);
+    delete G._inventarioDatos[cerradoId];
+    const siguiente=G.inventarios[0]||null;
+    if(siguiente){G.inventario=siguiente;G.conteos=G._inventarioDatos[siguiente.id]?.conteos||[];G.capturas=G._inventarioDatos[siguiente.id]?.capturas||{};}
     setBusy(false);
     rerender();showToast("Inventario cerrado. Saldos actualizados ✓");
   };
@@ -98,6 +109,10 @@ export function VInventario({G,rerender,showToast,usuario}){
     }catch(e){console.warn("Error al eliminar de la nube:",e);}
     // Limpiar localmente y resetear el snapshot de sincronización
     G.inventario=null;G.conteos=[];G.capturas={};G.alertas=[];
+    G.inventarios=G.inventarios.filter(i=>i.id!==invId);
+    delete G._inventarioDatos[invId];
+    const siguiente=G.inventarios[0]||null;
+    if(siguiente){G.inventario=siguiente;G.conteos=G._inventarioDatos[siguiente.id]?.conteos||[];G.capturas=G._inventarioDatos[siguiente.id]?.capturas||{};}
     G.conteos.forEach(()=>{});
     initSnap();
     setEliminando(false);setModalEliminar(false);setBusy(false);

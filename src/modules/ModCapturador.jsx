@@ -5,7 +5,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PageHeader } from "@/components/ui/page-header";
 import CamScanner from "@/components/CamScanner";
 import BtnNotas from "@/components/BtnNotas";
-import { G, SB, supabase, ID, TODAY, HOUR, conteoCompleto, nU, getStInv, card, inp } from "@/lib/data";
+import { G, SB, supabase, ID, TODAY, HOUR, conteoCompleto, nU, getStInv, card, inp, selectInventory } from "@/lib/data";
 
 function EstBadge({e}){
   const m={BUENO:["#dcfce7","#166534"],VENCIDO:["#fee2e2","#dc2626"],AVERIADO:["#fef3c7","#92400e"],"NO APTO VENTA":["#fee2e2","#991b1b"],BAJAS:["#fef9c3","#854d0e"],"SIN REVISAR":["#f1f5f9","#475569"]};
@@ -312,7 +312,10 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
           <div style={{display:"flex",alignItems:"center",gap:10}}>
             <Package size={20} color="white"/>
             <span style={{fontWeight:800,fontSize:15}}>tomfic</span>
-            {G.inventario&&<span style={{background:"#16a34a",fontSize:10,padding:"2px 10px",borderRadius:20,fontWeight:700}}>● {G.inventario.nombre}</span>}
+            {G.inventario&&<select value={G.inventario.id} onChange={e=>{setConteoActivo(null);setRondaActiva(null);selectInventory(e.target.value);rerender();}} aria-label="Inventario activo seleccionado"
+              style={{background:"#166534",border:"1px solid #22c55e",color:"white",fontSize:10,padding:"3px 8px",borderRadius:20,fontWeight:700,maxWidth:180}}>
+              {G.inventarios.map(inv=><option key={inv.id} value={inv.id} style={{color:"#0f172a"}}>{inv.nombre}</option>)}
+            </select>}
           </div>
           <div style={{display:"flex",gap:10,alignItems:"center"}}>
             <button onClick={toggleDark} title={dark?"Modo día":"Modo noche"} style={{background:"transparent",border:"1px solid #334155",color:"#facc15",padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer",display:"inline-flex",alignItems:"center"}}>{dark?<Sun size={14}/>:<Moon size={14}/>}</button>

@@ -127,6 +127,8 @@ export const G = {
   ubicacionesTipos: ["BODEGA","SALA DE VENTAS"],
   localizacionTipos: ["MUEBLE","LINEAL","NEVERA","PUNTA","JAULA","CAVA"],
   inventario: null,
+  inventarios: [],
+  _inventarioDatos: {},
   conteos: [],
   capturas: {},
   alertas: [],
@@ -139,7 +141,7 @@ export const G = {
 
 // --- Serialización ---
 export const capsDeConteo=(cid)=>{const o={};Object.entries(G.capturas).forEach(([k,v])=>{if(v.conteoId===cid)o[k]=v;});return o;};
-export const serConteo=(c,invId)=>({
+export const serConteo=(c,invId,capSource=G.capturas)=>({
   id:c.id, tenant_id:G.tenantId||null, inventario_id:invId||(G.inventario?G.inventario.id:"")||"",
   nombre:c.nombre||"", obs:c.obs||"", tipo:c.tipo||"",
   usuario_c1:c.usuarioC1||"", usuario_c2:c.usuarioC2||"", usuario_c3:c.usuarioC3||"",
@@ -147,7 +149,7 @@ export const serConteo=(c,invId)=>({
   ubicacion:c.ubicacion||"", localizacion_tipo:c.localizacion||"", nro:c.nro||"",
   fecha_creacion:c.fechaCreacion||TODAY(),
   rondas_cerradas:JSON.stringify(c.rondasCerradas||[]),
-  capturas_data:JSON.stringify(capsDeConteo(c.id)),
+  capturas_data:JSON.stringify(Object.fromEntries(Object.entries(capSource||{}).filter(([,v])=>v.conteoId===c.id))),
 });
 export const deserConteo=(r)=>{
   const c={id:r.id,nombre:r.nombre,obs:r.obs,tipo:r.tipo,usuarioC1:r.usuario_c1,usuarioC2:r.usuario_c2,usuarioC3:r.usuario_c3,estado:r.estado,locLabel:r.loc_label,locId:r.localizacion_id,ubicacion:r.ubicacion,localizacion:r.localizacion_tipo,nro:r.nro,fechaCreacion:r.fecha_creacion,rondasCerradas:r.rondas_cerradas?JSON.parse(r.rondas_cerradas):[]};
@@ -176,7 +178,22 @@ export const conteosReales=()=>G.conteos.filter(c=>c.tipo!=="ajuste");
 export const conteoAjusteActivo=()=>G.conteos.find(c=>c.tipo==="ajuste")||null;
 export const todosConteosCerrados=()=>{const r=conteosReales();return r.length>0&&r.every(conteoCompleto);};
 export const finalAjustado=(prodCaps,sumFinal)=>{const a=prodCaps.filter(c=>c.ronda==="AJU");return a.length?a[a.length-1].cantidad:sumFinal;};
-export const saveLocalCache=()=>{try{localStorage.setItem(STORAGE_KEY,JSON.stringify({productos:G.productos,usuarios:G.usuarios,inventario:G.inventario,conteos:G.conteos,capturas:G.capturas,historial:G.historial,savedAt:new Date().toISOString()}));}catch(e){}};
+export const saveLocalCache=()=>{try{localStorage.setItem(STORAGE_KEY,JSON.stringify({productos:G.productos,usuarios:G.usuarios,inventario:G.inventario,inventarios:G.inventarios,conteos:G.conteos,capturas:G.capturas,historial:G.historial,savedAt:new Date().toISOString()}));}catch(e){}};
+
+// Las vistas trabajan sobre el inventario seleccionado. Los demás inventarios
+// abiertos permanecen aislados aquí para no mezclar sus conteos y capturas.
+export const rememberSelectedInventory=()=>{
+  if(!G.inventario)return;
+  G._inventarioDatos[G.inventario.id]={conteos:G.conteos,capturas:G.capturas};
+};
+export const selectInventory=(id)=>{
+  rememberSelectedInventory();
+  const inv=G.inventarios.find(i=>i.id===id)||null;
+  G.inventario=inv;
+  const datos=inv&&G._inventarioDatos[id];
+  G.conteos=datos?.conteos||[];
+  G.capturas=datos?.capturas||{};
+};
 
 // ─────────────────────────────────────────
 // Análisis de un inventario (historial). getStInv es PURO: analiza un snapshot

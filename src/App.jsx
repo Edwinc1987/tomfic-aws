@@ -148,7 +148,7 @@ export default function TomficApp(){
 
   const logout=async()=>{
     try{await supabase.auth.signOut();}catch(e){}
-    G.tenantId=null;G.tenants=[];G.productos=[];G.conteos=[];G.capturas={};G.inventario=null;G.historial=[];G.notas=[];
+    G.tenantId=null;G.tenants=[];G.productos=[];G.conteos=[];G.capturas={};G.inventario=null;G.inventarios=[];G._inventarioDatos={};G.historial=[];G.notas=[];
     setEntrar(false);setLoginForm({tab:"equipo",empresa:"",user:"",email:"",pass:""});setLoginErr("");
     setUsuario(null);
   };

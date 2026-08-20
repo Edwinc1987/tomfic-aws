@@ -12,7 +12,7 @@ import { VUsuarios } from "@/views/VUsuarios";
 import { VHistorial } from "@/views/VHistorial";
 import BannerVencimiento from "@/components/BannerVencimiento";
 import BtnNotas from "@/components/BtnNotas";
-import { saveLocalConfig } from "@/lib/data";
+import { saveLocalConfig, selectInventory } from "@/lib/data";
 import { scheduleSync } from "@/lib/sync";
 
 export function ModAdmin({usuario,setUsuario,logout,G,rerender,recargar,showToast,lastSaved,limpiarDatos}){
@@ -61,10 +61,10 @@ export function ModAdmin({usuario,setUsuario,logout,G,rerender,recargar,showToas
             </div>
           </div>
           {G.inventario&&(
-            <div style={{background:"rgba(22,163,74,0.2)",border:"1px solid rgba(22,163,74,0.4)",fontSize:11,padding:"3px 12px",borderRadius:20,fontWeight:700,color:"#4ade80",display:"flex",alignItems:"center",gap:5}}>
-              <span style={{width:6,height:6,background:"#4ade80",borderRadius:99,display:"inline-block"}}/>
-              {G.inventario.nombre}
-            </div>
+            <select value={G.inventario.id} onChange={e=>{selectInventory(e.target.value);rerender();}} aria-label="Inventario activo seleccionado"
+              style={{background:"rgba(22,163,74,0.2)",border:"1px solid rgba(22,163,74,0.4)",fontSize:11,padding:"4px 10px",borderRadius:20,fontWeight:700,color:"#bbf7d0",maxWidth:220}}>
+              {G.inventarios.map(inv=><option key={inv.id} value={inv.id} style={{color:"#0f172a"}}>{inv.nombre}</option>)}
+            </select>
           )}
 
         </div>

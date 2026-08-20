@@ -3,7 +3,7 @@ import { Package, BarChart2, FileText, Landmark, AlertTriangle, Scale, DollarSig
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PageHeader } from "@/components/ui/page-header";
 import BannerVencimiento from "@/components/BannerVencimiento";
-import { G, nU, getStInv, TODAY, HOUR, ID } from "@/lib/data";
+import { G, nU, getStInv, TODAY, HOUR, ID, selectInventory } from "@/lib/data";
 
 export function ModGerente({usuario,setUsuario,logout,G,rerender,recargar,showToast}){
   const [view,setView]=useState("resumen");
@@ -69,7 +69,10 @@ return()=>clearInterval(t);
             <div style={{fontWeight:800,fontSize:15,letterSpacing:-0.5}}>tomfic</div>
             <div style={{fontSize:9,color:"rgba(255,255,255,0.6)",letterSpacing:1,textTransform:"uppercase"}}>Vista Gerente</div>
           </div>
-          {G.inventario&&<div style={{background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.25)",fontSize:11,padding:"3px 12px",borderRadius:20,fontWeight:700}}>● {G.inventario.nombre}</div>}
+          {G.inventario&&<select value={G.inventario.id} onChange={e=>{selectInventory(e.target.value);rerender();}} aria-label="Inventario activo seleccionado"
+            style={{background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.25)",color:"white",fontSize:11,padding:"4px 10px",borderRadius:20,fontWeight:700,maxWidth:220}}>
+            {G.inventarios.map(inv=><option key={inv.id} value={inv.id} style={{color:"#0f172a"}}>{inv.nombre}</option>)}
+          </select>}
         </div>
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
           <button onClick={async()=>{await recargar();showToast("Actualizado ✓");}} style={{background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.15)",color:"white",padding:"5px 12px",borderRadius:8,fontSize:11,cursor:"pointer"}}><RefreshCw size={11} style={{display:"inline",marginRight:4}}/> Sync</button>
