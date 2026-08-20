@@ -14,7 +14,7 @@ export function VClienteDetalle({t,showToast,onBack,onChanged}){
   const [pagos,setPagos]=useState([]);
   const [users,setUsers]=useState([]);
   const [loading,setLoading]=useState(true);
-  const [meta,setMeta]=useState({plan:t.plan||"basico",precio:t.precio||0,max_usuarios:t.max_usuarios||5,vence:t.vence||"",notas:t.notas||""});
+  const [meta,setMeta]=useState({plan:t.plan||"basico",precio:t.precio||0,max_usuarios:t.max_usuarios||5,limite_inventarios:t.limite_inventarios||1,vence:t.vence||"",notas:t.notas||""});
   const [savingMeta,setSavingMeta]=useState(false);
   const [pago,setPago]=useState({fecha:HOY(),monto:"",metodo:"Transferencia",nota:""});
   const [savingPago,setSavingPago]=useState(false);
@@ -37,7 +37,7 @@ export function VClienteDetalle({t,showToast,onBack,onChanged}){
   const guardarMeta=async()=>{
     setSavingMeta(true);
     try{
-      const patch={plan:meta.plan||"basico",precio:Number(meta.precio)||0,max_usuarios:Number(meta.max_usuarios)||0,vence:meta.vence||null,notas:meta.notas||null};
+      const patch={plan:meta.plan||"basico",precio:Number(meta.precio)||0,max_usuarios:Number(meta.max_usuarios)||0,limite_inventarios:Math.max(1,Number(meta.limite_inventarios)||1),vence:meta.vence||null,notas:meta.notas||null};
       const {error}=await SB.updateTenant(t.id,patch); if(error)throw error;
       Object.assign(t,patch); onChanged&&onChanged();
       showToast("Datos del cliente guardados ✓");
@@ -103,6 +103,7 @@ export function VClienteDetalle({t,showToast,onBack,onChanged}){
             <div className="space-y-1"><Label className="text-xs">Plan</Label><Input value={meta.plan} onChange={e=>setMeta(m=>({...m,plan:e.target.value}))}/></div>
             <div className="space-y-1"><Label className="text-xs">Precio mensual</Label><Input type="number" value={meta.precio} onChange={e=>setMeta(m=>({...m,precio:e.target.value}))}/></div>
             <div className="space-y-1"><Label className="text-xs">Máx. usuarios</Label><Input type="number" value={meta.max_usuarios} onChange={e=>setMeta(m=>({...m,max_usuarios:e.target.value}))}/></div>
+            <div className="space-y-1"><Label className="text-xs">Inventarios activos</Label><Input type="number" min="1" value={meta.limite_inventarios} onChange={e=>setMeta(m=>({...m,limite_inventarios:e.target.value}))}/></div>
             <div className="space-y-1"><Label className="text-xs">Vence</Label><Input type="date" value={meta.vence||""} onChange={e=>setMeta(m=>({...m,vence:e.target.value}))}/></div>
           </div>
           <div className="space-y-1 mt-3"><Label className="text-xs">Notas</Label><Input value={meta.notas} onChange={e=>setMeta(m=>({...m,notas:e.target.value}))} placeholder="Observaciones del cliente"/></div>
