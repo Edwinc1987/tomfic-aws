@@ -26,6 +26,7 @@ export function VUsuarios({usuario,G,rerender,showToast}){
   const [credCreada,setCredCreada]=useState(null); // credencial recién creada/reseteada para compartir
   const [busy,setBusy]=useState(false);
   const [busqUser,setBusqUser]=useState(""); // filtro de la tabla de usuarios
+  const [usuarioExistente,setUsuarioExistente]=useState("");
   // El admin es transversal; los demás usuarios pertenecen al inventario activo.
   const usuariosInventario=G.usuarios.filter(u=>u.rol==="admin"||u.inventario_id===G.inventario?.id);
   const usuariosFiltrados=usuariosInventario.filter(u=>{
@@ -54,6 +55,10 @@ export function VUsuarios({usuario,G,rerender,showToast}){
 
   const guardar=async()=>{
     if(!form.nombre.trim()||(!form.editId&&!form.pass.trim()))return showToast("Completa nombre y contraseña","err");
+    if(!form.editId){
+      const duplicado=G.usuarios.find(u=>(u.nombre||"").toUpperCase()===form.nombre.trim().toUpperCase());
+      if(duplicado)return showToast(`Ya existe el usuario ${duplicado.nombre}. Asígnalo desde "Usuarios existentes".`,"err");
+    }
     setBusy(true);
     try{
       if(form.editId){
@@ -91,6 +96,20 @@ export function VUsuarios({usuario,G,rerender,showToast}){
   const toggleActivo=async(u)=>{
     try{const {error}=await SB.updateUsuario(u.id,{activo:!u.activo});if(error)throw error;await refresh();rerender();}
     catch(e){showToast(e.message||"No se pudo actualizar","err");}
+  };
+
+  // Reutiliza la cuenta de la empresa y la vincula al inventario seleccionado.
+  const asignarExistente=async()=>{
+    const u=G.usuarios.find(x=>x.id===usuarioExistente);
+    if(!u||!G.inventario)return showToast("Selecciona un usuario y un inventario","err");
+    if(u.inventario_id&&u.inventario_id!==G.inventario.id&&!window.confirm(`${u.nombre} está asignado a otro inventario. ¿Moverlo a ${G.inventario.nombre}?`))return;
+    setBusy(true);
+    try{
+      const {error}=await SB.updateUsuario(u.id,{inventario_id:G.inventario.id});
+      if(error)throw error;
+      await refresh();setUsuarioExistente("");rerender();showToast(`${u.nombre} asignado a ${G.inventario.nombre} ✓`);
+    }catch(e){showToast(e.message||"No se pudo asignar el usuario","err");}
+    setBusy(false);
   };
 
   const eliminar=async(u)=>{
@@ -161,6 +180,7 @@ export function VUsuarios({usuario,G,rerender,showToast}){
   const admins=usuariosInventario.filter(u=>u.rol==="admin");
   const caps=usuariosInventario.filter(u=>u.rol==="capturador");
   const activos=usuariosInventario.filter(u=>u.activo);
+  const disponibles=G.usuarios.filter(u=>u.rol!=="admin"&&u.id!==usuario.id&&u.inventario_id!==G.inventario?.id);
   return(
     <Section>
       {/* Header */}
@@ -180,6 +200,16 @@ export function VUsuarios({usuario,G,rerender,showToast}){
           <Input value={busqUser} onChange={e=>setBusqUser(e.target.value)} placeholder="Buscar usuario, correo, rol…" className="pl-9"/>
         </div>
       </div>
+      {G.inventario&&disponibles.length>0&&<Card className="mb-3 border-blue-200 bg-blue-50/50">
+        <div className="flex flex-wrap items-center gap-2.5 px-3.5 py-3">
+          <div className="mr-auto"><div className="text-[12px] font-bold text-blue-900">Usuarios existentes</div><div className="text-[11px] text-blue-700">Asigna una cuenta ya creada a <b>{G.inventario.nombre}</b>, sin duplicarla.</div></div>
+          <Select value={usuarioExistente} onValueChange={setUsuarioExistente}>
+            <SelectTrigger className="w-52 bg-white"><SelectValue placeholder="Seleccionar usuario…"/></SelectTrigger>
+            <SelectContent>{disponibles.map(u=><SelectItem key={u.id} value={u.id}>{u.nombre}{u.inventario_id?" · otro inventario":" · sin asignar"}</SelectItem>)}</SelectContent>
+          </Select>
+          <Button size="sm" onClick={asignarExistente} disabled={!usuarioExistente||busy}>Asignar aquí</Button>
+        </div>
+      </Card>}
 
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">
