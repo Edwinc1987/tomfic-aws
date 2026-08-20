@@ -523,14 +523,14 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
         </div>
       </div>
 
-      <div style={{padding:"12px 14px",maxWidth:1000,margin:"0 auto",...nightFilter}}>
+       <div style={{padding:"8px 10px",maxWidth:1200,margin:"0 auto",...nightFilter}}>
         {/* Info */}
-        <div style={{background:"white",borderRadius:10,padding:"12px 16px",marginBottom:10,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
-          <div style={{display:"grid",gridTemplateColumns:"1fr auto",gap:12,alignItems:"center"}}>
+         <div style={{background:"white",borderRadius:9,padding:"8px 12px",marginBottom:8,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+           <div className="cap-count-header" style={{display:"grid",gridTemplateColumns:"1fr auto",gap:12,alignItems:"center"}}>
             <div>
-              <div style={{fontWeight:700,fontSize:14,color:"#0f172a"}}>{miConteo.nombre}</div>
+              <div style={{fontWeight:800,fontSize:13,color:"#0f172a"}}>{miConteo.nombre}</div>
               <div style={{fontSize:12,color:"#64748b",marginTop:2,display:"flex",alignItems:"center",gap:4}}><MapPin size={11}/> {miConteo.locLabel}</div>
-              {miRonda==="C3"&&<div style={{marginTop:6,background:"#faf5ff",borderRadius:6,padding:"4px 10px",fontSize:12,color:"#7c3aed",fontWeight:600,display:"inline-block"}}>Solo productos con diferencia entre C1 y C2 — {prodsC3.length} productos</div>}
+              {miRonda==="C3"&&<div style={{marginTop:4,background:"#faf5ff",borderRadius:6,padding:"3px 8px",fontSize:11,color:"#7c3aed",fontWeight:600,display:"inline-block"}}>Solo diferencias C1/C2 · {prodsC3.length} productos</div>}
             </div>
             <div style={{textAlign:"right",maxWidth:200}}>
               <div style={{fontSize:10,color:"#64748b",marginBottom:4,textTransform:"uppercase",letterSpacing:0.8}}>Mis otros conteos</div>
@@ -607,24 +607,24 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
         )}
 
         {/* Scanner + búsqueda — también disponible en C3 */}
-        <div style={{background:"white",borderRadius:10,padding:"12px 14px",marginBottom:10,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+         <div style={{background:"white",borderRadius:9,padding:"9px 12px",marginBottom:8,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+           <div className="cap-scan-grid" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
             <div>
-              <div style={{fontSize:11,fontWeight:700,color:"#374151",marginBottom:5}}>CÓDIGO (EAN / INTERNO)</div>
+               <div style={{fontSize:10,fontWeight:800,color:"#374151",marginBottom:4}}>CÓDIGO (EAN / INTERNO)</div>
               <div style={{display:"flex",gap:8}}>
                 <input ref={scanRef} value={scanInput} onChange={e=>setScanInput(e.target.value)} onKeyDown={handleScan}
                   placeholder="Escanee o escriba y presione Enter…"
-                  style={{...inp,flex:1,border:`2px solid ${rcol[miRonda]}`}} autoFocus/>
+                   style={{...inp,flex:1,padding:"7px 10px",border:`2px solid ${rcol[miRonda]}`}} autoFocus/>
                 <button onClick={()=>handleScan({key:"Enter"})} style={{padding:"9px 14px",background:rcol[miRonda],color:"white",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:15,display:"inline-flex",alignItems:"center"}}><CornerDownLeft size={16}/></button>
                 <button onClick={()=>setShowCam(true)} title="Escanear con cámara" style={{padding:"9px 14px",background:"white",color:rcol[miRonda],border:`2px solid ${rcol[miRonda]}`,borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:15,display:"inline-flex",alignItems:"center"}}><Camera size={16}/></button>
               </div>
               {notFound&&<div style={{marginTop:6,color:"#dc2626",fontSize:12,fontWeight:600,display:"flex",alignItems:"center",gap:4}}><AlertTriangle size={12}/> Código no encontrado</div>}
             </div>
             <div style={{position:"relative"}}>
-              <div style={{fontSize:11,fontWeight:700,color:"#374151",marginBottom:5}}>BUSCAR EN LA LISTA</div>
+               <div style={{fontSize:10,fontWeight:800,color:"#374151",marginBottom:4}}>BUSCAR EN LA LISTA</div>
               <input value={busqueda} onChange={e=>{setBusqueda(e.target.value);setProductoActivo(null);}}
                 placeholder="Escriba nombre, código o referencia…"
-                style={{...inp,border:`1.5px solid ${busqueda?"#2563eb":"#e2e8f0"}`}}
+                 style={{...inp,padding:"7px 10px",border:`1.5px solid ${busqueda?"#2563eb":"#e2e8f0"}`}}
                 onKeyDown={e=>{if(e.key==="Escape"){setBusqueda("");setProductoActivo(null);}}}
                 autoComplete="off"/>
               {busqueda.length>=1&&!productoActivo&&(()=>{
@@ -666,20 +666,20 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
           const caps=getCaps(miConteo.id,miRonda,productoActivo.id);
           const totalAnt=getTotal(miConteo.id,miRonda,productoActivo.id);
           return(
-            <div style={{background:"white",borderRadius:10,padding:20,marginBottom:10,boxShadow:"0 2px 8px rgba(0,0,0,0.1)",border:`2px solid ${rcol[miRonda]}`}}>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16,paddingBottom:14,borderBottom:"1px solid #f1f5f9"}}>
+             <div style={{background:"white",borderRadius:9,padding:14,marginBottom:8,boxShadow:"0 2px 8px rgba(0,0,0,0.1)",border:`2px solid ${rcol[miRonda]}`}}>
+               <div className="cap-product-meta" style={{display:"grid",gridTemplateColumns:"minmax(0,1.3fr) minmax(230px,.7fr)",gap:12,marginBottom:10,paddingBottom:10,borderBottom:"1px solid #f1f5f9"}}>
                 <div>
                   <div style={{fontSize:11,color:"#64748b",marginBottom:2}}>CÓDIGO</div>
                   <div style={{fontFamily:"monospace",fontSize:16,fontWeight:800,color:"#2563eb"}}>{productoActivo.codigo}</div>
-                  <div style={{marginTop:8}}>
+                   <div style={{marginTop:5}}>
                     <div style={{fontSize:11,color:"#64748b"}}>CÓD. BARRAS (EAN)</div>
                     <div style={{fontFamily:"monospace",fontSize:14,fontWeight:700,color:"#0f172a"}}>{productoActivo.ean||"—"}</div>
                   </div>
-                  <div style={{marginTop:8}}>
+                   <div style={{marginTop:5}}>
                     <div style={{fontSize:11,color:"#64748b"}}>NOMBRE PRODUCTO</div>
                     <div style={{fontWeight:700,fontSize:15,color:"#0f172a"}}>{productoActivo.nombre}</div>
                   </div>
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginTop:8}}>
+                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginTop:5}}>
                     <div><div style={{fontSize:10,color:"#64748b"}}>REFERENCIA</div><div style={{fontSize:13,fontWeight:600}}>{productoActivo.referencia||"—"}</div></div>
                     <div><div style={{fontSize:10,color:"#64748b"}}>PROVEEDOR</div><div style={{fontSize:13,fontWeight:600}}>{productoActivo.proveedor||"—"}</div></div>
                   </div>
@@ -701,39 +701,39 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
                     <div><div style={{fontSize:10,color:"#64748b"}}>N° LOCALIZACIÓN</div><div style={{fontSize:12,fontWeight:600}}>{miConteo.nro}</div></div>
                     <div><div style={{fontSize:10,color:"#64748b"}}>CONTEO N°</div><div style={{fontSize:12,fontWeight:600}}>{miRonda==="C1"?1:miRonda==="C2"?2:3}</div></div>
                   </div>
-                  <div style={{marginTop:8}}>
+                   <div style={{marginTop:5}}>
                     <div style={{fontSize:10,color:"#64748b"}}>LÍNEA / SUBLÍNEA / SUBGRUPO</div>
                     <div style={{fontSize:12,color:"#374151"}}>{productoActivo.categoria||"—"} / {productoActivo.subcategoria||"—"} / {productoActivo.subgrupo||"—"}</div>
                   </div>
                 </div>
               </div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20}}>
+               <div className="cap-form-grid" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
                 <div>
-                  <div style={{fontWeight:700,fontSize:12,color:"#374151",marginBottom:10,textTransform:"uppercase",letterSpacing:1}}>Cantidades</div>
-                  <div style={{display:"grid",gridTemplateColumns:"100px 1fr",gap:8,alignItems:"center"}}>
+                   <div style={{fontWeight:700,fontSize:11,color:"#374151",marginBottom:6,textTransform:"uppercase",letterSpacing:1}}>Cantidades</div>
+                   <div style={{display:"grid",gridTemplateColumns:"90px 1fr",gap:6,alignItems:"center"}}>
                     <label style={{fontSize:12,fontWeight:600,color:"#374151"}}>UNIDADES</label>
                     <input ref={unidadesRef} type="number" min="0" value={form.unidades}
                       onChange={e=>setForm(f=>({...f,unidades:e.target.value}))}
                       onKeyDown={e=>{if(e.key==="Enter"){if(form.cajas||form.embalaje){document.getElementById("inp-emb2")?.focus();}else{guardar();}}}}
-                      placeholder="0" style={{...inp,padding:"8px 10px",fontSize:16,fontWeight:700,textAlign:"center"}}/>
+                       placeholder="0" style={{...inp,padding:"6px 8px",fontSize:15,fontWeight:700,textAlign:"center"}}/>
                     <label style={{fontSize:12,fontWeight:600,color:"#374151"}}>EMBALAJE</label>
                     <input id="inp-emb2" type="number" min="0" value={form.embalaje}
                       onChange={e=>setForm(f=>({...f,embalaje:e.target.value}))}
                       onKeyDown={e=>{if(e.key==="Enter")document.getElementById("inp-caj2")?.focus();}}
-                      placeholder="Und/caja" style={{...inp,padding:"8px 10px",fontSize:14,textAlign:"center"}}/>
+                       placeholder="Und/caja" style={{...inp,padding:"6px 8px",fontSize:13,textAlign:"center"}}/>
                     <label style={{fontSize:12,fontWeight:600,color:"#374151"}}>CAJAS</label>
                     <input id="inp-caj2" type="number" min="0" value={form.cajas}
                       onChange={e=>setForm(f=>({...f,cajas:e.target.value}))}
                       onKeyDown={e=>{if(e.key==="Enter")guardar();}}
-                      placeholder="Cajas" style={{...inp,padding:"8px 10px",fontSize:14,textAlign:"center"}}/>
+                       placeholder="Cajas" style={{...inp,padding:"6px 8px",fontSize:13,textAlign:"center"}}/>
                     <label style={{fontSize:14,fontWeight:800,color:"#0f172a"}}>TOTAL</label>
-                    <div style={{...inp,padding:"10px",fontSize:22,fontWeight:800,textAlign:"center",background:total>0?"#eff6ff":"#f8fafc",color:total>0?rcol[miRonda]:"#64748b",border:`2px solid ${total>0?rcol[miRonda]:"#e2e8f0"}`,cursor:"default",userSelect:"none"}}>
+                     <div style={{...inp,padding:"7px",fontSize:20,fontWeight:800,textAlign:"center",background:total>0?"#eff6ff":"#f8fafc",color:total>0?rcol[miRonda]:"#64748b",border:`2px solid ${total>0?rcol[miRonda]:"#e2e8f0"}`,cursor:"default",userSelect:"none"}}>
                       {total||0}
                     </div>
                   </div>
                 </div>
                 <div>
-                  <div style={{fontWeight:700,fontSize:12,color:"#374151",marginBottom:10,textTransform:"uppercase",letterSpacing:1}}>Estado y observación</div>
+                   <div style={{fontWeight:700,fontSize:11,color:"#374151",marginBottom:6,textTransform:"uppercase",letterSpacing:1}}>Estado y observación</div>
                   <div style={{marginBottom:10}}>
                     <div style={{fontSize:11,color:"#64748b",marginBottom:4}}>ESTADO DEL PRODUCTO</div>
                     <select value={form.estado} onChange={e=>setForm(f=>({...f,estado:e.target.value}))} style={{...inp,fontSize:13}}>
@@ -749,7 +749,7 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
                   {miRonda==="C3"&&<div style={{marginTop:10,background:"#faf5ff",borderRadius:8,padding:"8px 12px",fontSize:12,color:"#7c3aed"}}>En C3 se permite guardar 0 unidades.</div>}
                 </div>
               </div>
-              <div style={{display:"flex",gap:10,marginTop:16,flexWrap:"wrap",alignItems:"center"}}>
+               <div style={{display:"flex",gap:8,marginTop:10,flexWrap:"wrap",alignItems:"center"}}>
                 <button onClick={guardar} disabled={miRonda!=="C3"&&total<=0}
                   style={{padding:"10px 28px",background:miRonda==="C3"||total>0?"#16a34a":"#e2e8f0",color:miRonda==="C3"||total>0?"white":"#64748b",border:"none",borderRadius:8,cursor:miRonda==="C3"||total>0?"pointer":"not-allowed",fontWeight:700,fontSize:14}}>
                   GUARDAR

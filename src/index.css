@@ -74,4 +74,13 @@
   tbody tr { transition: background-color .12s ease; }
   tbody tr:nth-child(even) { background-color: #fafbfc; }
   tbody tr:hover { background-color: #f1f5f9; }
+
+  /* Compacta el capturador en escritorio y evita desbordes en móvil. */
+  @media (max-width: 640px) {
+    .cap-count-header,
+    .cap-scan-grid,
+    .cap-product-meta,
+    .cap-form-grid { grid-template-columns: 1fr !important; }
+    .cap-count-header { gap: 6px !important; }
+  }
 }
