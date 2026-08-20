@@ -12,7 +12,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { PageHeader } from "@/components/ui/page-header";
 import Section from "@/components/Section";
 import { setBusy, setClearBase, _snap } from "@/lib/sync";
-import { G, SB, prodCols, exportSheet, saveLocalCache, todosConteosCerrados, conteosReales, conteoCompleto } from "@/lib/data";
+import { G, SB, prodCols, exportSheet, saveLocalCache, todosConteosCerrados, conteosReales, conteoCompleto, ID } from "@/lib/data";
 
 // ── BASE DE DATOS ──
 export function VBaseDatos({G,rerender,showToast}){
@@ -46,7 +46,7 @@ export function VBaseDatos({G,rerender,showToast}){
       const get=(...keys)=>{for(const k of keys){const nk=normKey(k);if(row[nk]!==undefined&&row[nk]!==null&&String(row[nk]).trim()!=="")return String(row[nk]).trim();}return "";};
       const getNum=(...keys)=>{for(const k of keys){const nk=normKey(k);if(row[nk]!==undefined&&row[nk]!==null&&String(row[nk]).trim()!=="")return toNum(row[nk]);}return 0;};
       return{
-        id:"p"+i,
+         id:ID(),
         ean:get("EAN13OCODIGOBARRAS","EAN13","EAN","CODIGOBARRAS","CODIGO DE BARRAS","BARRAS"),
         codigo:get("CODIGO","CODIGO INTERNO","CODIGOINTERNO","COD","CODIGO PRODUCTO","SKU","PLU"),
         nombre:get("NOMBRE PRODUCTO","NOMBRE DEL PRODUCTO","NOMBRE","DESCRIPCION","PRODUCTO"),
@@ -67,7 +67,7 @@ export function VBaseDatos({G,rerender,showToast}){
     G.productos=mapped;setPreview(null);setRawData(null);
     // Subir directamente a la nube y ESPERAR a que termine, antes de permitir refrescos.
     try{
-      await SB.deleteAllProductos(G.tenantId);
+       await SB.deleteAllProductos(G.tenantId,G.inventario?.id);
       if(mapped.length)await SB.upsertProductosBulk(mapped.map(prodCols));
       _snap.prods={};mapped.forEach(p=>{_snap.prods[p.id]=JSON.stringify(prodCols(p));}); // marca como ya sincronizado
     }catch(e){console.warn("Error subiendo productos:",e);showToast("Error subiendo a la nube, revisa tu conexión","err");}

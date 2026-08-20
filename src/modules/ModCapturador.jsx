@@ -52,6 +52,7 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
   const misConteos=G.conteos.filter(c=>
     c.usuarioC1===usuario.nombre||c.usuarioC2===usuario.nombre||c.usuarioC3===usuario.nombre
   );
+  const inventariosVisibles=G.inventarios.filter(inv=>!usuario.inventario_id||inv.id===usuario.inventario_id);
 
   const getConteo=()=>G.conteos.find(c=>c.id===conteoActivo)||null;
   const miConteo=getConteo();
@@ -314,7 +315,7 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
             <span style={{fontWeight:800,fontSize:15}}>tomfic</span>
             {G.inventario&&<select value={G.inventario.id} onChange={e=>{setConteoActivo(null);setRondaActiva(null);selectInventory(e.target.value);rerender();}} aria-label="Inventario activo seleccionado"
               style={{background:"#166534",border:"1px solid #22c55e",color:"white",fontSize:10,padding:"3px 8px",borderRadius:20,fontWeight:700,maxWidth:180}}>
-              {G.inventarios.map(inv=><option key={inv.id} value={inv.id} style={{color:"#0f172a"}}>{inv.nombre}</option>)}
+              {inventariosVisibles.map(inv=><option key={inv.id} value={inv.id} style={{color:"#0f172a"}}>{inv.nombre}</option>)}
             </select>}
           </div>
           <div style={{display:"flex",gap:10,alignItems:"center"}}>

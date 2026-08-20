@@ -2,21 +2,21 @@
 // sync.js — Sincronización a la nube (Supabase).
 // Extraído de App.jsx (Fase 2.2 de la modularización).
 // ─────────────────────────────────────────
-import { G, SB, serConteo, serInv, prodCols, userCols, loadLocalConfig, resetTenantConfig, deserConteo, rememberSelectedInventory, selectInventory } from "@/lib/data";
+import { G, SB, serConteo, serInv, prodCols, userCols, resetTenantConfig, deserConteo, rememberSelectedInventory, selectInventory } from "@/lib/data";
 
 // --- Snapshot para sincronización por diferencias ---
 export const initSnap=()=>{
   rememberSelectedInventory();
-  _snap={u:{},c:{},invs:{},hist:{},prods:{},cfg:""};
+  _snap={u:{},c:{},invs:{},hist:{},prods:{},cfgs:{}};
   G.usuarios.forEach(u=>{_snap.u[u.id]=JSON.stringify(userCols(u));});
-  G.productos.forEach(p=>{_snap.prods[p.id]=JSON.stringify(prodCols(p));});
+  G.inventarios.forEach(inv=>{const d=G._inventarioDatos[inv.id]||{};(d.productos||[]).forEach(p=>{_snap.prods[p.id]=JSON.stringify(prodCols(p,inv.id));});});
   G.inventarios.forEach(inv=>{_snap.invs[inv.id]=JSON.stringify(serInv(inv,"abierto"));});
   G.historial.forEach(h=>{_snap.hist[h.id]=JSON.stringify(serInv(h,"cerrado"));});
   G.inventarios.forEach(inv=>{const d=G._inventarioDatos[inv.id]||{conteos:[],capturas:{}};d.conteos.forEach(c=>{_snap.c[c.id]=JSON.stringify(serConteo(c,inv.id,d.capturas));});});
-  _snap.cfg=JSON.stringify({localizaciones:G.localizaciones,ubicacionesTipos:G.ubicacionesTipos,localizacionTipos:G.localizacionTipos,alertas:G.alertas,notas:G.notas});
+  G.inventarios.forEach(inv=>{const d=G._inventarioDatos[inv.id]||{};_snap.cfgs[inv.id]=JSON.stringify({localizaciones:d.localizaciones||[],ubicacionesTipos:d.ubicacionesTipos||[],localizacionTipos:d.localizacionTipos||[],alertas:d.alertas||[]});});
 };
 
-export let _snap={u:{},c:{},invs:{},hist:{},prods:{},cfg:""};
+export let _snap={u:{},c:{},invs:{},hist:{},prods:{},cfgs:{}};
 let _syncing=false,_pending=false,_syncTimer=null;
 let _dirty=false;
 let _clearBase=false;
@@ -34,7 +34,9 @@ const doSync=async()=>{
   if(_syncing){_pending=true;return;}
   _syncing=true;_dirty=false;
   try{
-    const curP={};G.productos.forEach(p=>{curP[p.id]=prodCols(p);});
+    rememberSelectedInventory();
+    const curP={};
+    G.inventarios.forEach(inv=>{const d=G._inventarioDatos[inv.id]||{};(d.productos||[]).forEach(p=>{curP[p.id]=prodCols(p,inv.id);});});
     const cambiados=[];for(const id in curP){const s=JSON.stringify(curP[id]);if(_snap.prods[id]!==s)cambiados.push(curP[id]);}
     const eliminados=[];for(const id in _snap.prods){if(!curP[id])eliminados.push(id);}
     if(eliminados.length && Object.keys(curP).length===0 && !_clearBase){
@@ -45,7 +47,6 @@ const doSync=async()=>{
     for(const id in curP)_snap.prods[id]=JSON.stringify(curP[id]);
     for(const id in _snap.prods){if(!curP[id])delete _snap.prods[id];}
     _clearBase=false;
-    rememberSelectedInventory();
     const curInv={};
     G.inventarios.forEach(inv=>{curInv[inv.id]=serInv(inv,"abierto");});
     for(const id in curInv){const s=JSON.stringify(curInv[id]);if(_snap.invs[id]!==s){await SB.upsertInventario(curInv[id]);_snap.invs[id]=s;}}
@@ -58,13 +59,11 @@ const doSync=async()=>{
     for(const id in curC){const s=JSON.stringify(curC[id]);if(_snap.c[id]!==s){await SB.upsertConteo(curC[id]);_snap.c[id]=s;}}
     for(const id in _snap.c){if(!curC[id]){await SB.deleteConteo(id);delete _snap.c[id];}}
     if(G.tenantId){
-      const cfgObj={localizaciones:G.localizaciones,ubicacionesTipos:G.ubicacionesTipos,localizacionTipos:G.localizacionTipos,alertas:G.alertas,notas:G.notas};
-      const cfg=JSON.stringify(cfgObj);
-      if(cfg!==_snap.cfg){
-        let prevTeniaLoc=false;try{const pv=_snap.cfg?JSON.parse(_snap.cfg):null;prevTeniaLoc=!!(pv&&pv.localizaciones&&pv.localizaciones.length);}catch(e){}
-        const ahoraVacio=!cfgObj.localizaciones||cfgObj.localizaciones.length===0;
-        if(ahoraVacio&&prevTeniaLoc){console.warn("Sync: se evitó sobrescribir ubicaciones con config vacía.");}
-        else{await SB.setConfig(`tenant:${G.tenantId}:config`,cfgObj);_snap.cfg=cfg;}
+      for(const inv of G.inventarios){
+        const d=G._inventarioDatos[inv.id]||{};
+        const cfgObj={localizaciones:d.localizaciones||[],ubicacionesTipos:d.ubicacionesTipos||[],localizacionTipos:d.localizacionTipos||[],alertas:d.alertas||[],notas:(G.notas||[]).filter(n=>n.inventarioId===inv.id)};
+        const cfg=JSON.stringify(cfgObj);
+        if(cfg!==_snap.cfgs[inv.id]){await SB.setConfig(`tenant:${G.tenantId}:inventario:${inv.id}:config`,cfgObj);_snap.cfgs[inv.id]=cfg;}
       }
     }
   }catch(e){_dirty=true;console.warn("Error de sincronización:",e);}
@@ -86,33 +85,31 @@ export const loadBootstrap=async()=>{
 
 export const setLoadingTenant=(v)=>{_loadingTenant=v;};
 
-export const loadTenantData=async(tid)=>{
+export const loadTenantData=async(tid,preferredInvId=null)=>{
  _loadingTenant=true;
  try{
   G.tenantId=tid;
-  resetTenantConfig();
-  const cfg=await SB.getConfig(`tenant:${tid}:config`);
-  if(cfg){
-    if(cfg.localizaciones)G.localizaciones=cfg.localizaciones;
-    if(cfg.ubicacionesTipos&&cfg.ubicacionesTipos.length)G.ubicacionesTipos=cfg.ubicacionesTipos;
-    if(cfg.localizacionTipos&&cfg.localizacionTipos.length)G.localizacionTipos=cfg.localizacionTipos;
-    if(cfg.alertas)G.alertas=cfg.alertas;
-    if(cfg.notas)G.notas=cfg.notas;
-  } else { loadLocalConfig(); }
-  const {usuarios,productos,inventarios,conteos}=await SB.loadAll(tid);
+   resetTenantConfig();
+   const legacyCfg=await SB.getConfig(`tenant:${tid}:config`);
+   const {usuarios,productos,inventarios,conteos}=await SB.loadAll(tid);
   if(usuarios.length)G.usuarios=usuarios;
-  G.productos=productos||[];
    const activos=inventarios.filter(i=>i.estado==="abierto").map(i=>({id:i.id,nombre:i.nombre,tipo:i.tipo,obs:i.obs,fecha:i.fecha,apertura:i.apertura,horaApertura:i.hora_apertura,usuarioApertura:i.usuario_apertura}));
-   const previo=G.inventario?.id;
+   const previo=preferredInvId||G.inventario?.id;
    G.inventarios=activos;
    G._inventarioDatos={};
-   activos.forEach(inv=>{
-     const d={conteos:[],capturas:{}};
+   const configs=await Promise.all(activos.map(inv=>SB.getConfig(`tenant:${tid}:inventario:${inv.id}:config`)));
+   G.notas=activos.flatMap((inv,index)=>((configs[index]||((!index)?legacyCfg:null)||{}).notas||[]));
+   activos.forEach((inv,index)=>{
+     const cfg=configs[index]||((!index)?legacyCfg:null)||{};
+     const filas=productos||[];
+     const legacy=filas.filter(p=>!p.inventario_id);
+     const propios=filas.filter(p=>p.inventario_id===inv.id);
+     const d={productos:propios.length?propios:(index===0?legacy:[]),localizaciones:cfg.localizaciones||[],ubicacionesTipos:cfg.ubicacionesTipos||[],localizacionTipos:cfg.localizacionTipos||[],alertas:cfg.alertas||[],conteos:[],capturas:{}};
      conteos.filter(r=>r.inventario_id===inv.id).forEach(r=>{const{c,caps}=deserConteo(r);d.conteos.push(c);Object.assign(d.capturas,caps);});
      G._inventarioDatos[inv.id]=d;
    });
    const seleccionado=activos.find(i=>i.id===previo)||activos[0]||null;
-   G.inventario=null;G.conteos=[];G.capturas={};
+   G.inventario=null;G.conteos=[];G.capturas={};G.productos=[];G.localizaciones=[];G.ubicacionesTipos=[];G.localizacionTipos=[];G.alertas=[];
    if(seleccionado)selectInventory(seleccionado.id);
   G.historial=inventarios.filter(i=>i.estado==="cerrado").map(i=>{
     const cs=i.conteos_snapshot?JSON.parse(i.conteos_snapshot):[];

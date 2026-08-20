@@ -29,7 +29,7 @@ export function VProcesos({G,rerender,showToast,usuario}){
   const [modalAjuste,setModalAjuste]=useState(false);
   const [ajusteUser,setAjusteUser]=useState("");
   const caps=Object.values(G.capturas);
-  const usuariosActivos=()=>G.usuarios.filter(u=>u.activo);
+  const usuariosActivos=()=>G.usuarios.filter(u=>u.activo&&(u.rol==="admin"||u.inventario_id===G.inventario?.id));
   // Crea el Conteo de Ajuste (correcciones post-diferencias) y lo asigna a un usuario.
   const crearAjuste=()=>{
     if(!ajusteUser)return showToast("Selecciona el usuario que hará el ajuste","err");
@@ -647,7 +647,7 @@ export function VProcesos({G,rerender,showToast,usuario}){
               }}>
                 <SelectTrigger><SelectValue placeholder="Seleccionar…"/></SelectTrigger>
                 <SelectContent>
-                  {G.usuarios.filter(u=>u.activo).map(u=><SelectItem key={u.id} value={u.nombre}>{u.nombre}</SelectItem>)}
+                  {usuariosActivos().map(u=><SelectItem key={u.id} value={u.nombre}>{u.nombre}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

@@ -23,6 +23,7 @@ return()=>clearInterval(t);
 
   const pct=G.conteos.length>0?Math.round(G.conteos.filter(c=>c.estado==="completado").length/G.conteos.length*100):0;
   const notasInv=G.notas.filter(n=>n.inventarioId===(G.inventario?.id||""));
+  const inventariosVisibles=G.inventarios.filter(inv=>!usuario.inventario_id||inv.id===usuario.inventario_id);
 
   // ── Métricas financieras del inventario (tablero gerencial) ──
   const _caps=Object.values(G.capturas);
@@ -71,7 +72,7 @@ return()=>clearInterval(t);
           </div>
           {G.inventario&&<select value={G.inventario.id} onChange={e=>{selectInventory(e.target.value);rerender();}} aria-label="Inventario activo seleccionado"
             style={{background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.25)",color:"white",fontSize:11,padding:"4px 10px",borderRadius:20,fontWeight:700,maxWidth:220}}>
-            {G.inventarios.map(inv=><option key={inv.id} value={inv.id} style={{color:"#0f172a"}}>{inv.nombre}</option>)}
+            {inventariosVisibles.map(inv=><option key={inv.id} value={inv.id} style={{color:"#0f172a"}}>{inv.nombre}</option>)}
           </select>}
         </div>
         <div style={{display:"flex",gap:8,alignItems:"center"}}>

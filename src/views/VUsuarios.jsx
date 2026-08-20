@@ -26,7 +26,9 @@ export function VUsuarios({usuario,G,rerender,showToast}){
   const [credCreada,setCredCreada]=useState(null); // credencial recién creada/reseteada para compartir
   const [busy,setBusy]=useState(false);
   const [busqUser,setBusqUser]=useState(""); // filtro de la tabla de usuarios
-  const usuariosFiltrados=G.usuarios.filter(u=>{
+  // El admin es transversal; los demás usuarios pertenecen al inventario activo.
+  const usuariosInventario=G.usuarios.filter(u=>u.rol==="admin"||u.inventario_id===G.inventario?.id);
+  const usuariosFiltrados=usuariosInventario.filter(u=>{
     const q=busqUser.trim().toLowerCase();
     if(!q)return true;
     return (u.nombre||"").toLowerCase().includes(q)||(u.correo||"").toLowerCase().includes(q)||(u.telefono||"").includes(q)||(u.rol||"").toLowerCase().includes(q);
@@ -61,6 +63,11 @@ export function VUsuarios({usuario,G,rerender,showToast}){
       }else{
         const {data,error}=await SB.createMember(form.nombre.toUpperCase().trim(),form.pass,form.rol,form.correo,form.telefono);
         if(error)throw error;
+        // La credencial queda vinculada al inventario seleccionado; el admin no.
+        if(data?.id&&G.inventario&&form.rol!=="admin"){
+          const {error:eInv}=await SB.updateUsuario(data.id,{inventario_id:G.inventario.id});
+          if(eInv)throw eInv;
+        }
         await refresh();
         setCredCreada({nombre:data.nombre||form.nombre.toUpperCase().trim(),pass:data.pass||form.pass,email:data.email});
         showToast("Usuario creado ✓");
@@ -151,9 +158,9 @@ export function VUsuarios({usuario,G,rerender,showToast}){
     showToast("Plantilla descargada ✓");
   };
 
-  const admins=G.usuarios.filter(u=>u.rol==="admin");
-  const caps=G.usuarios.filter(u=>u.rol==="capturador");
-  const activos=G.usuarios.filter(u=>u.activo);
+  const admins=usuariosInventario.filter(u=>u.rol==="admin");
+  const caps=usuariosInventario.filter(u=>u.rol==="capturador");
+  const activos=usuariosInventario.filter(u=>u.activo);
   return(
     <Section>
       {/* Header */}
@@ -162,7 +169,7 @@ export function VUsuarios({usuario,G,rerender,showToast}){
         title="Gestión de Usuarios"
         icon={Users}
         subtitle={`${activos.length} activos · ${admins.length} admin · ${caps.length} capturadores`}
-        count={G.usuarios.length}
+        count={usuariosInventario.length}
         countLabel="usuarios"
       />
       <div className="flex gap-2.5 mb-3 flex-wrap items-center">

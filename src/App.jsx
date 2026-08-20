@@ -41,7 +41,7 @@ export default function TomficApp(){
     setLoadingTenant(true);
     try{
       if(perfil.rol==="dueno"){G.tenantId=null;await loadTenants();}
-      else{await loadTenantData(perfil.tenant_id);}
+       else{await loadTenantData(perfil.tenant_id,perfil.inventario_id||null);}
     }catch(e){console.warn("Error cargando datos de la empresa:",e);}
     setLoadingTenant(false);
     setUsuario(perfil);

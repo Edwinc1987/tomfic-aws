@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import Section from "@/components/Section";
 import { setBusy, initSnap } from "@/lib/sync";
-import { G, TODAY, HOUR, ID, finalAjustado, supabase, SB, rememberSelectedInventory } from "@/lib/data";
+import { G, TODAY, HOUR, ID, finalAjustado, supabase, SB, rememberSelectedInventory, selectInventory } from "@/lib/data";
 
 // ── INVENTARIO ──
 export function VInventario({G,rerender,showToast,usuario}){
@@ -44,7 +44,13 @@ export function VInventario({G,rerender,showToast,usuario}){
     rememberSelectedInventory();
     G.inventarios=[...G.inventarios,inv];
     G.inventario=inv;
-    G._inventarioDatos[inv.id]={conteos:[],capturas:{}};
+    G._inventarioDatos[inv.id]={
+      productos:[],localizaciones:[],ubicacionesTipos:["BODEGA","SALA DE VENTAS"],
+      localizacionTipos:["MUEBLE","LINEAL","NEVERA","PUNTA","JAULA","CAVA"],
+      alertas:[],conteos:[],capturas:{},
+    };
+    G.productos=[];G.localizaciones=[];G.ubicacionesTipos=["BODEGA","SALA DE VENTAS"];
+    G.localizacionTipos=["MUEBLE","LINEAL","NEVERA","PUNTA","JAULA","CAVA"];
     G.conteos=[];G.capturas={};G.alertas=[];
     setModal(false);setForm({nombre:"",tipo:"2conteos",obs:"",fecha:TODAY()});
     rerender();showToast("Inventario creado. Ahora carga la base de productos ✓");
@@ -90,11 +96,11 @@ export function VInventario({G,rerender,showToast,usuario}){
       const tieneAjuste=caps.some(c=>c.ronda==="AJU");
       return (final>0||tieneAjuste)?{...p,saldo:final}:p; // un ajuste (aunque sea 0) siempre manda
     });
-    G.inventario=null;G.conteos=[];G.capturas={};G.alertas=[];
     G.inventarios=G.inventarios.filter(i=>i.id!==cerradoId);
     delete G._inventarioDatos[cerradoId];
     const siguiente=G.inventarios[0]||null;
-    if(siguiente){G.inventario=siguiente;G.conteos=G._inventarioDatos[siguiente.id]?.conteos||[];G.capturas=G._inventarioDatos[siguiente.id]?.capturas||{};}
+    G.inventario=null;G.conteos=[];G.capturas={};G.productos=[];G.localizaciones=[];G.alertas=[];
+    if(siguiente)selectInventory(siguiente.id);
     setBusy(false);
     rerender();showToast("Inventario cerrado. Saldos actualizados ✓");
   };
@@ -108,11 +114,11 @@ export function VInventario({G,rerender,showToast,usuario}){
       try{await supabase.from("inventarios").delete().eq("id",invId);}catch(e){}
     }catch(e){console.warn("Error al eliminar de la nube:",e);}
     // Limpiar localmente y resetear el snapshot de sincronización
-    G.inventario=null;G.conteos=[];G.capturas={};G.alertas=[];
     G.inventarios=G.inventarios.filter(i=>i.id!==invId);
     delete G._inventarioDatos[invId];
     const siguiente=G.inventarios[0]||null;
-    if(siguiente){G.inventario=siguiente;G.conteos=G._inventarioDatos[siguiente.id]?.conteos||[];G.capturas=G._inventarioDatos[siguiente.id]?.capturas||{};}
+    G.inventario=null;G.conteos=[];G.capturas={};G.productos=[];G.localizaciones=[];G.alertas=[];
+    if(siguiente)selectInventory(siguiente.id);
     G.conteos.forEach(()=>{});
     initSnap();
     setEliminando(false);setModalEliminar(false);setBusy(false);
@@ -177,7 +183,24 @@ export function VInventario({G,rerender,showToast,usuario}){
           {G.productos.length>0&&<div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm font-semibold text-green-700"><CheckCircle size={15} className="shrink-0"/> Base lista: {G.productos.length} productos disponibles. Puedes programar los conteos.</div>}
         </>
       )}
-      <Dialog open={modal} onOpenChange={setModal}>
+       {G.inventarios.length>0&&<div className="mt-5">
+         <div className="mb-2 flex items-center justify-between">
+           <div><div className="text-sm font-extrabold text-slate-900">Mis inventarios</div><div className="text-xs text-muted-foreground">Cada uno conserva su base, bodegas, usuarios y conteos.</div></div>
+           <span className="text-xs text-slate-500">{G.inventarios.length}/{Math.max(1,Number(G.tenant?.limite_inventarios||1))} activos</span>
+         </div>
+         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+           {G.inventarios.map(inv=>{
+             const d=G._inventarioDatos[inv.id]||{};const activo=G.inventario?.id===inv.id;
+             return <button key={inv.id} onClick={()=>{selectInventory(inv.id);rerender();}} className={`text-left rounded-xl border p-4 transition-shadow hover:shadow-md ${activo?"border-blue-500 bg-blue-50/60 shadow-sm":"border-slate-200 bg-white"}`}>
+               <div className="flex items-start justify-between gap-2"><div className="font-bold text-slate-900 truncate">{inv.nombre}</div><span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">ACTIVO</span></div>
+               <div className="mt-1 text-xs text-slate-500">Abierto {inv.apertura||"—"}</div>
+               <div className="mt-3 flex gap-3 text-xs text-slate-600"><span><b>{(d.productos||[]).length}</b> productos</span><span><b>{(d.conteos||[]).length}</b> conteos</span></div>
+               <div className={`mt-3 text-xs font-bold ${activo?"text-blue-700":"text-slate-500"}`}>{activo?"En este inventario":"Entrar al inventario →"}</div>
+             </button>;
+           })}
+         </div>
+       </div>}
+       <Dialog open={modal} onOpenChange={setModal}>
         <DialogContent className="max-w-md max-h-[92vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Nuevo Inventario</DialogTitle></DialogHeader>
           <div className="space-y-3.5">

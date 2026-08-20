@@ -49,7 +49,7 @@ export const SB={
   async upsertProductosBulk(prods){for(let i=0;i<prods.length;i+=500){await supabase.from("productos").upsert(prods.slice(i,i+500),{onConflict:"id"});}},
   // SIEMPRE scopeado por empresa. Si no hay tenant, es un NO-OP: nunca un borrado global
   // (con RLS el dueño podría borrar productos de TODAS las empresas → se prohíbe de raíz).
-  deleteAllProductos:(tid)=>tid?supabase.from("productos").delete().eq("tenant_id",tid):Promise.resolve({data:null,error:null}),
+  deleteAllProductos:(tid,invId)=>tid?supabase.from("productos").delete().eq("tenant_id",tid).eq("inventario_id",invId):Promise.resolve({data:null,error:null}),
   deleteProductosByIds:async(ids)=>{for(let i=0;i<ids.length;i+=200){const{error}=await supabase.from("productos").delete().in("id",ids.slice(i,i+200));if(error)throw error;}},
   upsertInventario:(inv)=>supabase.from("inventarios").upsert(inv,{onConflict:"id"}),
   upsertConteo:(c)=>supabase.from("conteos").upsert(c,{onConflict:"id"}),
@@ -164,8 +164,8 @@ export const serInv=(inv,estado)=>({
   capturas_snapshot:inv.capturas?JSON.stringify(inv.capturas):null,
   productos_snapshot:inv.productos?JSON.stringify(inv.productos):null,
 });
-export const prodCols=(p)=>({id:p.id,tenant_id:G.tenantId||null,ean:p.ean||"",codigo:p.codigo||"",nombre:p.nombre||"",referencia:p.referencia||"",categoria:p.categoria||"",subcategoria:p.subcategoria||"",subgrupo:p.subgrupo||"",determinada:p.determinada||"",localizacion:p.localizacion||"",ubicacion:p.ubicacion||"",observacion:p.observacion||"",saldo:p.saldo||0,costo:p.costo||0,nit:p.nit||"",proveedor:p.proveedor||""});
-export const userCols=(u)=>({id:u.id,tenant_id:u.tenant_id||G.tenantId||null,nombre:u.nombre,pass:u.pass,rol:u.rol,activo:u.activo,creado:u.creado||TODAY(),correo:u.correo||"",telefono:u.telefono||"",cargo:u.cargo||"",turno:u.turno||"",zona:u.zona||"",obs:u.obs||""});
+export const prodCols=(p,invId)=>({id:p.id,tenant_id:G.tenantId||null,inventario_id:invId||p.inventario_id||G.inventario?.id||null,ean:p.ean||"",codigo:p.codigo||"",nombre:p.nombre||"",referencia:p.referencia||"",categoria:p.categoria||"",subcategoria:p.subcategoria||"",subgrupo:p.subgrupo||"",determinada:p.determinada||"",localizacion:p.localizacion||"",ubicacion:p.ubicacion||"",observacion:p.observacion||"",saldo:p.saldo||0,costo:p.costo||0,nit:p.nit||"",proveedor:p.proveedor||""});
+export const userCols=(u)=>({id:u.id,tenant_id:u.tenant_id||G.tenantId||null,inventario_id:u.inventario_id||null,nombre:u.nombre,pass:u.pass,rol:u.rol,activo:u.activo,creado:u.creado||TODAY(),correo:u.correo||"",telefono:u.telefono||"",cargo:u.cargo||"",turno:u.turno||"",zona:u.zona||"",obs:u.obs||""});
 
 // --- Config local / dominio ---
 export const cfgKey=()=>CONFIG_KEY+(G.tenantId?(":"+G.tenantId):"");
@@ -184,13 +184,19 @@ export const saveLocalCache=()=>{try{localStorage.setItem(STORAGE_KEY,JSON.strin
 // abiertos permanecen aislados aquí para no mezclar sus conteos y capturas.
 export const rememberSelectedInventory=()=>{
   if(!G.inventario)return;
-  G._inventarioDatos[G.inventario.id]={conteos:G.conteos,capturas:G.capturas};
+  const prev=G._inventarioDatos[G.inventario.id]||{};
+  G._inventarioDatos[G.inventario.id]={...prev,productos:G.productos,localizaciones:G.localizaciones,ubicacionesTipos:G.ubicacionesTipos,localizacionTipos:G.localizacionTipos,alertas:G.alertas,conteos:G.conteos,capturas:G.capturas};
 };
 export const selectInventory=(id)=>{
   rememberSelectedInventory();
   const inv=G.inventarios.find(i=>i.id===id)||null;
   G.inventario=inv;
   const datos=inv&&G._inventarioDatos[id];
+  G.productos=datos?.productos||[];
+  G.localizaciones=datos?.localizaciones||[];
+  G.ubicacionesTipos=datos?.ubicacionesTipos||[];
+  G.localizacionTipos=datos?.localizacionTipos||[];
+  G.alertas=datos?.alertas||[];
   G.conteos=datos?.conteos||[];
   G.capturas=datos?.capturas||{};
 };

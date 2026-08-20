@@ -28,6 +28,7 @@ export function VConteos({G,rerender,showToast,usuario}){
   const [modalComp,setModalComp]=useState(null); // conteo para comparativo
   const [busqComp,setBusqComp]=useState("");
   const caps=Object.values(G.capturas);
+  const usuariosInv=G.usuarios.filter(u=>u.activo&&(u.rol==="admin"||u.inventario_id===G.inventario?.id));
   const getCapsRonda=(conteoId,ronda)=>caps.filter(c=>c.conteoId===conteoId&&c.ronda===ronda);
 
   const crear=()=>{
@@ -195,7 +196,7 @@ export function VConteos({G,rerender,showToast,usuario}){
                             <Select onValueChange={v=>v&&asignarC3(c.id,v)}>
                               <SelectTrigger className="h-7 w-auto gap-1 px-2 text-xs"><SelectValue placeholder="+ C3"/></SelectTrigger>
                               <SelectContent>
-                                {G.usuarios.filter(u=>u.activo).map(u=><SelectItem key={u.id} value={u.nombre}>{u.nombre}</SelectItem>)}
+                                 {usuariosInv.map(u=><SelectItem key={u.id} value={u.nombre}>{u.nombre}</SelectItem>)}
                               </SelectContent>
                             </Select>
                           )}
@@ -206,7 +207,7 @@ export function VConteos({G,rerender,showToast,usuario}){
                             <Select value={c2Val||undefined} onValueChange={setC2Val}>
                               <SelectTrigger className="h-8 w-auto text-xs"><SelectValue placeholder="Usuario C2…"/></SelectTrigger>
                               <SelectContent>
-                                {G.usuarios.filter(u=>u.activo).map(u=><SelectItem key={u.id} value={u.nombre}>{u.nombre}</SelectItem>)}
+                                 {usuariosInv.map(u=><SelectItem key={u.id} value={u.nombre}>{u.nombre}</SelectItem>)}
                               </SelectContent>
                             </Select>
                             <Button size="sm" className="h-8" onClick={()=>guardarC2(c.id)}>OK</Button>
@@ -246,7 +247,7 @@ export function VConteos({G,rerender,showToast,usuario}){
               <Select value={form.usuarioC1||undefined} onValueChange={v=>setForm(p=>({...p,usuarioC1:v}))}>
                 <SelectTrigger><SelectValue placeholder="Seleccionar usuario…"/></SelectTrigger>
                 <SelectContent>
-                  {G.usuarios.filter(u=>u.activo).map(u=><SelectItem key={u.id} value={u.nombre}>{u.nombre}</SelectItem>)}
+                   {usuariosInv.map(u=><SelectItem key={u.id} value={u.nombre}>{u.nombre}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -256,7 +257,7 @@ export function VConteos({G,rerender,showToast,usuario}){
                 <Select value={form.usuarioC2||undefined} onValueChange={v=>setForm(p=>({...p,usuarioC2:v}))}>
                   <SelectTrigger><SelectValue placeholder="Sin asignar por ahora…"/></SelectTrigger>
                   <SelectContent>
-                    {G.usuarios.filter(u=>u.activo).map(u=><SelectItem key={u.id} value={u.nombre}>{u.nombre}</SelectItem>)}
+                     {usuariosInv.map(u=><SelectItem key={u.id} value={u.nombre}>{u.nombre}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -283,7 +284,7 @@ export function VConteos({G,rerender,showToast,usuario}){
               <Label>Usuario — Conteo 1</Label>
               <Select value={modForm.usuarioC1||undefined} onValueChange={v=>setModForm(p=>({...p,usuarioC1:v}))}>
                 <SelectTrigger><SelectValue placeholder="Seleccionar…"/></SelectTrigger>
-                <SelectContent>{G.usuarios.filter(u=>u.activo).map(u=><SelectItem key={u.id} value={u.nombre}>{u.nombre}</SelectItem>)}</SelectContent>
+                <SelectContent>{usuariosInv.map(u=><SelectItem key={u.id} value={u.nombre}>{u.nombre}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             {modalMod.tipo==="2conteos"&&(
@@ -291,7 +292,7 @@ export function VConteos({G,rerender,showToast,usuario}){
                 <Label>Usuario — Conteo 2</Label>
                 <Select value={modForm.usuarioC2||undefined} onValueChange={v=>setModForm(p=>({...p,usuarioC2:v}))}>
                   <SelectTrigger><SelectValue placeholder="Sin asignar…"/></SelectTrigger>
-                  <SelectContent>{G.usuarios.filter(u=>u.activo).map(u=><SelectItem key={u.id} value={u.nombre}>{u.nombre}</SelectItem>)}</SelectContent>
+                <SelectContent>{usuariosInv.map(u=><SelectItem key={u.id} value={u.nombre}>{u.nombre}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
             )}
