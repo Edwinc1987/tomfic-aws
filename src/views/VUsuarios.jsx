@@ -57,7 +57,11 @@ export function VUsuarios({usuario,G,rerender,showToast}){
     if(!form.nombre.trim()||(!form.editId&&!form.pass.trim()))return showToast("Completa nombre y contraseña","err");
     if(!form.editId){
       const duplicado=G.usuarios.find(u=>(u.nombre||"").toUpperCase()===form.nombre.trim().toUpperCase());
-      if(duplicado)return showToast(`Ya existe el usuario ${duplicado.nombre}. Asígnalo desde "Usuarios existentes".`,"err");
+      if(duplicado){
+        setModal(false);
+        setUsuarioExistente(duplicado.id);
+        return showToast(`Ya existe ${duplicado.nombre}. Quedó seleccionado en "Usuarios existentes"; pulsa "Asignar aquí".`,"warn");
+      }
     }
     setBusy(true);
     try{
