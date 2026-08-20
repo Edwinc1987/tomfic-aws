@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Package } from "lucide-react";
+import { Package, CheckCircle2, AlertTriangle, XCircle, X } from "lucide-react";
 import { supabase, SB, G, STORAGE_KEY, saveLocalCache, saveLocalConfig, slugify, memberEmail, diasHasta, fmtFechaCorta, GRACIA_DIAS } from "@/lib/data";
 import { loadBootstrap, loadTenantData, loadTenants, doSync, scheduleSync, initSnap, getBusy, getDirty, getSyncing } from "@/lib/sync";
 import OfflineBanner from "@/components/OfflineBanner";
@@ -165,7 +165,7 @@ export default function TomficApp(){
   const p={usuario,setUsuario,logout,G,rerender,recargar,showToast,lastSaved,limpiarDatos};
   return(
     <>
-      {toast&&<div style={{position:"fixed",top:66,right:10,background:toast.type==="err"?"#dc2626":toast.type==="warn"?"#d97706":"#16a34a",color:"white",padding:"6px 12px",borderRadius:8,zIndex:9999,fontSize:12,fontWeight:700,boxShadow:"0 3px 12px rgba(0,0,0,0.18)",pointerEvents:"none",maxWidth:210,lineHeight:1.25}}>{toast.msg}</div>}
+      {toast&&(()=>{const err=toast.type==="err",warn=toast.type==="warn";const Icon=err?XCircle:warn?AlertTriangle:CheckCircle2;return <div role="status" aria-live="polite" style={{position:"fixed",right:18,bottom:18,display:"flex",alignItems:"flex-start",gap:10,background:"white",color:"#0f172a",padding:"12px 12px 12px 14px",borderLeft:`4px solid ${err?"#dc2626":warn?"#d97706":"#16a34a"}`,borderRadius:10,zIndex:9999,fontSize:13,fontWeight:600,boxShadow:"0 8px 25px rgba(15,23,42,0.18)",maxWidth:360,lineHeight:1.35}}><Icon size={18} color={err?"#dc2626":warn?"#d97706":"#16a34a"} style={{flexShrink:0,marginTop:1}}/><span>{toast.msg}</span><button aria-label="Cerrar mensaje" onClick={()=>setToast(null)} style={{border:0,background:"transparent",color:"#94a3b8",padding:0,cursor:"pointer",lineHeight:1}}><X size={16}/></button></div>})()}
       <OfflineBanner/>
       {usuario.rol==="dueno"?<PanelDueno {...p}/>:usuario.rol==="capturador"?<ModCapturador {...p}/>:usuario.rol==="gerente"?<ModGerente {...p}/>:<ModAdmin {...p}/>}
     </>

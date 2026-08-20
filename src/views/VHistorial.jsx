@@ -3,22 +3,39 @@ import * as XLSX from "xlsx";
 import {
   Landmark, DollarSign, BarChart2, Scale, AlertTriangle, CheckCircle,
   Package, FileText, ChevronLeft, ChevronRight, Camera, Trash2, Download,
-  Target, Percent, AlertCircle, XCircle, Calendar,
+  Target, Percent, AlertCircle, XCircle, Calendar, RotateCcw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge as UIBadge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { G, TODAY, getStInv, nU, SB } from "@/lib/data";
+import { G, TODAY, getStInv, nU, SB, selectInventory } from "@/lib/data";
 import { _snap } from "@/lib/sync";
-export function VHistorial({G,showToast,usuario}){
+export function VHistorial({G,showToast,usuario,rerender}){
   const [invSel,setInvSel]=useState(null);
   const [cardDetalle,setCardDetalle]=useState(null);
   const [confirmElim,setConfirmElim]=useState(null); // Ã­ndice del historial a eliminar
 
   const fmt=(n)=>"$"+Math.round(n).toLocaleString("es-CO");
   const _fmtCOP=(n)=>new Intl.NumberFormat("es-CO",{style:"currency",currency:"COP",maximumFractionDigits:0}).format(Math.round(n||0));
+
+  const reabrir=inv=>{
+    const limite=Math.max(1,Number(G.tenant?.limite_inventarios||1));
+    if(G.inventarios.length>=limite)return showToast(`No puedes reabrirlo: el plan permite ${limite} inventario${limite===1?"":"s"} activo${limite===1?"":"s"}.` ,"err");
+    if(G.inventarios.some(x=>x.id===inv.id))return showToast("Este inventario ya está activo","warn");
+    const activo={...inv,apertura:TODAY(),horaApertura:new Date().toLocaleTimeString("es-CO"),usuarioApertura:usuario?.nombre||inv.usuarioApertura,cierre:"",horaCierre:"",usuarioCierre:""};
+    G.inventarios=[...G.inventarios,activo];
+    G._inventarioDatos[inv.id]={
+      productos:JSON.parse(JSON.stringify(inv.productos||[])),
+      localizaciones:JSON.parse(JSON.stringify(inv.localizaciones||[])),
+      ubicacionesTipos:[...(inv.ubicacionesTipos||[])],localizacionTipos:[...(inv.localizacionTipos||[])],
+      alertas:[],conteos:JSON.parse(JSON.stringify(inv.conteos||[])),capturas:JSON.parse(JSON.stringify(inv.capturas||{})),
+    };
+    G.historial=G.historial.filter(x=>x.id!==inv.id);
+    selectInventory(inv.id);
+    rerender();showToast(`Inventario "${inv.nombre}" reabierto`);
+  };
 
   const expXLSX=(data,cols,fname,titulo)=>{
     const ws=XLSX.utils.aoa_to_sheet([[titulo],[TODAY()],[],cols,...data]);
@@ -353,9 +370,8 @@ export function VHistorial({G,showToast,usuario}){
                 </Card>
               ))}
             </div>
-            <Card className="p-5 mb-4 border-l-4 border-l-primary">
-              <div className="font-bold text-base">{inv.nombre}</div>
-              <div className="text-xs text-muted-foreground mt-0.5">{inv.apertura} â†’ {inv.cierre} Â· Por: {inv.usuarioApertura}</div>
+             <Card className="p-5 mb-4 border-l-4 border-l-primary">
+               <div className="flex items-center justify-between gap-3"><div><div className="font-bold text-base">{inv.nombre}</div><div className="text-xs text-muted-foreground mt-0.5">{inv.apertura} â†’ {inv.cierre} Â· Por: {inv.usuarioApertura}</div></div><Button variant="outline" size="sm" onClick={()=>reabrir(inv)}><RotateCcw size={14}/> Reabrir</Button></div>
             </Card>
             <div className="grid gap-3" style={{gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))"}}>
               {[
@@ -435,6 +451,7 @@ export function VHistorial({G,showToast,usuario}){
                     <div className="flex items-center gap-2.5 shrink-0 ml-3">
                       <span className="text-[11px] text-muted-foreground font-semibold hidden sm:inline-flex items-center gap-1.5"><FileText size={11}/> {notasH.length} Â· <Camera size={11}/> {fotosN}</span>
                       <div className="text-xs text-primary font-semibold cursor-pointer inline-flex items-center gap-0.5" onClick={()=>setInvSel(h)}>Ver detalle <ChevronRight size={13}/></div>
+                      <Button variant="outline" size="sm" className="h-8 px-2.5" onClick={e=>{e.stopPropagation();reabrir(h);}}><RotateCcw size={14}/> Reabrir</Button>
                       <Button variant="outline" size="sm" className="h-8 px-2.5 text-destructive border-red-200 hover:bg-red-50 hover:text-destructive" onClick={e=>{e.stopPropagation();setConfirmElim(i);}}><Trash2 size={14}/></Button>
                     </div>
                   </div>

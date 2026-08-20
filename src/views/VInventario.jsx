@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   CheckCircle, AlertTriangle, Pencil, Trash2, Lock, Plus,
-  ClipboardList, Package, FileText,
+  ClipboardList, Package,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -84,6 +84,8 @@ export function VInventario({G,rerender,showToast,usuario}){
     G.historial.unshift({
       ...G.inventario,cierre:TODAY(),horaCierre:HOUR(),usuarioCierre:usuario.nombre,
       conteos:conteosSnapshot,capturas:capsSnapshot,productos:prodsSnapshot,
+      localizaciones:JSON.parse(JSON.stringify(G.localizaciones)),
+      ubicacionesTipos:[...G.ubicacionesTipos],localizacionTipos:[...G.localizacionTipos],
       totalProductos:G.productos.length,totalCapturas:Object.keys(G.capturas).length,
     });
     const cerradoId=G.inventario.id;
@@ -178,9 +180,6 @@ export function VInventario({G,rerender,showToast,usuario}){
             <Button variant="outline" onClick={()=>{setEditForm({nombre:G.inventario.nombre,obs:G.inventario.obs||""});setModalEdit(true);}}><Pencil size={15}/> Editar</Button>
             <Button variant="outline" className="text-destructive border-red-200 hover:bg-red-50 hover:text-destructive" onClick={()=>setModalEliminar(true)}><Trash2 size={15}/> Eliminar</Button>
           </div>
-          {G.inventario.obs&&<div className="mb-3 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-1.5 text-sm text-muted-foreground"><FileText size={15} className="shrink-0"/> {G.inventario.obs}</div>}
-          {G.productos.length===0&&<div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-700"><AlertTriangle size={15} className="shrink-0"/> La base de productos está vacía. Ve a "Base de datos" y carga el Excel del cliente antes de programar conteos.</div>}
-          {G.productos.length>0&&<div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm font-semibold text-green-700"><CheckCircle size={15} className="shrink-0"/> Base lista: {G.productos.length} productos disponibles. Puedes programar los conteos.</div>}
         </>
       )}
        {G.inventarios.length>0&&<div className="mt-5">
@@ -190,12 +189,11 @@ export function VInventario({G,rerender,showToast,usuario}){
          </div>
          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
            {G.inventarios.map(inv=>{
-             const d=G._inventarioDatos[inv.id]||{};const activo=G.inventario?.id===inv.id;
+             const activo=G.inventario?.id===inv.id;
              return <button key={inv.id} onClick={()=>{selectInventory(inv.id);rerender();}} className={`text-left rounded-xl border p-4 transition-shadow hover:shadow-md ${activo?"border-blue-500 bg-blue-50/60 shadow-sm":"border-slate-200 bg-white"}`}>
                <div className="flex items-start justify-between gap-2"><div className="font-bold text-slate-900 truncate">{inv.nombre}</div><span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">ACTIVO</span></div>
                <div className="mt-1 text-xs text-slate-500">Abierto {inv.apertura||"—"}</div>
-               <div className="mt-3 flex gap-3 text-xs text-slate-600"><span><b>{(d.productos||[]).length}</b> productos</span><span><b>{(d.conteos||[]).length}</b> conteos</span></div>
-               <div className={`mt-3 text-xs font-bold ${activo?"text-blue-700":"text-slate-500"}`}>{activo?"En este inventario":"Entrar al inventario →"}</div>
+               <div className={`mt-3 text-xs font-bold ${activo?"text-blue-700":"text-slate-500"}`}>{activo?"Seleccionado":"Entrar al inventario →"}</div>
              </button>;
            })}
          </div>

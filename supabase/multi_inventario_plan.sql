@@ -18,6 +18,9 @@ where plan is null or plan = '' or limite_inventarios is null or limite_inventar
 alter table public.conteos add column if not exists inventario_id text;
 alter table public.productos add column if not exists inventario_id text;
 alter table public.usuarios add column if not exists inventario_id text;
+alter table public.inventarios add column if not exists localizaciones_snapshot jsonb;
+alter table public.inventarios add column if not exists ubicaciones_tipos_snapshot jsonb;
+alter table public.inventarios add column if not exists localizacion_tipos_snapshot jsonb;
 
 -- Compatibilidad: los datos del modelo anterior pertenecían al único
 -- inventario abierto. Se asignan solo cuando aún no tienen inventario.

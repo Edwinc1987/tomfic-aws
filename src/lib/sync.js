@@ -53,7 +53,8 @@ const doSync=async()=>{
     for(const id in _snap.invs){if(!curInv[id]){await SB.deleteInventario(id);delete _snap.invs[id];}}
     const curH={};G.historial.forEach(h=>{curH[h.id]=serInv(h,"cerrado");});
     for(const id in curH){const s=JSON.stringify(curH[id]);if(_snap.hist[id]!==s){await SB.upsertInventario(curH[id]);_snap.hist[id]=s;}}
-    for(const id in _snap.hist){if(!curH[id]){await SB.deleteInventario(id);delete _snap.hist[id];}}
+    // Un inventario puede pasar de cerrado a abierto sin cambiar de id.
+    for(const id in _snap.hist){if(!curH[id]&&!curInv[id]){await SB.deleteInventario(id);delete _snap.hist[id];}}
     const curC={};
     G.inventarios.forEach(inv=>{const d=G._inventarioDatos[inv.id]||{conteos:[],capturas:{}};d.conteos.forEach(c=>{curC[c.id]=serConteo(c,inv.id,d.capturas);});});
     for(const id in curC){const s=JSON.stringify(curC[id]);if(_snap.c[id]!==s){await SB.upsertConteo(curC[id]);_snap.c[id]=s;}}
@@ -114,8 +115,11 @@ export const loadTenantData=async(tid,preferredInvId=null)=>{
   G.historial=inventarios.filter(i=>i.estado==="cerrado").map(i=>{
     const cs=i.conteos_snapshot?JSON.parse(i.conteos_snapshot):[];
     const ca=i.capturas_snapshot?JSON.parse(i.capturas_snapshot):{};
-    const pr=i.productos_snapshot?JSON.parse(i.productos_snapshot):[];
-    return {id:i.id,nombre:i.nombre,tipo:i.tipo,obs:i.obs,fecha:i.fecha,apertura:i.apertura,horaApertura:i.hora_apertura,usuarioApertura:i.usuario_apertura,cierre:i.cierre,horaCierre:i.hora_cierre,usuarioCierre:i.usuario_cierre,conteos:cs,capturas:ca,productos:pr,totalProductos:pr.length,totalCapturas:Object.keys(ca).length};
+     const pr=i.productos_snapshot?JSON.parse(i.productos_snapshot):[];
+     const loc=i.localizaciones_snapshot?(typeof i.localizaciones_snapshot==="string"?JSON.parse(i.localizaciones_snapshot):i.localizaciones_snapshot):[];
+     const ubi=i.ubicaciones_tipos_snapshot?(typeof i.ubicaciones_tipos_snapshot==="string"?JSON.parse(i.ubicaciones_tipos_snapshot):i.ubicaciones_tipos_snapshot):[];
+     const ltip=i.localizacion_tipos_snapshot?(typeof i.localizacion_tipos_snapshot==="string"?JSON.parse(i.localizacion_tipos_snapshot):i.localizacion_tipos_snapshot):[];
+     return {id:i.id,nombre:i.nombre,tipo:i.tipo,obs:i.obs,fecha:i.fecha,apertura:i.apertura,horaApertura:i.hora_apertura,usuarioApertura:i.usuario_apertura,cierre:i.cierre,horaCierre:i.hora_cierre,usuarioCierre:i.usuario_cierre,conteos:cs,capturas:ca,productos:pr,localizaciones:loc,ubicacionesTipos:ubi,localizacionTipos:ltip,totalProductos:pr.length,totalCapturas:Object.keys(ca).length};
   }).sort((a,b)=>(b.cierre||"").localeCompare(a.cierre||""));
   initSnap();
  } finally { _loadingTenant=false; }
