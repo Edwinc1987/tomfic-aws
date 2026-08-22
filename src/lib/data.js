@@ -46,7 +46,7 @@ export const SB={
   upsertUsuario:(u)=>supabase.from("usuarios").upsert(u,{onConflict:"id"}),
   updateUsuario:(id,patch)=>supabase.from("usuarios").update(patch).eq("id",id),
   deleteUsuario:(id)=>supabase.from("usuarios").delete().eq("id",id),
-  async upsertProductosBulk(prods){for(let i=0;i<prods.length;i+=500){await supabase.from("productos").upsert(prods.slice(i,i+500),{onConflict:"id"});}},
+   async upsertProductosBulk(prods,onProgress){for(let i=0;i<prods.length;i+=500){const lote=prods.slice(i,i+500);const{error}=await supabase.from("productos").upsert(lote,{onConflict:"id"});if(error)throw error;onProgress?.(Math.min(i+lote.length,prods.length),prods.length);}},
   // SIEMPRE scopeado por empresa. Si no hay tenant, es un NO-OP: nunca un borrado global
   // (con RLS el dueño podría borrar productos de TODAS las empresas → se prohíbe de raíz).
   deleteAllProductos:(tid,invId)=>tid?supabase.from("productos").delete().eq("tenant_id",tid).eq("inventario_id",invId):Promise.resolve({data:null,error:null}),

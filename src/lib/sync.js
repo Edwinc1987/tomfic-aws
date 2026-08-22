@@ -31,6 +31,7 @@ export const getSyncing=()=>_syncing;
 
 const doSync=async()=>{
   if(!G.tenantId||_loadingTenant)return;
+  if(typeof navigator!=="undefined"&&!navigator.onLine){_dirty=true;return;}
   if(_syncing){_pending=true;return;}
   _syncing=true;_dirty=false;
   try{

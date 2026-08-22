@@ -20,6 +20,8 @@ export function VBaseDatos({G,rerender,showToast}){
   const [catF,setCatF]=useState("");
   const [preview,setPreview]=useState(null);
   const [rawData,setRawData]=useState(null);
+  const [importando,setImportando]=useState(false);
+  const [importProgress,setImportProgress]=useState({done:0,total:0});
 
   const cargarPreview=(e)=>{
     const file=e.target.files[0];if(!file)return;
@@ -37,8 +39,10 @@ export function VBaseDatos({G,rerender,showToast}){
   };
 
   const confirmarImport=async()=>{
-    if(!rawData)return;
-    setBusy(true);
+     if(!rawData||importando)return;
+     setBusy(true);
+     setImportando(true);
+     setImportProgress({done:0,total:rawData.length});
     const normKey=(k)=>String(k).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^A-Z0-9]/g,"");
     const toNum=(v)=>{if(v===undefined||v===null||v==="")return 0;if(typeof v==="number")return isNaN(v)?0:v;let s=String(v).replace(/[^\d.,-]/g,"").trim();if(s==="")return 0;if(s.includes(".")&&s.includes(","))s=s.replace(/\./g,"").replace(",",".");else if(s.includes(","))s=s.replace(",",".");const n=parseFloat(s);return isNaN(n)?0:n;};
     const mapped=rawData.map((rawRow,i)=>{
@@ -64,15 +68,18 @@ export function VBaseDatos({G,rerender,showToast}){
         proveedor:get("NOMBRE PROVEEDOR","PROVEEDOR"),
       };
     }).filter(r=>r.nombre);
-    G.productos=mapped;setPreview(null);setRawData(null);
+     G.productos=mapped;
     // Subir directamente a la nube y ESPERAR a que termine, antes de permitir refrescos.
     try{
        await SB.deleteAllProductos(G.tenantId,G.inventario?.id);
-      if(mapped.length)await SB.upsertProductosBulk(mapped.map(prodCols));
-      _snap.prods={};mapped.forEach(p=>{_snap.prods[p.id]=JSON.stringify(prodCols(p));}); // marca como ya sincronizado
-    }catch(e){console.warn("Error subiendo productos:",e);showToast("Error subiendo a la nube, revisa tu conexión","err");}
-    saveLocalCache();
-    setBusy(false);
+       // No usar mapped.map(prodCols): Array.map pasa el índice como segundo argumento
+       // y prodCols lo interpreta como inventario_id.
+       if(mapped.length)await SB.upsertProductosBulk(mapped.map(p=>prodCols(p,G.inventario?.id)),(done,total)=>setImportProgress({done,total}));
+       _snap.prods={};mapped.forEach(p=>{_snap.prods[p.id]=JSON.stringify(prodCols(p));}); // marca como ya sincronizado
+       setPreview(null);setRawData(null);
+     }catch(e){console.warn("Error subiendo productos:",e);showToast("Error subiendo a la nube, revisa tu conexión","err");}
+     saveLocalCache();
+     setBusy(false);setImportando(false);
     rerender();
     const conCosto=mapped.filter(p=>p.costo>0).length,conSaldo=mapped.filter(p=>p.saldo>0).length;
     if(conCosto===0||conSaldo===0)showToast(`Importados ${mapped.length}, pero ${conCosto===0?"COSTO":""}${conCosto===0&&conSaldo===0?" y ":""}${conSaldo===0?"SALDO":""} salieron en 0 — revisa el nombre de esas columnas`,"warn");
@@ -250,10 +257,22 @@ export function VBaseDatos({G,rerender,showToast}){
             <div className="flex justify-between items-center mb-3 gap-3 flex-wrap">
               <div className="font-bold text-base text-blue-800">Vista previa — {rawData.length} filas detectadas</div>
               <div className="flex gap-2">
-                <Button variant="outline" onClick={()=>{setPreview(null);setRawData(null);}}>Cancelar</Button>
-                <Button onClick={confirmarImport}><CheckCircle size={15}/> Confirmar importación</Button>
-              </div>
-            </div>
+                 <Button variant="outline" disabled={importando} onClick={()=>{setPreview(null);setRawData(null);}}>Cancelar</Button>
+                 <Button disabled={importando} onClick={confirmarImport}><CheckCircle size={15}/> {importando?"Importando…":"Confirmar importación"}</Button>
+               </div>
+             </div>
+             {importando&&(
+               <div className="mb-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2.5">
+                 <div className="mb-1.5 flex items-center justify-between gap-3 text-xs text-slate-600">
+                   <span>Guardando productos en la nube</span>
+                   <b className="text-slate-700">{Math.round((importProgress.done/Math.max(importProgress.total,1))*100)}%</b>
+                 </div>
+                 <div className="h-1.5 overflow-hidden rounded-full bg-slate-200">
+                   <div className="h-full rounded-full bg-blue-600 transition-all duration-300" style={{width:`${(importProgress.done/Math.max(importProgress.total,1))*100}%`}}/>
+                 </div>
+                 <div className="mt-1 text-[11px] text-slate-500">{importProgress.done.toLocaleString("es-CO")} de {importProgress.total.toLocaleString("es-CO")} productos procesados</div>
+               </div>
+             )}
             <div className="overflow-x-auto rounded-lg border">
               <table className="w-full text-xs">
                 <thead>

@@ -90,6 +90,9 @@ export default function TomficApp(){
     setLastSaved(new Date().toLocaleTimeString("es-CO"));
   };
   const recargar=async()=>{
+    // Nunca reemplazar el estado local con una carga de nube mientras el móvil
+    // está sin conexión. Las capturas quedan pendientes para sincronizarse al volver.
+    if(typeof navigator!=="undefined"&&!navigator.onLine)return;
     if(getBusy())return;
     if(G.tenantId&&getDirty()){
       try{await doSync();}catch(e){}

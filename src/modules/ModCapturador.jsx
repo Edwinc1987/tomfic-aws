@@ -14,8 +14,8 @@ function EstBadge({e}){
 }
 
 export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,showToast}){
-  const [conteoActivo,setConteoActivo]=useState(null);
-  const [rondaActiva,setRondaActiva]=useState(null); // ronda elegida cuando el usuario tiene varias
+  const [conteoActivo,setConteoActivo]=useState(()=>{try{return sessionStorage.getItem("tomfic_cap_conteo")||null;}catch(e){return null;}});
+  const [rondaActiva,setRondaActiva]=useState(()=>{try{return sessionStorage.getItem("tomfic_cap_ronda")||null;}catch(e){return null;}}); // ronda elegida cuando el usuario tiene varias
   const [scanInput,setScanInput]=useState("");
   const [productoActivo,setProductoActivo]=useState(null);
   const [form,setForm]=useState({unidades:"",embalaje:"",cajas:"",estado:"BUENO",obs:""});
@@ -31,6 +31,7 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
   // se oscurece SOLO el contenido (no la barra ni la cámara) con un filtro suave.
   const [dark,setDark]=useState(()=>{try{return localStorage.getItem("tomfic_capdark")==="1";}catch(e){return false;}});
   const toggleDark=()=>setDark(d=>{const nv=!d;try{localStorage.setItem("tomfic_capdark",nv?"1":"0");}catch(e){}return nv;});
+  useEffect(()=>{try{if(conteoActivo)sessionStorage.setItem("tomfic_cap_conteo",conteoActivo);else sessionStorage.removeItem("tomfic_cap_conteo");if(rondaActiva)sessionStorage.setItem("tomfic_cap_ronda",rondaActiva);else sessionStorage.removeItem("tomfic_cap_ronda");}catch(e){}},[conteoActivo,rondaActiva]);
   const pageBg=dark?"#0b1220":"#f1f5f9";
   const nightFilter=dark?{filter:"invert(0.92) hue-rotate(180deg)"}:null;
   const [ajusteVals,setAjusteVals]=useState({}); // {productId: string} inputs del conteo de ajuste
@@ -133,7 +134,7 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
   };
 
   const handleScan=(e)=>{
-    if(e.key!=="Enter")return;
+    if(e.key!=="Enter"&&e.key!=="NumpadEnter")return;
     const p=buscarProd(scanInput);
     setNotFound(!p);
     if(p){setProductoActivo(p);setForm({unidades:"",embalaje:"",cajas:"",estado:"BUENO",obs:""});setTimeout(()=>unidadesRef.current?.focus(),80);}
@@ -309,20 +310,20 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
     const cerrados=entradas.filter(e=>e.cerrada);
     return(
       <div style={{minHeight:"100vh",background:pageBg,fontFamily:"system-ui,sans-serif"}}>
-        <div style={{background:"#0f172a",color:"white",padding:"0 16px",display:"flex",alignItems:"center",justifyContent:"space-between",height:52,position:"sticky",top:0,zIndex:100}}>
+         <div style={{background:"#ffffff",color:"#1e293b",padding:"0 16px",display:"flex",alignItems:"center",justifyContent:"space-between",height:52,position:"sticky",top:0,zIndex:100,borderBottom:"1px solid #e2e8f0",boxShadow:"0 1px 4px rgba(15,23,42,0.08)"}}>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
-            <Package size={20} color="white"/>
-            <span style={{fontWeight:800,fontSize:15}}>tomfic</span>
+             <Package size={20} color="#2563eb"/>
+             <span style={{fontWeight:800,fontSize:15,color:"#0f172a"}}>tomfic</span>
             {G.inventario&&<select value={G.inventario.id} onChange={e=>{setConteoActivo(null);setRondaActiva(null);selectInventory(e.target.value);rerender();}} aria-label="Inventario activo seleccionado"
-              style={{background:"#166534",border:"1px solid #22c55e",color:"white",fontSize:10,padding:"3px 8px",borderRadius:20,fontWeight:700,maxWidth:180}}>
+               style={{background:"#f8fafc",border:"1px solid #cbd5e1",color:"#475569",fontSize:10,padding:"3px 8px",borderRadius:5,fontWeight:700,maxWidth:180}}>
               {inventariosVisibles.map(inv=><option key={inv.id} value={inv.id} style={{color:"#0f172a"}}>{inv.nombre}</option>)}
             </select>}
           </div>
           <div style={{display:"flex",gap:10,alignItems:"center"}}>
-            <button onClick={toggleDark} title={dark?"Modo día":"Modo noche"} style={{background:"transparent",border:"1px solid #334155",color:"#facc15",padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer",display:"inline-flex",alignItems:"center"}}>{dark?<Sun size={14}/>:<Moon size={14}/>}</button>
-            <button onClick={async()=>{await recargar();showToast("Actualizado ✓");}} style={{background:"transparent",border:"1px solid #334155",color:"#94a3b8",padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer",display:"flex",alignItems:"center"}}><RefreshCw size={13}/></button>
-            <span style={{fontSize:11,color:"#94a3b8",display:"flex",alignItems:"center",gap:4}}><Users size={11}/> {usuario.nombre}</span>
-            <button onClick={()=>setModalSalir(true)} style={{background:"#dc2626",border:"none",color:"white",padding:"6px 16px",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:4}}><LogOut size={13}/> Salir</button>
+             <button onClick={toggleDark} title={dark?"Modo día":"Modo noche"} style={{background:"#ffffff",border:"1px solid #cbd5e1",color:"#64748b",padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer",display:"inline-flex",alignItems:"center"}}>{dark?<Sun size={14}/>:<Moon size={14}/>}</button>
+             <button onClick={async()=>{await recargar();showToast("Actualizado ✓");}} style={{background:"#ffffff",border:"1px solid #cbd5e1",color:"#64748b",padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer",display:"flex",alignItems:"center"}}><RefreshCw size={13}/></button>
+             <span style={{fontSize:11,color:"#64748b",display:"flex",alignItems:"center",gap:4}}><Users size={11}/> {usuario.nombre}</span>
+             <button onClick={()=>setModalSalir(true)} style={{background:"#fff1f2",border:"1px solid #fecdd3",color:"#be123c",padding:"6px 16px",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:4}}><LogOut size={13}/> Salir</button>
           </div>
         </div>
         <div style={{maxWidth:700,margin:"0 auto",padding:"20px 14px",...nightFilter}}>
@@ -436,16 +437,16 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
     }).sort((a,b)=>difProd(a)-difProd(b));
     return(
       <div style={{minHeight:"100vh",background:pageBg,fontFamily:"system-ui,sans-serif"}}>
-        <div style={{background:"#0f172a",color:"white",padding:"0 16px",display:"flex",alignItems:"center",justifyContent:"space-between",height:52,position:"sticky",top:0,zIndex:100}}>
+         <div style={{background:"#ffffff",color:"#1e293b",padding:"0 16px",display:"flex",alignItems:"center",justifyContent:"space-between",height:52,position:"sticky",top:0,zIndex:100,borderBottom:"1px solid #e2e8f0",boxShadow:"0 1px 4px rgba(15,23,42,0.08)"}}>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
-            <button onClick={()=>{setConteoActivo(null);setRondaActiva(null);}} style={{background:"transparent",border:"1px solid #334155",color:"#94a3b8",padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:3}}><ChevronLeft size={13}/> Mis conteos</button>
-            <span style={{fontWeight:800,fontSize:15,color:"white"}}>tomfic</span>
+             <button onClick={()=>{setConteoActivo(null);setRondaActiva(null);}} style={{background:"#ffffff",border:"1px solid #cbd5e1",color:"#64748b",padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:3}}><ChevronLeft size={13}/> Mis conteos</button>
+             <span style={{fontWeight:800,fontSize:15,color:"#0f172a"}}>tomfic</span>
             <span style={{background:"#7c3aed",fontSize:10,padding:"2px 10px",borderRadius:20,fontWeight:700}}>AJUSTE</span>
           </div>
           <div style={{display:"flex",gap:10,alignItems:"center"}}>
-            <button onClick={toggleDark} title={dark?"Modo día":"Modo noche"} style={{background:"transparent",border:"1px solid #334155",color:"#facc15",padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer",display:"inline-flex",alignItems:"center"}}>{dark?<Sun size={14}/>:<Moon size={14}/>}</button>
-            <span style={{fontSize:11,color:"#94a3b8",display:"flex",alignItems:"center",gap:4}}><Users size={11}/> {usuario.nombre}</span>
-            <button onClick={()=>setModalSalir(true)} style={{background:"#dc2626",border:"none",color:"white",padding:"6px 16px",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:4}}><LogOut size={13}/> Salir</button>
+             <button onClick={toggleDark} title={dark?"Modo día":"Modo noche"} style={{background:"#ffffff",border:"1px solid #cbd5e1",color:"#64748b",padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer",display:"inline-flex",alignItems:"center"}}>{dark?<Sun size={14}/>:<Moon size={14}/>}</button>
+             <span style={{fontSize:11,color:"#64748b",display:"flex",alignItems:"center",gap:4}}><Users size={11}/> {usuario.nombre}</span>
+           <button onClick={()=>setModalSalir(true)} style={{background:"#fff1f2",border:"1px solid #fecdd3",color:"#be123c",padding:"6px 16px",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:4}}><LogOut size={13}/> Salir</button>
           </div>
         </div>
         <div style={{maxWidth:1000,margin:"0 auto",padding:"14px",...nightFilter}}>
@@ -507,19 +508,19 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
   const total=calcTotal(form);
   return(
     <div style={{minHeight:"100vh",background:pageBg,fontFamily:"system-ui,sans-serif"}}>
-      <div style={{background:"#0f172a",color:"white",padding:"0 16px",display:"flex",alignItems:"center",justifyContent:"space-between",height:52,position:"sticky",top:0,zIndex:100}}>
+       <div style={{background:"#ffffff",color:"#1e293b",padding:"0 16px",display:"flex",alignItems:"center",justifyContent:"space-between",height:52,position:"sticky",top:0,zIndex:100,borderBottom:"1px solid #e2e8f0",boxShadow:"0 1px 4px rgba(15,23,42,0.08)"}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <button onClick={()=>{setConteoActivo(null);setRondaActiva(null);setProductoActivo(null);setScanInput("");setBusqueda("");}}
-            style={{background:"transparent",border:"1px solid #334155",color:"#94a3b8",padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:3}}><ChevronLeft size={13}/> Mis conteos</button>
-          <span style={{fontWeight:800,fontSize:15,color:"white"}}>TOMFIC</span>
+           <button onClick={()=>{setConteoActivo(null);setRondaActiva(null);setProductoActivo(null);setScanInput("");setBusqueda("");}}
+             style={{background:"#ffffff",border:"1px solid #cbd5e1",color:"#64748b",padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:3}}><ChevronLeft size={13}/> Mis conteos</button>
+           <span style={{fontWeight:800,fontSize:15,color:"#0f172a"}}>TOMFIC</span>
           <span style={{background:rcol[miRonda],fontSize:10,padding:"2px 10px",borderRadius:20,fontWeight:700}}>{rlbl[miRonda]}</span>
         </div>
         <div style={{display:"flex",gap:10,alignItems:"center"}}>
-          <button onClick={toggleDark} title={dark?"Modo día":"Modo noche"} style={{background:"transparent",border:"1px solid #334155",color:"#facc15",padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer",display:"inline-flex",alignItems:"center"}}>{dark?<Sun size={14}/>:<Moon size={14}/>}</button>
-          <button onClick={async()=>{await recargar();showToast("Actualizado ✓");}} title="Traer lo último de la nube" style={{background:"transparent",border:"1px solid #334155",color:"#94a3b8",padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer",display:"flex",alignItems:"center"}}><RefreshCw size={13}/></button>
-          <span style={{fontSize:11,color:"#94a3b8",display:"flex",alignItems:"center",gap:4}}><Users size={11}/> {usuario.nombre}</span>
+           <button onClick={toggleDark} title={dark?"Modo día":"Modo noche"} style={{background:"#ffffff",border:"1px solid #cbd5e1",color:"#64748b",padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer",display:"inline-flex",alignItems:"center"}}>{dark?<Sun size={14}/>:<Moon size={14}/>}</button>
+           <button onClick={async()=>{await recargar();showToast("Actualizado ✓");}} title="Traer lo último de la nube" style={{background:"#ffffff",border:"1px solid #cbd5e1",color:"#64748b",padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer",display:"flex",alignItems:"center"}}><RefreshCw size={13}/></button>
+           <span style={{fontSize:11,color:"#64748b",display:"flex",alignItems:"center",gap:4}}><Users size={11}/> {usuario.nombre}</span>
           {soyPrincipal(miConteo)&&<button onClick={()=>setModalCerrar(true)} style={{background:"#dc2626",color:"white",border:"none",padding:"6px 14px",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:700}}>Terminar conteo</button>}
-          <button onClick={()=>setModalSalir(true)} style={{background:"#dc2626",border:"none",color:"white",padding:"6px 16px",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:4}}><LogOut size={13}/> Salir</button>
+           <button onClick={()=>setModalSalir(true)} style={{background:"#fff1f2",border:"1px solid #fecdd3",color:"#be123c",padding:"6px 16px",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:4}}><LogOut size={13}/> Salir</button>
         </div>
       </div>
 
@@ -612,7 +613,7 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
             <div>
                <div style={{fontSize:10,fontWeight:800,color:"#374151",marginBottom:4}}>CÓDIGO (EAN / INTERNO)</div>
               <div style={{display:"flex",gap:8}}>
-                <input ref={scanRef} value={scanInput} onChange={e=>setScanInput(e.target.value)} onKeyDown={handleScan}
+                   <input ref={scanRef} value={scanInput} onChange={e=>setScanInput(e.target.value)} onKeyDown={handleScan} enterKeyHint="go"
                   placeholder="Escanee o escriba y presione Enter…"
                    style={{...inp,flex:1,padding:"7px 10px",border:`2px solid ${rcol[miRonda]}`}} autoFocus/>
                 <button onClick={()=>handleScan({key:"Enter"})} style={{padding:"9px 14px",background:rcol[miRonda],color:"white",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:15,display:"inline-flex",alignItems:"center"}}><CornerDownLeft size={16}/></button>
@@ -714,17 +715,17 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
                     <label style={{fontSize:12,fontWeight:600,color:"#374151"}}>UNIDADES</label>
                     <input ref={unidadesRef} type="number" min="0" value={form.unidades}
                       onChange={e=>setForm(f=>({...f,unidades:e.target.value}))}
-                      onKeyDown={e=>{if(e.key==="Enter"){if(form.cajas||form.embalaje){document.getElementById("inp-emb2")?.focus();}else{guardar();}}}}
+                       onKeyDown={e=>{if(e.key==="Enter"||e.key==="NumpadEnter"){if(form.cajas||form.embalaje){document.getElementById("inp-emb2")?.focus();}else{guardar();}}}}
                        placeholder="0" style={{...inp,padding:"6px 8px",fontSize:15,fontWeight:700,textAlign:"center"}}/>
                     <label style={{fontSize:12,fontWeight:600,color:"#374151"}}>EMBALAJE</label>
                     <input id="inp-emb2" type="number" min="0" value={form.embalaje}
                       onChange={e=>setForm(f=>({...f,embalaje:e.target.value}))}
-                      onKeyDown={e=>{if(e.key==="Enter")document.getElementById("inp-caj2")?.focus();}}
+                       onKeyDown={e=>{if(e.key==="Enter"||e.key==="NumpadEnter")document.getElementById("inp-caj2")?.focus();}}
                        placeholder="Und/caja" style={{...inp,padding:"6px 8px",fontSize:13,textAlign:"center"}}/>
                     <label style={{fontSize:12,fontWeight:600,color:"#374151"}}>CAJAS</label>
                     <input id="inp-caj2" type="number" min="0" value={form.cajas}
                       onChange={e=>setForm(f=>({...f,cajas:e.target.value}))}
-                      onKeyDown={e=>{if(e.key==="Enter")guardar();}}
+                       onKeyDown={e=>{if(e.key==="Enter"||e.key==="NumpadEnter")guardar();}}
                        placeholder="Cajas" style={{...inp,padding:"6px 8px",fontSize:13,textAlign:"center"}}/>
                     <label style={{fontSize:14,fontWeight:800,color:"#0f172a"}}>TOTAL</label>
                      <div style={{...inp,padding:"7px",fontSize:20,fontWeight:800,textAlign:"center",background:total>0?"#eff6ff":"#f8fafc",color:total>0?rcol[miRonda]:"#64748b",border:`2px solid ${total>0?rcol[miRonda]:"#e2e8f0"}`,cursor:"default",userSelect:"none"}}>
@@ -743,7 +744,7 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
                   <div>
                     <div style={{fontSize:11,color:"#64748b",marginBottom:4}}>OBSERVACIÓN</div>
                     <input type="text" value={form.obs} onChange={e=>setForm(f=>({...f,obs:e.target.value}))}
-                      onKeyDown={e=>{if(e.key==="Enter")guardar();}}
+                       onKeyDown={e=>{if(e.key==="Enter"||e.key==="NumpadEnter")guardar();}}
                       placeholder="Opcional…" style={{...inp,fontSize:13}}/>
                   </div>
                   {miRonda==="C3"&&<div style={{marginTop:10,background:"#faf5ff",borderRadius:8,padding:"8px 12px",fontSize:12,color:"#7c3aed"}}>En C3 se permite guardar 0 unidades.</div>}
