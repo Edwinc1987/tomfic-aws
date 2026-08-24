@@ -84,3 +84,25 @@
     .cap-count-header { gap: 6px !important; }
   }
 }
+
+/* Tema noche del capturador. Se aplican colores reales, no inversión de
+   píxeles, para conservar legibles fotos, iconos y colores de estado. */
+.cap-dark-shell { color: #e2e8f0; }
+.cap-dark-shell [style*="background: white"],
+.cap-dark-shell [style*="background:#ffffff"],
+.cap-dark-shell [style*="background: #ffffff"],
+.cap-dark-shell [style*="background: #f8fafc"],
+.cap-dark-shell [style*="background: #f1f5f9"],
+.cap-dark-shell [style*="background: #eef2ff"] { background: #1e293b !important; }
+.cap-dark-shell [style*="color: #0f172a"],
+.cap-dark-shell [style*="color: #1e293b"],
+.cap-dark-shell [style*="color: #374151"] { color: #e2e8f0 !important; }
+.cap-dark-shell [style*="color: #64748b"] { color: #94a3b8 !important; }
+.cap-dark-shell [style*="border: 1px solid #e2e8f0"],
+.cap-dark-shell [style*="borderBottom: 1px solid #e2e8f0"],
+.cap-dark-shell [style*="border: 1px solid #cbd5e1"] { border-color: #334155 !important; }
+.cap-dark-shell input,
+.cap-dark-shell select,
+.cap-dark-shell textarea { background: #0f172a !important; color: #e2e8f0 !important; border-color: #475569 !important; }
+.cap-dark-shell option { background: #0f172a; color: #e2e8f0; }
+.cap-dark-shell img { filter: none !important; }

@@ -13,12 +13,28 @@ function EstBadge({e}){
   return <span style={{background:bg,color:tc,padding:"2px 8px",borderRadius:12,fontSize:11,fontWeight:700}}>{e||"—"}</span>;
 }
 
+const comprimirFoto=(file)=>new Promise((resolve,reject)=>{
+  const reader=new FileReader();
+  reader.onload=()=>{
+    const img=new Image();
+    img.onload=()=>{
+      const scale=Math.min(1,1280/Math.max(img.width,img.height));
+      const canvas=document.createElement("canvas");
+      canvas.width=Math.round(img.width*scale);canvas.height=Math.round(img.height*scale);
+      canvas.getContext("2d").drawImage(img,0,0,canvas.width,canvas.height);
+      resolve({name:file.name,data:canvas.toDataURL("image/jpeg",0.72)});
+    };
+    img.onerror=reject;img.src=reader.result;
+  };
+  reader.onerror=reject;reader.readAsDataURL(file);
+});
+
 export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,showToast}){
   const [conteoActivo,setConteoActivo]=useState(()=>{try{return sessionStorage.getItem("tomfic_cap_conteo")||null;}catch(e){return null;}});
   const [rondaActiva,setRondaActiva]=useState(()=>{try{return sessionStorage.getItem("tomfic_cap_ronda")||null;}catch(e){return null;}}); // ronda elegida cuando el usuario tiene varias
   const [scanInput,setScanInput]=useState("");
   const [productoActivo,setProductoActivo]=useState(null);
-  const [form,setForm]=useState({unidades:"",embalaje:"",cajas:"",estado:"BUENO",obs:""});
+   const [form,setForm]=useState({unidades:"",embalaje:"",cajas:"",estado:"BUENO",obs:"",fotos:[]});
   const [c3Vals,setC3Vals]=useState({}); // {productoId: cantidad}
   const [notFound,setNotFound]=useState(false);
   const [modalCerrar,setModalCerrar]=useState(false);
@@ -33,7 +49,16 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
   const toggleDark=()=>setDark(d=>{const nv=!d;try{localStorage.setItem("tomfic_capdark",nv?"1":"0");}catch(e){}return nv;});
   useEffect(()=>{try{if(conteoActivo)sessionStorage.setItem("tomfic_cap_conteo",conteoActivo);else sessionStorage.removeItem("tomfic_cap_conteo");if(rondaActiva)sessionStorage.setItem("tomfic_cap_ronda",rondaActiva);else sessionStorage.removeItem("tomfic_cap_ronda");}catch(e){}},[conteoActivo,rondaActiva]);
   const pageBg=dark?"#0b1220":"#f1f5f9";
-  const nightFilter=dark?{filter:"invert(0.92) hue-rotate(180deg)"}:null;
+   const nightFilter=dark?{className:"cap-dark"}:{};
+   const agregarFoto=async(e)=>{
+     const files=Array.from(e.target.files||[]);
+     for(const file of files){
+       try{const foto=await comprimirFoto(file);setForm(f=>({...f,fotos:[...(f.fotos||[]),foto]}));}
+       catch(err){showToast("No se pudo cargar la foto","err");}
+     }
+     e.target.value="";
+   };
+   const resetForm=()=>setForm({unidades:"",embalaje:"",cajas:"",estado:"BUENO",obs:"",fotos:[]});
   const [ajusteVals,setAjusteVals]=useState({}); // {productId: string} inputs del conteo de ajuste
   const [soloDif,setSoloDif]=useState(true); // ajuste: por defecto solo productos con diferencia
   const scanRef=useRef(null);
@@ -137,7 +162,7 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
     if(e.key!=="Enter"&&e.key!=="NumpadEnter")return;
     const p=buscarProd(scanInput);
     setNotFound(!p);
-    if(p){setProductoActivo(p);setForm({unidades:"",embalaje:"",cajas:"",estado:"BUENO",obs:""});setTimeout(()=>unidadesRef.current?.focus(),80);}
+     if(p){setProductoActivo(p);resetForm();setTimeout(()=>unidadesRef.current?.focus(),80);}
     setScanInput("");
   };
 
@@ -145,7 +170,7 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
     setShowCam(false);
     const p=buscarProd(code);
     setNotFound(!p);
-    if(p){setProductoActivo(p);setForm({unidades:"",embalaje:"",cajas:"",estado:"BUENO",obs:""});setTimeout(()=>unidadesRef.current?.focus(),200);showToast(`📷 ${p.nombre}`);}
+     if(p){setProductoActivo(p);resetForm();setTimeout(()=>unidadesRef.current?.focus(),200);showToast(`📷 ${p.nombre}`);}
     else{showToast(`Código ${code} no está en la base`,"err");setTimeout(()=>scanRef.current?.focus(),120);}
   };
 
@@ -166,11 +191,11 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
         G.capturas[key]={...G.capturas[key],
           cantidad:total,unidades:parseFloat(form.unidades)||0,
           cajas:parseFloat(form.cajas)||0,embalaje:parseFloat(form.embalaje)||0,
-          estado:form.estado,obs:form.obs,
+           estado:form.estado,obs:form.obs,fotos:form.fotos||[],
           fecha:TODAY(),hora:HOUR(),
         };
         rerender();showToast(`✓ Editado: ${productoActivo.nombre} — ${total} und`);
-        setProductoActivo(null);setForm({unidades:"",embalaje:"",cajas:"",estado:"BUENO",obs:""});
+         setProductoActivo(null);resetForm();
         setEditCap(null);
         setTimeout(()=>scanRef.current?.focus(),80);
         return;
@@ -186,11 +211,11 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
       proveedor:productoActivo.proveedor,nit:productoActivo.nit,
       cantidad:total,unidades:parseFloat(form.unidades)||0,
       cajas:parseFloat(form.cajas)||0,embalaje:parseFloat(form.embalaje)||0,
-      estado:form.estado,obs:form.obs,
+       estado:form.estado,obs:form.obs,fotos:form.fotos||[],
       usuario:usuario.nombre,fecha:TODAY(),hora:HOUR(),
     };
     rerender();showToast(`✓ ${productoActivo.nombre} — ${total} und`);
-    setProductoActivo(null);setForm({unidades:"",embalaje:"",cajas:"",estado:"BUENO",obs:""});
+     setProductoActivo(null);resetForm();
     setEditCap(null);
     setTimeout(()=>scanRef.current?.focus(),80);
   };
@@ -214,11 +239,11 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
       proveedor:productoActivo.proveedor,nit:productoActivo.nit,
       cantidad:-cant,unidades:-(parseFloat(form.unidades)||0),
       cajas:parseFloat(form.cajas)||0,embalaje:parseFloat(form.embalaje)||0,
-      estado:form.estado,obs:form.obs?("(ajuste) "+form.obs):"Ajuste: resta de unidades",
+       estado:form.estado,obs:form.obs?("(ajuste) "+form.obs):"Ajuste: resta de unidades",fotos:form.fotos||[],
       usuario:usuario.nombre,fecha:TODAY(),hora:HOUR(),ajuste:true,
     };
     rerender();showToast(`➖ ${productoActivo.nombre} — restadas ${cant} und (queda ${totalAnt-cant})`);
-    setProductoActivo(null);setForm({unidades:"",embalaje:"",cajas:"",estado:"BUENO",obs:""});
+     setProductoActivo(null);resetForm();
     setEditCap(null);
     setTimeout(()=>scanRef.current?.focus(),80);
   };
@@ -309,7 +334,7 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
     const activos=entradas.filter(e=>!e.cerrada);
     const cerrados=entradas.filter(e=>e.cerrada);
     return(
-      <div style={{minHeight:"100vh",background:pageBg,fontFamily:"system-ui,sans-serif"}}>
+      <div className={dark?"cap-shell cap-dark-shell":"cap-shell"} style={{minHeight:"100vh",background:pageBg,fontFamily:"system-ui,sans-serif"}}>
          <div style={{background:"#ffffff",color:"#1e293b",padding:"0 16px",display:"flex",alignItems:"center",justifyContent:"space-between",height:52,position:"sticky",top:0,zIndex:100,borderBottom:"1px solid #e2e8f0",boxShadow:"0 1px 4px rgba(15,23,42,0.08)"}}>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
              <Package size={20} color="#2563eb"/>
@@ -436,7 +461,7 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
     // Orden: del más negativo (faltantes) al más positivo (sobrantes).
     }).sort((a,b)=>difProd(a)-difProd(b));
     return(
-      <div style={{minHeight:"100vh",background:pageBg,fontFamily:"system-ui,sans-serif"}}>
+      <div className={dark?"cap-shell cap-dark-shell":"cap-shell"} style={{minHeight:"100vh",background:pageBg,fontFamily:"system-ui,sans-serif"}}>
          <div style={{background:"#ffffff",color:"#1e293b",padding:"0 16px",display:"flex",alignItems:"center",justifyContent:"space-between",height:52,position:"sticky",top:0,zIndex:100,borderBottom:"1px solid #e2e8f0",boxShadow:"0 1px 4px rgba(15,23,42,0.08)"}}>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
              <button onClick={()=>{setConteoActivo(null);setRondaActiva(null);}} style={{background:"#ffffff",border:"1px solid #cbd5e1",color:"#64748b",padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:3}}><ChevronLeft size={13}/> Mis conteos</button>
@@ -507,7 +532,7 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
   // ── VISTA CAPTURA ──
   const total=calcTotal(form);
   return(
-    <div style={{minHeight:"100vh",background:pageBg,fontFamily:"system-ui,sans-serif"}}>
+    <div className={dark?"cap-shell cap-dark-shell":"cap-shell"} style={{minHeight:"100vh",background:pageBg,fontFamily:"system-ui,sans-serif"}}>
        <div style={{background:"#ffffff",color:"#1e293b",padding:"0 16px",display:"flex",alignItems:"center",justifyContent:"space-between",height:52,position:"sticky",top:0,zIndex:100,borderBottom:"1px solid #e2e8f0",boxShadow:"0 1px 4px rgba(15,23,42,0.08)"}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
            <button onClick={()=>{setConteoActivo(null);setRondaActiva(null);setProductoActivo(null);setScanInput("");setBusqueda("");}}
@@ -641,7 +666,7 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
                     {sugs.map((p,i)=>{
                       const tot=getTotal(miConteo.id,miRonda,p.id);
                       return(
-                        <div key={p.id} onClick={()=>{setProductoActivo(p);setForm({unidades:"",embalaje:"",cajas:"",estado:"BUENO",obs:""});setBusqueda("");setTimeout(()=>unidadesRef.current?.focus(),80);}}
+                        <div key={p.id} onClick={()=>{setProductoActivo(p);resetForm();setBusqueda("");setTimeout(()=>unidadesRef.current?.focus(),80);}}
                           style={{padding:"10px 14px",cursor:"pointer",borderBottom:i<sugs.length-1?"1px solid #f1f5f9":"none",display:"flex",justifyContent:"space-between",alignItems:"center"}}
                           onMouseEnter={e=>e.currentTarget.style.background="#eff6ff"}
                           onMouseLeave={e=>e.currentTarget.style.background="white"}>
@@ -741,12 +766,27 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
                       {["BUENO","VENCIDO","AVERIADO","NO APTO VENTA","BAJAS","SIN REVISAR"].map(s=><option key={s}>{s}</option>)}
                     </select>
                   </div>
-                  <div>
-                    <div style={{fontSize:11,color:"#64748b",marginBottom:4}}>OBSERVACIÓN</div>
-                    <input type="text" value={form.obs} onChange={e=>setForm(f=>({...f,obs:e.target.value}))}
-                       onKeyDown={e=>{if(e.key==="Enter"||e.key==="NumpadEnter")guardar();}}
-                      placeholder="Opcional…" style={{...inp,fontSize:13}}/>
-                  </div>
+                   <div>
+                     <div style={{fontSize:11,color:"#64748b",marginBottom:4}}>OBSERVACIÓN</div>
+                     <input type="text" value={form.obs} onChange={e=>setForm(f=>({...f,obs:e.target.value}))}
+                        onKeyDown={e=>{if(e.key==="Enter"||e.key==="NumpadEnter")guardar();}}
+                       placeholder="Opcional…" style={{...inp,fontSize:13}}/>
+                   </div>
+                   <div style={{marginTop:10}}>
+                     <div style={{fontSize:11,color:"#64748b",marginBottom:4}}>EVIDENCIA FOTOGRÁFICA</div>
+                     <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                       <label style={{padding:"7px 10px",background:"#f1f5f9",border:"1px solid #cbd5e1",borderRadius:7,cursor:"pointer",fontSize:12,fontWeight:700,color:"#374151",display:"inline-flex",alignItems:"center",gap:5}}>
+                         <Camera size={14}/> Agregar foto<input type="file" accept="image/*" capture="environment" multiple onChange={agregarFoto} style={{display:"none"}}/>
+                       </label>
+                       {form.fotos?.length>0&&<span style={{fontSize:11,color:"#64748b"}}>{form.fotos.length} foto{form.fotos.length===1?"":"s"}</span>}
+                     </div>
+                     {form.fotos?.length>0&&<div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:6}}>
+                       {form.fotos.map((foto,i)=><div key={i} style={{position:"relative"}}>
+                         <img src={foto.data} alt={foto.name} style={{width:54,height:54,objectFit:"cover",borderRadius:6,border:"1px solid #cbd5e1"}}/>
+                         <button type="button" onClick={()=>setForm(f=>({...f,fotos:f.fotos.filter((_,j)=>j!==i)}))} aria-label="Quitar foto" style={{position:"absolute",top:-5,right:-5,width:17,height:17,border:0,borderRadius:99,background:"#dc2626",color:"white",fontSize:12,cursor:"pointer"}}>×</button>
+                       </div>)}
+                     </div>}
+                   </div>
                   {miRonda==="C3"&&<div style={{marginTop:10,background:"#faf5ff",borderRadius:8,padding:"8px 12px",fontSize:12,color:"#7c3aed"}}>En C3 se permite guardar 0 unidades.</div>}
                 </div>
               </div>
@@ -803,10 +843,10 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
                           const emb=lastCap.embalaje||"";
                           const caj=lastCap.cajas||"";
                           const und=emb&&caj?"":(lastCap.cantidad||"");
-                          setForm({unidades:String(und),embalaje:String(emb),cajas:String(caj),estado:lastCap.estado||"BUENO",obs:lastCap.obs||""});
+                           setForm({unidades:String(und),embalaje:String(emb),cajas:String(caj),estado:lastCap.estado||"BUENO",obs:lastCap.obs||"",fotos:lastCap.fotos||[]});
                           setEditCap({p,cap:lastCap});
                         }else{
-                          setForm({unidades:"",embalaje:"",cajas:"",estado:"BUENO",obs:""});
+                           resetForm();
                           setEditCap(null);
                         }
                         setTimeout(()=>unidadesRef.current?.focus(),80);

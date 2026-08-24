@@ -57,7 +57,8 @@ export function VReportes({G,showToast,usuario}){
   const capFinal=G.productos.flatMap(p=>{
     const misC=caps.filter(c=>c.productoId===p.id&&["C1","C2","C3"].includes(c.ronda));
     if(!misC.length)return [];
-    const last=misC[misC.length-1];
+     const finalRonda=misC.some(c=>c.ronda==="C3")?"C3":misC.some(c=>c.ronda==="C2")?"C2":"C1";
+     const last=misC[misC.length-1];
     const conteo=G.conteos.find(c=>c.id===last.conteoId);
     const estados=[...new Set(misC.map(c=>(c.estado||"BUENO")))];
     return estados.map(est=>{
@@ -65,7 +66,9 @@ export function VReportes({G,showToast,usuario}){
       const sumC1=ce.filter(c=>c.ronda==="C1").reduce((s,c)=>s+c.cantidad,0);
       const sumC2=ce.filter(c=>c.ronda==="C2").reduce((s,c)=>s+c.cantidad,0);
       const sumC3=ce.filter(c=>c.ronda==="C3").reduce((s,c)=>s+c.cantidad,0);
-      const final=sumC3||sumC2||sumC1;
+       // El estado final debe salir de la última ronda disponible completa,
+       // no de sumar estados de rondas distintas.
+       const final=ce.filter(c=>c.ronda===finalRonda).reduce((s,c)=>s+c.cantidad,0);
       const le=ce[ce.length-1];
       return{
         ...p,
@@ -76,7 +79,8 @@ export function VReportes({G,showToast,usuario}){
         cantFinal:final,
         diferencia:final-(p.saldo||0),
         valDif:(final-(p.saldo||0))*(p.costo||0),
-        estado:est,
+         estado:est,
+         rondaFinal:finalRonda,
         obs:le?.obs||"",
         usuario:le?.usuario||"",
       };
@@ -92,12 +96,16 @@ export function VReportes({G,showToast,usuario}){
     if(c.ronda==="C1")r.c1+=c.cantidad;else if(c.ronda==="C2")r.c2+=c.cantidad;else if(c.ronda==="C3")r.c3+=c.cantidad;else if(c.ronda==="AJU")r.aju=c.cantidad;
     r.last=c;
   });
-  const baseCompleta=G.productos.map(p=>{
+   const baseCompleta=G.productos.map(p=>{
     const r=capByProd[p.id];
     const sumC1=r?r.c1:0,sumC2=r?r.c2:0,sumC3=r?r.c3:0;
     const contado=!!r;
     const final=(r&&r.aju!==null)?r.aju:(contado?(sumC3||sumC2||sumC1):0); // el ajuste manda
-    const last=r?r.last:null;
+     const last=r?r.last:null;
+     const capsProd=r?caps.filter(c=>c.productoId===p.id&&["C1","C2","C3"].includes(c.ronda)):[];
+     const rondaFinal=capsProd.some(c=>c.ronda==="C3")?"C3":capsProd.some(c=>c.ronda==="C2")?"C2":"C1";
+     const estadosFinal={};
+     capsProd.filter(c=>c.ronda===rondaFinal).forEach(c=>{const estado=c.estado||"BUENO";estadosFinal[estado]=(estadosFinal[estado]||0)+c.cantidad;});
     const conteo=last?G.conteos.find(c=>c.id===last.conteoId):null;
     return{
       ...p,
@@ -109,7 +117,8 @@ export function VReportes({G,showToast,usuario}){
       contado,
       diferencia:final-(p.saldo||0),
       valDif:(final-(p.saldo||0))*(p.costo||0),
-      estado:contado?(last.estado||""):"SIN CONTAR",
+       estado:contado?Object.entries(estadosFinal).map(([estado,cantidad])=>`${estado}: ${cantidad}`).join(" | "):"SIN CONTAR",
+       estadoDesglose:estadosFinal,
       obs:last?.obs||"",
       usuario:last?.usuario||"",
     };

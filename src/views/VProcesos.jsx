@@ -3,7 +3,7 @@ import * as XLSX from "xlsx";
 import {
   Radio, Package, ClipboardList, Settings, Bell, AlertTriangle,
   CheckCircle, Eye, RefreshCw, ChevronRight, X, Plus, Printer,
-  MapPin, Wrench, Trash2, Scale,
+  MapPin, Wrench, Trash2, Scale, MoreHorizontal,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +27,8 @@ export function VProcesos({G,rerender,showToast,usuario}){
   const [verAlertas,setVerAlertas]=useState(false);
   const [pendForm,setPendForm]=useState(null); // {tipo:'crear'|'c2'|'c3', id/locId, nombre, c1, c2}
   const [modalAjuste,setModalAjuste]=useState(false);
+  const [menuAcciones,setMenuAcciones]=useState(null);
+  const [modalKpi,setModalKpi]=useState(null);
   const [ajusteUser,setAjusteUser]=useState("");
   const caps=Object.values(G.capturas);
   const usuariosActivos=()=>G.usuarios.filter(u=>u.activo&&(u.rol==="admin"||u.inventario_id===G.inventario?.id));
@@ -51,6 +53,7 @@ export function VProcesos({G,rerender,showToast,usuario}){
   // Crear conteo rápido desde el panel de pendientes
   const crearConteoRapido=(loc,nombre,c1,c2)=>{
     if(!nombre.trim()||!c1)return showToast("Completa nombre y usuario C1","err");
+    if(G.conteos.some(c=>c.tipo!=="ajuste"&&(c.locId===loc.id||`${c.ubicacion}|${c.localizacion}|${c.nro}`===`${loc.ubicacion}|${loc.localizacion}|${loc.nro}`)))return showToast("Esta ubicación ya fue utilizada en un conteo","err");
     G.conteos.push({
       id:ID(),nombre:nombre.trim(),locId:loc.id,
       locLabel:`${loc.ubicacion} › ${loc.localizacion} › ${loc.nro}`,
@@ -280,17 +283,17 @@ export function VProcesos({G,rerender,showToast,usuario}){
       {/* Tarjetas KPI — mismos colores de marca; ícono mini junto al texto (variante C) */}
       <div className="grid gap-3 mb-4" style={{gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))"}}>
         {[
-          {l:"Productos",v:total,c:"#2563eb",icon:Package},
-          {l:"Total conteos",v:totalConteos,c:"#475569",icon:ClipboardList},
-          {l:"Completados",v:conteosCompletos,total:totalConteos,c:"#16a34a",icon:CheckCircle},
-          {l:"En progreso",v:totalConteos-conteosCompletos,total:totalConteos,c:"#0891b2",icon:Settings},
-          {l:"Con diferencia",v:G.conteos.filter(c=>c.tipo==="2conteos"&&getDifsConteo(c).length>0).length,c:"#dc2626",icon:AlertTriangle},
-          {l:"Alertas",v:nAlertas+totalPend,c:"#7c3aed",icon:Bell,onClick:()=>setVerAlertas(v=>!v)},
-        ].map(s=>(
-          <Card key={s.l} onClick={s.onClick} className={`rounded-2xl border bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${s.onClick?"cursor-pointer":""}`} style={{borderColor:"#eaecf1"}}>
+           {l:"Productos",v:total,c:"#2563eb",icon:Package,detail:[`${total} productos cargados en la base.`]},
+           {l:"Total conteos",v:totalConteos,c:"#475569",icon:ClipboardList,detail:conteosVis.map(c=>c.nombre)},
+           {l:"Completados",v:conteosCompletos,total:totalConteos,c:"#16a34a",icon:CheckCircle,detail:conteosVis.filter(c=>["completado","cerradoC2","cerradoC1"].includes(c.estado)).map(c=>c.nombre)},
+           {l:"En progreso",v:totalConteos-conteosCompletos,total:totalConteos,c:"#0891b2",icon:Settings,detail:conteosVis.filter(c=>!["completado","cerradoC2","cerradoC1"].includes(c.estado)).map(c=>`${c.nombre} · ${c.estado}`)},
+           {l:"Con diferencia",v:G.conteos.filter(c=>c.tipo==="2conteos"&&getDifsConteo(c).length>0).length,c:"#dc2626",icon:AlertTriangle,detail:conteosVis.filter(c=>getDifsConteo(c).length>0).map(c=>`${c.nombre} · ${getDifsConteo(c).length} productos`)},
+           {l:"Alertas",v:nAlertas+totalPend,c:"#7c3aed",icon:Bell,detail:[...G.alertas.filter(a=>!a.leida).map(a=>`${a.usuario} terminó ${a.ronda} · ${a.conteoNombre}`),...conteosPend.map(x=>`${x.c.nombre} · ${x.razon}`),...locSinConteo.map(l=>`${l.ubicacion} › ${l.localizacion} › ${l.nro} · sin conteo`)]},
+         ].map(s=>(
+           <Card key={s.l} onClick={()=>setModalKpi(s)} className="cursor-pointer rounded-2xl border bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md" style={{borderColor:"#eaecf1"}}>
             <div className="flex items-center gap-1.5 text-[12.5px] font-semibold text-slate-500">
               <s.icon size={14} style={{color:s.c}}/>
-              {s.l}{s.onClick&&<span className="ml-0.5 text-slate-400">›</span>}
+               {s.l}<span className="ml-0.5 text-slate-400">›</span>
             </div>
             <div className="mt-1.5 text-[26px] font-black leading-none tabular-nums" style={{color:s.c}}>
               {s.v}{s.total!==undefined&&<span className="ml-0.5 text-base font-bold text-slate-400">/{s.total}</span>}
@@ -298,6 +301,15 @@ export function VProcesos({G,rerender,showToast,usuario}){
           </Card>
         ))}
       </div>
+
+      <Dialog open={!!modalKpi} onOpenChange={v=>!v&&setModalKpi(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>{modalKpi?.l}</DialogTitle></DialogHeader>
+          <div className="max-h-80 overflow-y-auto rounded-lg border bg-slate-50 p-3">
+            {modalKpi?.detail?.length?modalKpi.detail.map((d,i)=><div key={i} className="border-b border-slate-200 py-2 text-sm last:border-0">{d}</div>):<div className="py-4 text-center text-sm text-muted-foreground">No hay información para mostrar.</div>}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Conteo de ajuste — correcciones tras revisar diferencias (solo con conteos cerrados) */}
       {todosConteosCerrados()&&(ajuste?(
@@ -453,7 +465,7 @@ export function VProcesos({G,rerender,showToast,usuario}){
             <table className="w-full text-[11px] min-w-[900px]">
               <thead>
                 <tr className="bg-slate-50 text-slate-600 border-b border-slate-200">
-                  {["Ubicación","Localización","N° Local.","Observación","Usuarios","Conteo 1","Obs C1","Conteo 2","Obs C2","Diferencia","Obs Dif","C3","Validador","Acciones"].map(h=>(
+                   {["Ubicación","Localización","N° Local.","Observación","Conteo 1","Obs C1","Conteo 2","Obs C2","Diferencia","C3","Acciones"].map(h=>(
                     <th key={h} className="px-2 py-1.5 text-left font-semibold whitespace-nowrap text-[10px]">{h}</th>
                   ))}
                 </tr>
@@ -463,11 +475,7 @@ export function VProcesos({G,rerender,showToast,usuario}){
                   const c1s=caps.filter(x=>x.conteoId===c.id&&x.ronda==="C1");
                   const c2s=caps.filter(x=>x.conteoId===c.id&&x.ronda==="C2");
                   const c3s=caps.filter(x=>x.conteoId===c.id&&x.ronda==="C3");
-                  const p1=total?Math.round(new Set(c1s.map(x=>x.productoId)).size/total*100):0;
-                  const p2=total?Math.round(new Set(c2s.map(x=>x.productoId)).size/total*100):0;
                   const difs=getDifsConteo(c);
-                  const extras=usuariosExtra[c.id]||[];
-                  const todosUsuarios=[c.usuarioC1,...extras].filter(Boolean);
 
                   // C1 cerrado si estado es cerradoC1/completado/diferencia/enC3/cerradoC2
                   const c1Cerrado=["cerradoC1","cerradoC2","completado","diferencia","enC3"].includes(c.estado);
@@ -475,21 +483,6 @@ export function VProcesos({G,rerender,showToast,usuario}){
                   const c2Cerrado=["cerradoC2","completado","diferencia","enC3"].includes(c.estado);
                   // Hay diferencia real
                   const hayDifs=difs.length>0&&c1Cerrado&&c2Cerrado;
-                  // ¿El C3 ya se realizó? (hay capturas C3 registradas para este conteo)
-                  const c3Terminado=c.usuarioC3&&c.estado==="completado"&&caps.some(x=>x.conteoId===c.id&&x.ronda==="C3");
-                  // ¿Se puede hacer clic para asignar C3? Solo si hay diferencias y el C3 aún NO terminó
-                  const puedeAsignarC3=(hayDifs||c.estado==="diferencia")&&!c3Terminado;
-
-                  // Validador
-                  const validColor=
-                    c3Terminado?"#64748b":
-                    c.estado==="completado"&&!hayDifs?"#16a34a":
-                    puedeAsignarC3?"#dc2626":"#64748b";
-                  const validContent=
-                    c3Terminado?<span style={{color:"white",fontWeight:800,fontSize:13,display:"flex",alignItems:"center",justifyContent:"center"}}><Settings size={11}/></span>:
-                    c.estado==="completado"&&!hayDifs?<span style={{color:"white",fontWeight:800,fontSize:13}}>OK</span>:
-                    puedeAsignarC3?<span style={{color:"white",fontWeight:800,fontSize:11}}>CLIC</span>:
-                    <span style={{color:"white",fontWeight:800,fontSize:16}}>?</span>;
 
                   return(
                     <tr key={c.id} className="border-b border-slate-100 align-top hover:bg-slate-50">
@@ -498,26 +491,9 @@ export function VProcesos({G,rerender,showToast,usuario}){
                       <td className="px-2.5 py-1.5 font-semibold">{c.nro}</td>
                       <td className="px-2.5 py-1.5 text-muted-foreground text-[11px]">{c.obs||"—"}</td>
 
-                      {/* Usuarios */}
-                      <td className="px-2.5 py-1.5 min-w-[120px]">
-                        <div className="flex flex-col gap-1 items-start">
-                          {todosUsuarios.map(u=>(
-                            <div key={u} className="flex items-center gap-1">
-                              <span className="bg-blue-50 text-primary px-1.5 py-0.5 rounded-full text-[10px] font-bold">{u}</span>
-                              {u!==c.usuarioC1&&<button onClick={()=>quitarUsuarioExtra(c.id,u)} className="text-destructive"><X size={11}/></button>}
-                            </div>
-                          ))}
-                          {c.usuarioC2&&<span className="bg-green-50 text-green-600 px-1.5 py-0.5 rounded-full text-[10px] font-bold">C2: {c.usuarioC2}</span>}
-                          {c.usuarioC3&&<span className="bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded-full text-[10px] font-bold">C3: {c.usuarioC3}</span>}
-                          <button onClick={()=>setModalAsignar({conteoId:c.id,tipo:"extra"})} className="rounded-md border border-dashed border-slate-400 text-slate-500 px-2 py-0.5 text-[10px] mt-0.5 hover:bg-slate-50">+ Apoyo</button>
-                        </div>
-                      </td>
-
                       {/* Conteo 1 — clickeable */}
                       <td className="px-2.5 py-1.5 min-w-[120px]">
                         <div className="text-[11px] font-semibold text-primary mb-1">{c.usuarioC1||"—"}</div>
-                        <div className="bg-slate-200 rounded-full h-[5px] mb-1"><div className="bg-primary rounded-full h-full" style={{width:p1+"%"}}/></div>
-                        <div className="text-[10px] text-muted-foreground mb-1">{new Set(c1s.map(x=>x.productoId)).size}/{total} · {p1}%</div>
                         <button onClick={()=>setModalCaps({conteoId:c.id,ronda:"C1",nombre:c.nombre})}
                           className={`inline-flex items-center justify-center gap-1 min-w-[40px] h-[22px] rounded-md px-2 text-[10px] font-extrabold text-white ${c1Cerrado?"bg-green-600 hover:bg-green-700":"bg-slate-400"}`}>
                           {c1Cerrado?<>OK <Eye size={11}/></>:"?"}
@@ -536,8 +512,6 @@ export function VProcesos({G,rerender,showToast,usuario}){
                           c.usuarioC2?(
                             <>
                               <div className="text-[11px] font-semibold text-green-600 mb-1">{c.usuarioC2}</div>
-                              <div className="bg-slate-200 rounded-full h-[5px] mb-1"><div className="bg-green-600 rounded-full h-full" style={{width:p2+"%"}}/></div>
-                              <div className="text-[10px] text-muted-foreground mb-1">{new Set(c2s.map(x=>x.productoId)).size}/{total} · {p2}%</div>
                               <button onClick={()=>setModalCaps({conteoId:c.id,ronda:"C2",nombre:c.nombre})}
                                 className={`inline-flex items-center justify-center gap-1 min-w-[40px] h-[22px] rounded-md px-2 text-[10px] font-extrabold text-white ${c2Cerrado?"bg-green-600 hover:bg-green-700":"bg-slate-400"}`}>
                                 {c2Cerrado?<>OK <Eye size={11}/></>:"?"}
@@ -569,16 +543,6 @@ export function VProcesos({G,rerender,showToast,usuario}){
                         ):<span className="text-slate-300">—</span>}
                       </td>
 
-                      {/* Obs Dif — PDF solo si hay diferencia */}
-                      <td className="px-2.5 py-1.5 text-[11px] text-muted-foreground">
-                        {difs.length>0&&c1Cerrado&&c2Cerrado&&(
-                          <button onClick={()=>expPDF(difs,c.nombre)}
-                            className="inline-flex items-center gap-1 rounded-md bg-red-100 text-destructive px-2.5 py-1 text-[11px] font-bold hover:bg-red-200">
-                            <Printer size={11}/> PDF
-                          </button>
-                        )}
-                      </td>
-
                       {/* C3 — solo si hay diferencia */}
                       <td className="px-2.5 py-1.5 min-w-[90px]">
                         {c.estado==="diferencia"&&!c.usuarioC3?(
@@ -595,26 +559,16 @@ export function VProcesos({G,rerender,showToast,usuario}){
                         ):<span className="text-slate-300 text-[11px]">—</span>}
                       </td>
 
-                      {/* Validador */}
-                      <td className="px-2.5 py-1.5 text-center min-w-[80px]">
-                        <div onClick={()=>puedeAsignarC3&&setModalAsignar({conteoId:c.id,tipo:"C3"})}
-                          className="w-11 h-11 rounded-full flex items-center justify-center mx-auto shadow-md" style={{background:validColor,cursor:puedeAsignarC3?"pointer":"default",opacity:c3Terminado?0.7:1}}>
-                          {validContent}
-                        </div>
-                        <div className="text-[9px] text-muted-foreground mt-1 text-center">
-                          {c3Terminado?"C3 validado":puedeAsignarC3?"→ C3":c.estado==="completado"?"Sin dif":"En proceso"}
-                        </div>
-                      </td>
-
-                      {/* Acciones */}
-                      <td className="px-2.5 py-1.5 whitespace-nowrap">
-                        <div className="flex gap-1.5 items-center">
-                          <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" title="Imprimir documento de esta ubicación" onClick={()=>imprimirConteo(c)}><Printer size={12}/> Imprimir</Button>
-                          {["cerradoC1","cerradoC2","completado","diferencia","enC3"].includes(c.estado)&&(
-                            <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs text-amber-700 border-amber-200 hover:bg-amber-50 hover:text-amber-700" onClick={()=>setModalReabrir(c)}><RefreshCw size={12}/> Reabrir</Button>
-                          )}
-                        </div>
-                      </td>
+                       {/* Acciones */}
+                       <td className="px-2.5 py-1.5 whitespace-nowrap">
+                         <div className="relative flex justify-center">
+                           <Button variant="outline" size="icon" className="h-8 w-8" title="Más acciones" onClick={()=>setMenuAcciones(menuAcciones===c.id?null:c.id)}><MoreHorizontal size={16}/></Button>
+                           {menuAcciones===c.id&&<div className="absolute right-0 top-9 z-30 flex min-w-[150px] flex-col rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
+                             <button className="flex items-center gap-2 rounded-md px-3 py-2 text-left text-xs hover:bg-slate-50" onClick={()=>{imprimirConteo(c);setMenuAcciones(null);}}><Printer size={14}/> Imprimir</button>
+                             {["cerradoC1","cerradoC2","completado","diferencia","enC3"].includes(c.estado)&&<button className="flex items-center gap-2 rounded-md px-3 py-2 text-left text-xs text-amber-700 hover:bg-amber-50" onClick={()=>{setModalReabrir(c);setMenuAcciones(null);}}><RefreshCw size={14}/> Reabrir</button>}
+                           </div>}
+                         </div>
+                       </td>
                     </tr>
                   );
                 })}

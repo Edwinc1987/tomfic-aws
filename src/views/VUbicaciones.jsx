@@ -1,7 +1,8 @@
 import { useState } from "react";
+import * as XLSX from "xlsx";
 import {
   MapPin, Settings, ChevronUp, ChevronDown, RefreshCw,
-  AlertTriangle, Plus, Printer, Pencil, Trash2,
+  AlertTriangle, Plus, Printer, Pencil, Trash2, Download, FileSpreadsheet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +25,15 @@ export function VUbicaciones({G,rerender,showToast}){
   const [verTipos,setVerTipos]=useState(false);     // panel de tipos, oculto por defecto (libera pantalla)
   const [verRecuperar,setVerRecuperar]=useState(false); // panel de recuperar, oculto por defecto
 
+  const exportar=(plantilla=false)=>{
+    const cols=["UBICACION","LOCALIZACION","NRO","OBSERVACION"];
+    const rows=plantilla?[]:G.localizaciones.map(l=>[l.ubicacion,l.localizacion,l.nro,l.observacion||""]);
+    const ws=XLSX.utils.aoa_to_sheet([cols,...rows]);
+    const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Ubicaciones");
+    XLSX.writeFile(wb,plantilla?"plantilla_ubicaciones.xlsx":"ubicaciones.xlsx");
+    showToast(plantilla?"Plantilla descargada ✓":"Ubicaciones exportadas ✓");
+  };
+
   const siguienteNro=()=>{
     if(!form.ubicacion||!form.localizacion)return "";
     const existentes=G.localizaciones.filter(l=>l.ubicacion===form.ubicacion&&l.localizacion===form.localizacion);
@@ -36,7 +46,7 @@ export function VUbicaciones({G,rerender,showToast}){
     const existe=G.localizaciones.find(l=>l.ubicacion===form.ubicacion&&l.localizacion===form.localizacion&&l.nro===nro);
     if(existe)return showToast("Ya existe esa localización","err");
     G.localizaciones.push({id:ID(),ubicacion:form.ubicacion,localizacion:form.localizacion,nro,observacion:form.observacion});
-    setForm(p=>({...p,nro:"",observacion:""}));
+     setForm({ubicacion:"",localizacion:"",nro:"",observacion:""});
     rerender();showToast("Localización agregada ✓");
   };
 
@@ -160,11 +170,13 @@ export function VUbicaciones({G,rerender,showToast}){
       />
 
       {/* Barra de acciones: tipos y recuperar quedan OCULTOS por defecto para liberar pantalla */}
-      <div className="mb-3 flex gap-2 flex-wrap">
+       <div className="mb-3 flex gap-2 flex-wrap">
         <Button variant="outline" size="sm" onClick={()=>setVerTipos(v=>!v)}><Settings size={14}/> Gestionar tipos {verTipos?<ChevronUp size={14}/>:<ChevronDown size={14}/>}</Button>
         {(G.conteos.length>0||(G.historial||[]).length>0)&&(
           <Button variant="outline" size="sm" onClick={()=>setVerRecuperar(v=>!v)}><RefreshCw size={14}/> Recuperar ubicaciones {verRecuperar?<ChevronUp size={14}/>:<ChevronDown size={14}/>}</Button>
         )}
+        <Button variant="outline" size="sm" title="Exportar ubicaciones" onClick={()=>exportar()}><Download size={14}/> Exportar</Button>
+        <Button variant="outline" size="sm" title="Descargar plantilla de ubicaciones" onClick={()=>exportar(true)}><FileSpreadsheet size={14}/> Plantilla</Button>
       </div>
 
       {verRecuperar&&(
@@ -268,9 +280,9 @@ export function VUbicaciones({G,rerender,showToast}){
                       <td className="px-4 py-1.5 text-muted-foreground">{l.observacion||"—"}</td>
                       <td className="px-4 py-1.5">
                         <div className="flex gap-2 items-center">
-                          <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100 hover:text-blue-700" onClick={()=>imprimirEtiqueta(l)}><Printer size={11}/> Etiqueta</Button>
-                          <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100" onClick={()=>{setEditLoc(l);setEditFormLoc({nro:l.nro,observacion:l.observacion||"",ubicacion:l.ubicacion,localizacion:l.localizacion});}}><Pencil size={11}/> Editar</Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive hover:bg-red-50" onClick={()=>eliminar(l.id)} title="Eliminar"><Trash2 size={14}/></Button>
+                           <Button variant="outline" size="icon" className="h-7 w-7 bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100 hover:text-blue-700" onClick={()=>imprimirEtiqueta(l)} title="Imprimir etiqueta" aria-label="Imprimir etiqueta"><Printer size={13}/></Button>
+                           <Button variant="outline" size="icon" className="h-7 w-7 bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100" onClick={()=>{setEditLoc(l);setEditFormLoc({nro:l.nro,observacion:l.observacion||"",ubicacion:l.ubicacion,localizacion:l.localizacion});}} title="Editar" aria-label="Editar"><Pencil size={13}/></Button>
+                           <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive hover:bg-red-50" onClick={()=>eliminar(l.id)} title="Eliminar" aria-label="Eliminar"><Trash2 size={14}/></Button>
                         </div>
                       </td>
                     </tr>

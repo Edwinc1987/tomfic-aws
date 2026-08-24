@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
-  FolderOpen, AlertTriangle, Plus, FileText, Package, Trash2,
-  RefreshCw, ChevronRight, Scale, Eye, CheckCircle, X, MapPin,
+  FolderOpen, AlertTriangle, Plus, FileText, Trash2,
+  RefreshCw, ChevronRight, Scale, Eye, CheckCircle, X, MapPin, Pencil,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,14 +27,19 @@ export function VConteos({G,rerender,showToast,usuario}){
   const [busqCaps,setBusqCaps]=useState("");
   const [modalComp,setModalComp]=useState(null); // conteo para comparativo
   const [busqComp,setBusqComp]=useState("");
+  const [locExpandida,setLocExpandida]=useState(null);
   const caps=Object.values(G.capturas);
   const usuariosInv=G.usuarios.filter(u=>u.activo&&(u.rol==="admin"||u.inventario_id===G.inventario?.id));
   const getCapsRonda=(conteoId,ronda)=>caps.filter(c=>c.conteoId===conteoId&&c.ronda===ronda);
+  const locKey=x=>`${x?.ubicacion||""}|${x?.localizacion||""}|${x?.nro||""}`;
+  const locUsada=l=>G.conteos.some(c=>c.tipo!=="ajuste"&&(c.locId===l.id||locKey(c)===locKey(l)));
+  const locDisponibles=G.localizaciones.filter(l=>!locUsada(l));
 
   const crear=()=>{
     if(!G.inventario)return showToast("Primero crea un inventario","err");
     if(!form.nombre.trim()||!form.locId||!form.usuarioC1)return showToast("Completa nombre, localización y usuario C1","err");
     const loc=G.localizaciones.find(l=>l.id===form.locId);
+    if(loc&&locUsada(loc))return showToast("Esta ubicación ya fue utilizada en un conteo","err");
     G.conteos.push({
       id:ID(),nombre:form.nombre,locId:form.locId,
       locLabel:`${loc.ubicacion} › ${loc.localizacion} › ${loc.nro}`,
@@ -182,15 +187,15 @@ export function VConteos({G,rerender,showToast,usuario}){
                           </button>
                         ):<span className="text-slate-300 text-[11px]">—</span>}
                       </td>
-                      <td className="px-3 py-1.5"><UIBadge className="border-transparent" style={{background:estCol+"22",color:estCol}}>{stL[c.estado]||c.estado}</UIBadge></td>
+                       <td className="px-3 py-1.5"><span title={stL[c.estado]||c.estado} aria-label={stL[c.estado]||c.estado} className="inline-flex h-7 w-7 items-center justify-center rounded-full" style={{background:estCol+"22",color:estCol}}>{c.estado==="completado"||c.estado==="cerradoC1"||c.estado==="cerradoC2"?<CheckCircle size={15}/>:c.estado==="diferencia"?<AlertTriangle size={15}/>:<RefreshCw size={14}/>}</span></td>
                       <td className="px-3 py-1.5 whitespace-nowrap">
                         <div className="flex gap-1.5 items-center">
-                          <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" onClick={()=>{setModalMod(c);setModForm({obs:c.obs||"",usuarioC1:c.usuarioC1,usuarioC2:c.usuarioC2||""});}}>Modificar</Button>
+                           <Button variant="outline" size="icon" className="h-7 w-7" title="Modificar" aria-label="Modificar" onClick={()=>{setModalMod(c);setModForm({obs:c.obs||"",usuarioC1:c.usuarioC1,usuarioC2:c.usuarioC2||""});}}><Pencil size={13}/></Button>
                           {rondasReabribles(c).length>0&&(
-                            <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs text-amber-700 border-amber-200 hover:bg-amber-50 hover:text-amber-700" onClick={()=>setModalReabrir(c)}><RefreshCw size={12}/> Reabrir</Button>
+                             <Button variant="outline" size="icon" className="h-7 w-7 text-amber-700 border-amber-200 hover:bg-amber-50 hover:text-amber-700" title="Reabrir" aria-label="Reabrir" onClick={()=>setModalReabrir(c)}><RefreshCw size={13}/></Button>
                           )}
                           {c.tipo==="2conteos"&&(
-                            <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs text-purple-700 border-purple-200 hover:bg-purple-50 hover:text-purple-700" onClick={()=>{setBusqComp("");setModalComp(c);}}><Scale size={12}/> Comparar</Button>
+                             <Button variant="outline" size="icon" className="h-7 w-7 text-purple-700 border-purple-200 hover:bg-purple-50 hover:text-purple-700" title="Comparar" aria-label="Comparar" onClick={()=>{setBusqComp("");setModalComp(c);}}><Scale size={13}/></Button>
                           )}
                           {c.estado==="diferencia"&&!c.usuarioC3&&(
                             <Select onValueChange={v=>v&&asignarC3(c.id,v)}>
@@ -200,7 +205,7 @@ export function VConteos({G,rerender,showToast,usuario}){
                               </SelectContent>
                             </Select>
                           )}
-                          <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs text-destructive border-red-200 hover:bg-red-50 hover:text-destructive" onClick={()=>borrarConteo(c)}><Trash2 size={12}/> Eliminar</Button>
+                           <Button variant="outline" size="icon" className="h-7 w-7 text-destructive border-red-200 hover:bg-red-50 hover:text-destructive" title="Eliminar" aria-label="Eliminar" onClick={()=>borrarConteo(c)}><Trash2 size={13}/></Button>
                         </div>
                         {editC2===c.id&&(
                           <div className="mt-1.5 flex gap-1.5 items-center">
@@ -233,38 +238,21 @@ export function VConteos({G,rerender,showToast,usuario}){
               <Label>Nombre del conteo</Label>
               <Input value={form.nombre} onChange={e=>setForm(p=>({...p,nombre:e.target.value}))} placeholder="Ej: Conteo Bodega Turno Mañana"/>
             </div>
-            <div className="space-y-1.5">
-              <Label>Localización</Label>
-              <Select value={form.locId||undefined} onValueChange={v=>setForm(p=>({...p,locId:v}))}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar localización…"/></SelectTrigger>
-                <SelectContent>
-                  {G.localizaciones.map(l=><SelectItem key={l.id} value={l.id}>{l.ubicacion} › {l.localizacion} › {l.nro}{l.observacion?" — "+l.observacion:""}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Usuario — Conteo 1 *</Label>
-              <Select value={form.usuarioC1||undefined} onValueChange={v=>setForm(p=>({...p,usuarioC1:v}))}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar usuario…"/></SelectTrigger>
-                <SelectContent>
-                   {usuariosInv.map(u=><SelectItem key={u.id} value={u.nombre}>{u.nombre}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            {G.inventario?.tipo==="2conteos"&&(
-              <div className="space-y-1.5">
-                <Label>Usuario — Conteo 2 (opcional)</Label>
-                <Select value={form.usuarioC2||undefined} onValueChange={v=>setForm(p=>({...p,usuarioC2:v}))}>
-                  <SelectTrigger><SelectValue placeholder="Sin asignar por ahora…"/></SelectTrigger>
-                  <SelectContent>
-                     {usuariosInv.map(u=><SelectItem key={u.id} value={u.nombre}>{u.nombre}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            <div className="flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-800">
-              <Package size={14} className="shrink-0"/> Total productos en la base: <b>{G.productos.length}</b>
-            </div>
+             <div className="space-y-1.5">
+               <Label>Ubicación pendiente de conteo</Label>
+               <div className="max-h-56 space-y-1 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-1.5">
+                 {locDisponibles.length===0?<div className="px-3 py-4 text-center text-xs text-muted-foreground">No hay ubicaciones pendientes por programar.</div>:locDisponibles.map(l=>{
+                   const abierta=locExpandida===l.id;
+                   return <div key={l.id} className={`rounded-md ${form.locId===l.id?"bg-blue-100 ring-1 ring-blue-400":"bg-white"}`}>
+                     <button type="button" onClick={()=>{setForm(p=>({...p,locId:l.id}));setLocExpandida(abierta?null:l.id);}} className="flex w-full items-start gap-2 rounded-md px-3 py-2 text-left text-xs hover:bg-slate-100"><MapPin size={14} className="mt-0.5 shrink-0 text-blue-700"/><span className="flex-1"><b>{l.ubicacion} › {l.localizacion} › {l.nro}</b>{l.observacion&&<span className="mt-0.5 block text-[11px] text-slate-500">{l.observacion}</span>}</span><span className="text-[11px] text-slate-500">{abierta?"⌃":"⌄"}</span></button>
+                     {abierta&&<div className="grid gap-2 border-t border-blue-200 px-3 pb-3 pt-2 sm:grid-cols-2">
+                       <Select value={form.usuarioC1||undefined} onValueChange={v=>setForm(p=>({...p,usuarioC1:v}))}><SelectTrigger className="h-8 bg-white text-xs"><SelectValue placeholder="Usuario C1 *"/></SelectTrigger><SelectContent>{usuariosInv.map(u=><SelectItem key={u.id} value={u.nombre}>{u.nombre}</SelectItem>)}</SelectContent></Select>
+                       {G.inventario?.tipo==="2conteos"&&<Select value={form.usuarioC2||undefined} onValueChange={v=>setForm(p=>({...p,usuarioC2:v}))}><SelectTrigger className="h-8 bg-white text-xs"><SelectValue placeholder="Usuario C2 (opcional)"/></SelectTrigger><SelectContent>{usuariosInv.map(u=><SelectItem key={u.id} value={u.nombre}>{u.nombre}</SelectItem>)}</SelectContent></Select>}
+                     </div>}
+                   </div>;
+                 })}
+               </div>
+             </div>
             <Button className="w-full" onClick={crear}><Plus size={16}/> Programar Conteo</Button>
           </div>
         </DialogContent>

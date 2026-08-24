@@ -7,7 +7,7 @@ export default function BannerVencimiento({G}){
   if(d===null||d>AVISO_DIAS)return null;
   const vencido=d<0;
   const restan=GRACIA_DIAS+d;
-  const bg=vencido?"#fef2f2":"#fffbeb", bd=vencido?"#fecaca":"#fde68a", fg=vencido?"#b91c1c":"#b45309";
+   const bg=vencido?"#fff1f2":"#fffbeb", bd=vencido?"#fda4af":"#fcd34d", fg=vencido?"#be123c":"#b45309";
   const Icono=vencido?AlertCircle:Clock;
   let msg;
   if(!vencido) msg = d===0
@@ -15,9 +15,9 @@ export default function BannerVencimiento({G}){
     : <>Tu plan vence en <b>{d} día{d===1?"":"s"}</b> ({fmtFechaCorta(v)}). Renueva a tiempo para no perder el acceso.</>;
   else msg = <>Tu plan <b>venció el {fmtFechaCorta(v)}</b>. Tu acceso se bloqueará {restan<=0?<b>hoy</b>:<>en <b>{restan} día{restan===1?"":"s"}</b></>} si no se registra el pago. Contacta a tu proveedor.</>;
   return(
-    <div style={{display:"flex",alignItems:"center",gap:10,background:bg,border:`1px solid ${bd}`,color:fg,borderRadius:10,padding:"10px 14px",fontSize:13,fontWeight:600,marginBottom:16}}>
-      <Icono size={18} style={{flexShrink:0}}/>
-      <div>{msg}</div>
+     <div style={{display:"flex",alignItems:"center",gap:9,background:bg,borderLeft:`4px solid ${bd}`,color:fg,padding:"9px 12px",fontSize:12.5,fontWeight:600,marginBottom:14}}>
+       <Icono size={17} style={{flexShrink:0}}/>
+       <div style={{lineHeight:1.45}}>{msg}</div>
     </div>
   );
 }
