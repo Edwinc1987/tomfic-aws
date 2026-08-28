@@ -234,3 +234,27 @@ export const getStInv=(inv)=>{
   const conDif=resumen.filter(r=>{const p=prods.find(x=>x.id===r.productoId);return p&&r.cantFinal!==p.saldo;});
   return{totalFisico,totalSistema,ajuste:totalFisico-totalSistema,buenos,vencidos,averiados,conDif,resumen,contados:resumen.length,totalProductos:prods.length,caps};
 };
+
+// KPIs de gerencia derivadas del análisis puro (getStInv). Centralizadas aquí
+// para que el dashboard del historial (VHistorial) y el del gerente (ModGerente)
+// muestren SIEMPRE la misma cifra — una sola verdad: exactitud, precisión C1=C2,
+// cobertura y el ajuste separado en sobrante/faltante (unidades y valor).
+export const getKPIsInv=(inv)=>{
+  const st=getStInv(inv);
+  const prods=inv.productos||[];
+  const findP=(id)=>prods.find(x=>x.id===id);
+  const analH=st.resumen.map(r=>{const p=findP(r.productoId);return{...r,dif:r.cantFinal-(p?.saldo||0)};});
+  const coincide=st.resumen.filter(r=>{const p=findP(r.productoId);return p&&r.cantFinal===(p.saldo||0);}).length;
+  const exactitud=st.contados?Math.round(coincide/st.contados*1000)/10:0;
+  const cobertura=st.totalProductos?Math.round(st.contados/st.totalProductos*1000)/10:0;
+  const noContados=prods.filter(p=>!st.resumen.some(r=>r.productoId===p.id));
+  const es2=inv.tipo==="2conteos";
+  const conC2=st.resumen.filter(r=>(r.totalC2||0)>0);
+  const coincC1C2=conC2.filter(r=>(r.totalC1||0)===(r.totalC2||0)).length;
+  const desempates=st.resumen.filter(r=>(r.totalC3||0)>0);
+  const precision=conC2.length?Math.round(coincC1C2/conC2.length*1000)/10:0;
+  let sobU=0,falU=0,sobV=0,falV=0;
+  analH.forEach(a=>{const c=findP(a.productoId)?.costo||0;if(a.dif>0){sobU+=a.dif;sobV+=a.dif*c;}else if(a.dif<0){falU+=-a.dif;falV+=-a.dif*c;}});
+  const hayCosto=st.totalFisico>0||st.totalSistema>0;
+  return{st,analH,coincide,exactitud,cobertura,noContados,es2,conC2,coincC1C2,desempates,precision,sobU,falU,sobV,falV,hayCosto};
+};

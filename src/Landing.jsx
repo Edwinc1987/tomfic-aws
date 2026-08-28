@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DEFAULT_LANDING } from "@/landingContent";
+import { WhatsAppFab, waLink } from "@/components/WhatsAppButton";
 
 // slugify equivalente al de App.jsx y al SQL (para mostrar el identificador sugerido).
 const slugify = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"");
@@ -487,7 +488,7 @@ export default function Landing({ onEnter, onRegister, onLead, content, preview 
             <div className="text-white font-semibold text-sm mb-3">Contacto</div>
             <ul className="space-y-2 text-sm">
               <li>{contacto.email}</li>
-              <li>WhatsApp: {contacto.whatsapp}</li>
+              <li><a href={waLink("Hola, quiero una demo de TOMFIC")} target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">WhatsApp: {contacto.whatsapp}</a></li>
             </ul>
           </div>
         </div>
@@ -498,6 +499,7 @@ export default function Landing({ onEnter, onRegister, onLead, content, preview 
           </div>
         </div>
       </footer>
+      <WhatsAppFab message="Hola, quiero una demo de TOMFIC 👋" />
     </div>
   );
 }

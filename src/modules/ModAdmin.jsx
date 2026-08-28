@@ -11,6 +11,7 @@ import { VReportes } from "@/views/VReportes";
 import { VUsuarios } from "@/views/VUsuarios";
 import { VHistorial } from "@/views/VHistorial";
 import BannerVencimiento from "@/components/BannerVencimiento";
+import { WhatsAppButton } from "@/components/WhatsAppButton";
 import { saveLocalConfig, selectInventory } from "@/lib/data";
 import { scheduleSync } from "@/lib/sync";
 
@@ -68,6 +69,7 @@ export function ModAdmin({usuario,setUsuario,logout,G,rerender,recargar,showToas
 
         </div>
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          <WhatsAppButton message="Hola, soy administrador y necesito soporte con TOMFIC." label="Soporte" />
           <button onClick={async()=>{await recargar();showToast("Datos actualizados ✓");}}
              style={{background:"#ffffff",border:"1px solid #e2e8f0",color:"#64748b",padding:"5px 12px",borderRadius:6,fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}>
             <RefreshCw size={13}/> <span>Sync</span>

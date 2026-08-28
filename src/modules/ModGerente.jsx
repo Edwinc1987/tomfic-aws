@@ -3,7 +3,7 @@ import { Package, BarChart2, FileText, Landmark, AlertTriangle, Scale, DollarSig
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PageHeader } from "@/components/ui/page-header";
 import BannerVencimiento from "@/components/BannerVencimiento";
-import { G, nU, getStInv, TODAY, HOUR, ID, selectInventory } from "@/lib/data";
+import { G, nU, getStInv, getKPIsInv, TODAY, HOUR, ID, selectInventory } from "@/lib/data";
 
 export function ModGerente({usuario,setUsuario,logout,G,rerender,recargar,showToast}){
   const [view,setView]=useState("resumen");
@@ -366,9 +366,9 @@ return()=>clearInterval(t);
               ):(
                 (()=>{
                   const inv=hSel;
-                  const st=getStInv(inv);
+                  // KPIs centralizadas en lib/data (getKPIsInv): misma cifra que VHistorial.
+                  const {st,analH,coincide,exactitud,cobertura,es2,conC2,coincC1C2,desempates,precision,sobU,falU,sobV,falV,hayCosto}=getKPIsInv(inv);
                   const invP=inv.productos||[];
-                  const analH=st.resumen.map(r=>{const p=invP.find(x=>x.id===r.productoId);const dif=r.cantFinal-(p?.saldo||0);return{...r,dif};});
                   const topDH=[...analH].filter(a=>a.dif!==0).sort((a,b)=>Math.abs(b.dif)-Math.abs(a.dif)).slice(0,5);
                   const topDHMax=Math.max(1,...topDH.map(a=>Math.abs(a.dif)));
                   const saludH={bueno:st.buenos.reduce((s,r)=>s+r.cantFinal,0),vencido:st.vencidos.reduce((s,r)=>s+r.cantFinal,0),averiado:st.averiados.reduce((s,r)=>s+r.cantFinal,0)};
@@ -376,17 +376,6 @@ return()=>clearInterval(t);
                   const catHMap={};analH.forEach(a=>{const k=a.categoria||"Sin categoría";catHMap[k]=(catHMap[k]||0)+a.dif;});
                   const catsH=Object.entries(catHMap).map(([cat,val])=>({cat,val})).filter(c=>c.val!==0).sort((a,b)=>Math.abs(b.val)-Math.abs(a.val)).slice(0,6);
                   const catHMax=Math.max(1,...catsH.map(c=>Math.abs(c.val)));
-                  const coincide=st.resumen.filter(r=>{const p=invP.find(x=>x.id===r.productoId);return p&&r.cantFinal===(p.saldo||0);}).length;
-                  const exactitud=st.contados?Math.round(coincide/st.contados*1000)/10:0;
-                  const cobertura=st.totalProductos?Math.round(st.contados/st.totalProductos*1000)/10:0;
-                  const es2=inv.tipo==="2conteos";
-                  const conC2=st.resumen.filter(r=>(r.totalC2||0)>0);
-                  const coincC1C2=conC2.filter(r=>(r.totalC1||0)===(r.totalC2||0)).length;
-                  const desempates=st.resumen.filter(r=>(r.totalC3||0)>0);
-                  const precision=conC2.length?Math.round(coincC1C2/conC2.length*1000)/10:0;
-                  let sobU=0,falU=0,sobV=0,falV=0;
-                  analH.forEach(a=>{const p=invP.find(x=>x.id===a.productoId);const c=p?.costo||0;if(a.dif>0){sobU+=a.dif;sobV+=a.dif*c;}else if(a.dif<0){falU+=-a.dif;falV+=-a.dif*c;}});
-                  const hayCosto=st.totalFisico>0||st.totalSistema>0;
                   const notasH=G.notas.filter(n=>n.inventarioId===inv.id);
                   const rolC={admin:"#1e40af",gerente:"#7c3aed",capturador:"#16a34a"};
                   return(

@@ -1,22 +1,21 @@
 import { useState, useEffect } from "react";
-import { Package, BarChart2, Users, DollarSign, Globe, UserPlus, RefreshCw, LogOut } from "lucide-react";
+import { Package, BarChart2, Users, DollarSign, Globe, UserPlus, RefreshCw, LogOut, BriefcaseBusiness } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { VResumen } from "@/views/VResumen";
-import { VClientes } from "@/views/VClientes";
 import { VPagos } from "@/views/VPagos";
 import { VPaginaWeb } from "@/views/VPaginaWeb";
 import { VLeads } from "@/views/VLeads";
+import { VCRM } from "@/views/VCRM";
 
 
 export function PanelDueno({usuario,setUsuario,logout,G,rerender,recargar,showToast}){
   const [view,setView]=useState("resumen");
   const [modalSalir,setModalSalir]=useState(false);
   const [focusTenant,setFocusTenant]=useState(null); // empresa a abrir directo desde el Dashboard
-  const [clientesFiltro,setClientesFiltro]=useState(null); // filtro inicial al entrar a Clientes desde el dashboard
-  const irA=(v,filtro)=>{ if(v==="clientes")setClientesFiltro(filtro||null); setView(v); };
+  const irA=(v,filtro)=>setView(v==="clientes"?"crm":v);
   const nav=[
     {id:"resumen",icon:BarChart2,label:"Resumen"},
-    {id:"clientes",icon:Users,label:"Clientes"},
+    {id:"crm",icon:BriefcaseBusiness,label:"CRM"},
     {id:"pagos",icon:DollarSign,label:"Pagos"},
     {id:"web",icon:Globe,label:"Página web"},
     {id:"leads",icon:UserPlus,label:"Leads"},
@@ -53,8 +52,8 @@ export function PanelDueno({usuario,setUsuario,logout,G,rerender,recargar,showTo
           </div>
         </div>
         <div className="flex-1 p-6 overflow-y-auto">
-          {view==="resumen"&&<VResumen G={G} showToast={showToast} onOpenCliente={(t)=>{setFocusTenant(t);setView("clientes");}} onGo={irA}/>}
-          {view==="clientes"&&<VClientes G={G} rerender={rerender} recargar={recargar} showToast={showToast} focusTenant={focusTenant} clearFocus={()=>setFocusTenant(null)} initFiltro={clientesFiltro} clearFiltro={()=>setClientesFiltro(null)}/>}
+           {view==="resumen"&&<VResumen G={G} showToast={showToast} onOpenCliente={(t)=>{setFocusTenant(t);setView("crm");}} onGo={irA}/>}
+            {view==="crm"&&<VCRM G={G} showToast={showToast} focusTenant={focusTenant} clearFocus={()=>setFocusTenant(null)}/>} 
           {view==="pagos"&&<VPagos G={G} showToast={showToast}/>}
           {view==="web"&&<VPaginaWeb G={G} rerender={rerender} showToast={showToast}/>}
           {view==="leads"&&<VLeads G={G} showToast={showToast}/>}

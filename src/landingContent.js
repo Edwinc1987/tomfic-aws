@@ -16,12 +16,12 @@ export const DEFAULT_LANDING = {
     texto: "",
   },
   hero: {
-    badge: "100% en la nube · sincronización en tiempo real",
-    title: "Toma de inventarios físicos,",
-    titleHighlight: "sin caos.",
+    badge: "100% en la nube · funciona aunque se caiga el internet",
+    title: "Cuenta tu inventario y confía en",
+    titleHighlight: "cada número.",
     subtitle:
-      "TOMFIC organiza tus conteos por ubicación, coordina varios capturadores a la vez y te entrega las diferencias listas para exportar.",
-    ctaPrimary: "Ingresar al sistema",
+      "TOMFIC organiza tus conteos por ubicación, coordina a varios capturadores a la vez y te muestra las diferencias explicadas en pantalla, listas para exportar. Deja de perder tiempo y dinero por descuadres que nadie explica.",
+    ctaPrimary: "Crear cuenta gratis",
     ctaSecondary: "Ver cómo funciona",
   },
   about: {
@@ -31,17 +31,17 @@ export const DEFAULT_LANDING = {
     p2: "Desde el primer conteo hasta el reporte final para contabilidad, todo queda registrado, organizado por ubicación y disponible para tu equipo.",
   },
   features: [
-    { title: "Conteos por ubicación", desc: "Organiza la toma física por bodega, mueble, nevera o lineal. Cada conteo sabe exactamente dónde va." },
-    { title: "Varios capturadores a la vez", desc: "Asigna C1, C2 y un tercer conteo de desempate. Todos capturan en paralelo, sin pisarse." },
+    { title: "Conteos por ubicación", desc: "Organiza la toma por bodega, mueble, nevera o lineal. Cada conteo sabe dónde va y quién lo hizo." },
+    { title: "Varios capturadores a la vez", desc: "Asigna C1, C2 y un desempate C3. Todos cuentan en paralelo desde su móvil, sin pisarse." },
     { title: "Captura con escáner o cámara", desc: "Escanea el código de barras o búscalo por nombre. Suma unidades, cajas y embalaje al instante." },
-    { title: "Diferencias automáticas", desc: "El sistema compara C1 vs C2 y resalta los productos con diferencia para revisarlos al toque." },
-    { title: "Reportes exportables", desc: "Diferencias, ajuste de inventario, sin conteo y captura completa — todo a Excel en un clic." },
+    { title: "Diferencias automáticas", desc: "Compara C1 vs C2, resalta cada producto que no cuadra y separa lo que sobra de lo que falta." },
+    { title: "Reportes en pantalla", desc: "Exactitud, diferencias, ajuste y captura: todo se ve y se filtra en pantalla, y se exporta a Excel o PDF en un clic." },
     { title: "Historial permanente", desc: "Cada inventario cerrado queda guardado con sus valores, diferencias y notas para consultarlo cuando quieras." },
   ],
   steps: [
-    { title: "Crea el inventario", desc: "Carga la base de productos desde Excel y abre una nueva toma física." },
-    { title: "Asigna los conteos", desc: "Reparte ubicaciones entre tus capturadores y deja que cuenten desde su celular." },
-    { title: "Revisa y exporta", desc: "Valida las diferencias, ajusta lo necesario y exporta los reportes para tu contabilidad." },
+    { title: "Crea el inventario", desc: "Sube tu base de productos desde Excel y abre una nueva toma física en minutos." },
+    { title: "Asigna los conteos", desc: "Reparte ubicaciones entre tus capturadores y deja que cuenten desde su móvil, incluso sin señal." },
+    { title: "Revisa y exporta", desc: "Valida las diferencias en pantalla, ajusta lo necesario y entrega el reporte listo para contabilidad." },
   ],
   // Casos de éxito: historias de clientes que contrataron el servicio (editable desde el panel).
   casos: [
@@ -73,7 +73,7 @@ export const DEFAULT_LANDING = {
   ],
   contacto: {
     email: "soporte@tomfic.com",
-    whatsapp: "+57 300 000 0000",
+    whatsapp: "+57 318 587 2017",
   },
 };
 

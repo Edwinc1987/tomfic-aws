@@ -9,6 +9,7 @@ import { ModAdmin } from "@/modules/ModAdmin";
 import { ModCapturador } from "@/modules/ModCapturador";
 import { ModGerente } from "@/modules/ModGerente";
 import { PanelDueno } from "@/modules/PanelDueno";
+import { VComercial } from "@/views/VComercial";
 import Landing from "@/Landing";
 import { mergeLanding } from "@/landingContent";
 
@@ -31,7 +32,7 @@ export default function TomficApp(){
     if(!perfil){await supabase.auth.signOut();setLoginErr("Tu usuario no tiene perfil. Contacta al administrador.");return false;}
     if(perfil.activo===false){await supabase.auth.signOut();setLoginErr("Tu usuario está inactivo.");return false;}
     G.tenant=null;
-    if(perfil.rol!=="dueno"){
+    if(perfil.rol!=="dueno"&&perfil.rol!=="comercial"){
       const {data:ten}=await SB.loadTenant(perfil.tenant_id);
       if(!ten||ten.activo===false){await supabase.auth.signOut();setLoginErr("Tu empresa está pendiente de aprobación o ha sido suspendida.");return false;}
       const d=diasHasta(ten.vence);
@@ -40,7 +41,7 @@ export default function TomficApp(){
     }
     setLoadingTenant(true);
     try{
-      if(perfil.rol==="dueno"){G.tenantId=null;await loadTenants();}
+       if(perfil.rol==="dueno"||perfil.rol==="comercial"){G.tenantId=null;await loadTenants();}
        else{await loadTenantData(perfil.tenant_id,perfil.inventario_id||null);}
     }catch(e){console.warn("Error cargando datos de la empresa:",e);}
     setLoadingTenant(false);
@@ -99,7 +100,7 @@ export default function TomficApp(){
       if(getDirty())return;
     }
     if(getSyncing())return;
-    try{if(usuario&&usuario.rol==="dueno")await loadTenants();else if(G.tenantId)await loadTenantData(G.tenantId);}catch(e){}
+     try{if(usuario&&(usuario.rol==="dueno"||usuario.rol==="comercial"))await loadTenants();else if(G.tenantId)await loadTenantData(G.tenantId);}catch(e){}
     tick(n=>n+1);
   };
 
@@ -170,7 +171,7 @@ export default function TomficApp(){
     <>
       {toast&&(()=>{const err=toast.type==="err",warn=toast.type==="warn";const Icon=err?XCircle:warn?AlertTriangle:CheckCircle2;return <div role="status" aria-live="polite" style={{position:"fixed",right:18,bottom:18,display:"flex",alignItems:"flex-start",gap:10,background:"white",color:"#0f172a",padding:"12px 12px 12px 14px",borderLeft:`4px solid ${err?"#dc2626":warn?"#d97706":"#16a34a"}`,borderRadius:10,zIndex:9999,fontSize:13,fontWeight:600,boxShadow:"0 8px 25px rgba(15,23,42,0.18)",maxWidth:360,lineHeight:1.35}}><Icon size={18} color={err?"#dc2626":warn?"#d97706":"#16a34a"} style={{flexShrink:0,marginTop:1}}/><span>{toast.msg}</span><button aria-label="Cerrar mensaje" onClick={()=>setToast(null)} style={{border:0,background:"transparent",color:"#94a3b8",padding:0,cursor:"pointer",lineHeight:1}}><X size={16}/></button></div>})()}
       <OfflineBanner/>
-      {usuario.rol==="dueno"?<PanelDueno {...p}/>:usuario.rol==="capturador"?<ModCapturador {...p}/>:usuario.rol==="gerente"?<ModGerente {...p}/>:<ModAdmin {...p}/>}
+       {usuario.rol==="dueno"?<PanelDueno {...p}/>:usuario.rol==="comercial"?<VComercial {...p}/>:usuario.rol==="capturador"?<ModCapturador {...p}/>:usuario.rol==="gerente"?<ModGerente {...p}/>:<ModAdmin {...p}/>}
     </>
   );
 }

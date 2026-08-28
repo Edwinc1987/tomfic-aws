@@ -14,6 +14,18 @@ import Section from "@/components/Section";
 import { setBusy, setClearBase, _snap } from "@/lib/sync";
 import { G, SB, prodCols, exportSheet, saveLocalCache, todosConteosCerrados, conteosReales, conteoCompleto, ID } from "@/lib/data";
 
+// Alias de columnas para autodetección + mapeo manual de rescate del importador.
+const _normKey=(k)=>String(k).toUpperCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^A-Z0-9]/g,"");
+const IMPORT_ALIAS={
+  ean:["EAN13OCODIGOBARRAS","EAN13","EAN","CODIGOBARRAS","CODIGO DE BARRAS","BARRAS"],
+  codigo:["CODIGO","CODIGO INTERNO","CODIGOINTERNO","COD","CODIGO PRODUCTO","SKU","PLU"],
+  nombre:["NOMBRE PRODUCTO","NOMBRE DEL PRODUCTO","NOMBRE","DESCRIPCION","PRODUCTO"],
+  saldo:["SALDO","EXISTENCIA","EXISTENCIAS","STOCK","SALDO SISTEMA","SALDO ACTUAL","CANTIDAD SISTEMA","INVENTARIO","DISPONIBLE","CANTIDAD","CANT"],
+  costo:["COSTO","COSTO UNITARIO","COSTO PROMEDIO","COSTO UND","COSTO UNIDAD","ULTIMO COSTO","COSTO ACTUAL","COSTO REAL","PRECIO COSTO","VALOR UNITARIO","VR UNITARIO"],
+};
+const IMPORT_FIELDS=[["codigo","Código"],["ean","EAN / cód. barras"],["nombre","Nombre"],["saldo","Saldo sistema"],["costo","Costo"]];
+const detectCol=(cols,aliases)=>{const set=aliases.map(_normKey);for(const c of cols){if(set.includes(_normKey(c)))return c;}return null;};
+
 // ── BASE DE DATOS ──
 export function VBaseDatos({G,rerender,showToast}){
   const [search,setSearch]=useState("");
@@ -22,6 +34,7 @@ export function VBaseDatos({G,rerender,showToast}){
   const [rawData,setRawData]=useState(null);
   const [importando,setImportando]=useState(false);
   const [importProgress,setImportProgress]=useState({done:0,total:0});
+  const [colMap,setColMap]=useState({}); // override manual de columnas {campo:"NombreColumnaExcel"}
 
   const cargarPreview=(e)=>{
     const file=e.target.files[0];if(!file)return;
@@ -33,6 +46,7 @@ export function VBaseDatos({G,rerender,showToast}){
       if(!data.length)return showToast("Archivo vacío","err");
       setRawData(data);
       setPreview(data.slice(0,8));
+      setColMap({});
     };
     reader.readAsBinaryString(file);
     e.target.value="";
@@ -49,11 +63,15 @@ export function VBaseDatos({G,rerender,showToast}){
       const row={};Object.keys(rawRow).forEach(k=>{row[normKey(k)]=rawRow[k];});
       const get=(...keys)=>{for(const k of keys){const nk=normKey(k);if(row[nk]!==undefined&&row[nk]!==null&&String(row[nk]).trim()!=="")return String(row[nk]).trim();}return "";};
       const getNum=(...keys)=>{for(const k of keys){const nk=normKey(k);if(row[nk]!==undefined&&row[nk]!==null&&String(row[nk]).trim()!=="")return toNum(row[nk]);}return 0;};
+      // Override manual: si el usuario asignó una columna en el mapeo, esa manda; si no, cae en la autodetección por alias.
+      const _ov=(field)=>{const c=colMap[field];return c?normKey(c):null;};
+      const getM=(field,...keys)=>{const k=_ov(field);if(k&&row[k]!==undefined&&row[k]!==null&&String(row[k]).trim()!=="")return String(row[k]).trim();return get(...keys);};
+      const getNumM=(field,...keys)=>{const k=_ov(field);if(k&&row[k]!==undefined&&row[k]!==null&&String(row[k]).trim()!=="")return toNum(row[k]);return getNum(...keys);};
       return{
          id:ID(),
-        ean:get("EAN13OCODIGOBARRAS","EAN13","EAN","CODIGOBARRAS","CODIGO DE BARRAS","BARRAS"),
-        codigo:get("CODIGO","CODIGO INTERNO","CODIGOINTERNO","COD","CODIGO PRODUCTO","SKU","PLU"),
-        nombre:get("NOMBRE PRODUCTO","NOMBRE DEL PRODUCTO","NOMBRE","DESCRIPCION","PRODUCTO"),
+        ean:getM("ean",...IMPORT_ALIAS.ean),
+        codigo:getM("codigo",...IMPORT_ALIAS.codigo),
+        nombre:getM("nombre",...IMPORT_ALIAS.nombre),
         referencia:get("NOMBRE REFERENCIA","REFERENCIA","REF","PRESENTACION"),
         categoria:get("NOMBRE CATEGORIA","CATEGORIA","LINEA","GRUPO"),
         subcategoria:get("NOMBRE SUBCATEGORIA","SUBCATEGORIA","SUB CATEGORIA"),
@@ -62,8 +80,8 @@ export function VBaseDatos({G,rerender,showToast}){
         localizacion:get("NOMBRE LOCALIZACION","LOCALIZACION"),
         ubicacion:get("NOMBRE UBICACION","UBICACION"),
         observacion:get("OBSERVACION","OBS"),
-        saldo:getNum("SALDO","EXISTENCIA","EXISTENCIAS","STOCK","SALDO SISTEMA","SALDO ACTUAL","CANTIDAD SISTEMA","INVENTARIO","DISPONIBLE","CANTIDAD","CANT"),
-        costo:getNum("COSTO","COSTO UNITARIO","COSTO PROMEDIO","COSTO UND","COSTO UNIDAD","ULTIMO COSTO","COSTO ACTUAL","COSTO REAL","PRECIO COSTO","VALOR UNITARIO","VR UNITARIO"),
+        saldo:getNumM("saldo",...IMPORT_ALIAS.saldo),
+        costo:getNumM("costo",...IMPORT_ALIAS.costo),
         nit:get("NIT"),
         proveedor:get("NOMBRE PROVEEDOR","PROVEEDOR"),
       };
@@ -157,6 +175,29 @@ export function VBaseDatos({G,rerender,showToast}){
     showToast("Plantilla descargada ✓");
   };
 
+  // "Llévate tus datos": respaldo COMPLETO del tenant en un JSON (anti lock-in).
+  const exportarTodo=()=>{
+    const dump={
+      exportadoEn:new Date().toISOString(),
+      empresa:G.tenant?.nombre||"",
+      nit:G.tenant?.nit||"",
+      productos:G.productos||[],
+      inventario:G.inventario||null,
+      inventarios:G.inventarios||[],
+      conteos:G.conteos||[],
+      capturas:G.capturas||{},
+      historial:G.historial||[],
+      notas:G.notas||[],
+    };
+    const blob=new Blob([JSON.stringify(dump,null,2)],{type:"application/json"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url;a.download=`tomfic_respaldo_${G.tenant?.slug||"datos"}_${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+    showToast("Respaldo descargado ✓");
+  };
+
   const conEAN=G.productos.filter(p=>p.ean).length;
   return(
     <Section>
@@ -182,6 +223,9 @@ export function VBaseDatos({G,rerender,showToast}){
         </Button>
         <Button variant="outline" onClick={descargarPlantilla}>
           <Download size={15}/> Plantilla
+        </Button>
+        <Button variant="outline" onClick={exportarTodo} title="Descarga TODOS tus datos (productos, conteos, capturas, historial) en un archivo JSON. Son tuyos: puedes llevártelos cuando quieras.">
+          <Download size={15}/> Respaldar todo
         </Button>
         {G.productos.length>0&&(todosConteosCerrados()?(
           <Button asChild className="bg-emerald-600 hover:bg-emerald-700 text-white">
@@ -261,6 +305,22 @@ export function VBaseDatos({G,rerender,showToast}){
                  <Button disabled={importando} onClick={confirmarImport}><CheckCircle size={15}/> {importando?"Importando…":"Confirmar importación"}</Button>
                </div>
              </div>
+             {!importando&&(()=>{const cols=Object.keys(preview[0]||{});return(
+               <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                 <div className="text-xs font-bold text-slate-700 mb-2">Mapeo de columnas <span className="font-medium text-slate-500">— se detectan solas; corrige solo si alguna salió mal (⚠)</span></div>
+                 <div className="grid gap-2.5" style={{gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))"}}>
+                   {IMPORT_FIELDS.map(([f,label])=>{const auto=detectCol(cols,IMPORT_ALIAS[f]);const cur=colMap[f]!==undefined?colMap[f]:(auto||"");const missing=!cur;return(
+                     <label key={f} className="block">
+                       <span className={"text-[11px] font-semibold "+(missing?"text-amber-700":"text-slate-600")}>{label}{missing?" ⚠":""}</span>
+                       <select value={cur} onChange={e=>setColMap(m=>({...m,[f]:e.target.value}))} className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-700">
+                         <option value="">— sin asignar —</option>
+                         {cols.map(c=><option key={c} value={c}>{c}</option>)}
+                       </select>
+                     </label>
+                   );})}
+                 </div>
+               </div>
+             );})()}
              {importando&&(
                <div className="mb-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2.5">
                  <div className="mb-1.5 flex items-center justify-between gap-3 text-xs text-slate-600">

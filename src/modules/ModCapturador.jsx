@@ -5,6 +5,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PageHeader } from "@/components/ui/page-header";
 import CamScanner from "@/components/CamScanner";
 import BtnNotas from "@/components/BtnNotas";
+import SyncStatus from "@/components/SyncStatus";
 import { G, SB, supabase, ID, TODAY, HOUR, conteoCompleto, nU, getStInv, card, inp, selectInventory } from "@/lib/data";
 
 function EstBadge({e}){
@@ -345,6 +346,7 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
             </select>}
           </div>
           <div style={{display:"flex",gap:10,alignItems:"center"}}>
+             <SyncStatus/>
              <button onClick={toggleDark} title={dark?"Modo día":"Modo noche"} style={{background:"#ffffff",border:"1px solid #cbd5e1",color:"#64748b",padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer",display:"inline-flex",alignItems:"center"}}>{dark?<Sun size={14}/>:<Moon size={14}/>}</button>
              <button onClick={async()=>{await recargar();showToast("Actualizado ✓");}} style={{background:"#ffffff",border:"1px solid #cbd5e1",color:"#64748b",padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer",display:"flex",alignItems:"center"}}><RefreshCw size={13}/></button>
              <span style={{fontSize:11,color:"#64748b",display:"flex",alignItems:"center",gap:4}}><Users size={11}/> {usuario.nombre}</span>
@@ -469,6 +471,7 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
             <span style={{background:"#7c3aed",fontSize:10,padding:"2px 10px",borderRadius:20,fontWeight:700}}>AJUSTE</span>
           </div>
           <div style={{display:"flex",gap:10,alignItems:"center"}}>
+             <SyncStatus/>
              <button onClick={toggleDark} title={dark?"Modo día":"Modo noche"} style={{background:"#ffffff",border:"1px solid #cbd5e1",color:"#64748b",padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer",display:"inline-flex",alignItems:"center"}}>{dark?<Sun size={14}/>:<Moon size={14}/>}</button>
              <span style={{fontSize:11,color:"#64748b",display:"flex",alignItems:"center",gap:4}}><Users size={11}/> {usuario.nombre}</span>
            <button onClick={()=>setModalSalir(true)} style={{background:"#fff1f2",border:"1px solid #fecdd3",color:"#be123c",padding:"6px 16px",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:4}}><LogOut size={13}/> Salir</button>

@@ -312,7 +312,7 @@ export function VUsuarios({usuario,G,rerender,showToast}){
             <div className="space-y-1.5">
               <Label>Rol</Label>
               <div className="grid grid-cols-2 gap-2.5">
-                {[["capturador","Capturador","Solo captura"],["admin","Administrador","Acceso total"],["gerente","Gerente","Solo lectura"]].map(([v,t,s])=>(
+                 {[["capturador","Capturador","Solo captura"],["admin","Administrador","Acceso total"],["gerente","Gerente","Solo lectura"],["comercial","Comercial","Gestiona clientes y renovaciones"]].map(([v,t,s])=>(
                   <div key={v} onClick={()=>setForm(p=>({...p,rol:v}))} className={`rounded-lg border-2 p-3 cursor-pointer transition-colors ${form.rol===v?"border-primary bg-blue-50":"border-slate-200 hover:border-slate-300"}`}>
                     <div className={`font-bold text-sm ${form.rol===v?"text-primary":"text-slate-900"}`}>{t}</div>
                     <div className="text-[11px] text-muted-foreground mt-0.5">{s}</div>
