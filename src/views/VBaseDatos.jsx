@@ -91,6 +91,7 @@ export function VBaseDatos({G,rerender,showToast}){
      const rawReales=rawData.filter(r=>Object.values(r).some(v=>String(v??"").trim()!=="")).length;
      if(mapped.length===0){setBusy(false);setImportando(false);return showToast("No se detectó la columna NOMBRE en ninguna fila. Corrige el mapeo de columnas. Tu base actual NO se tocó.","err");}
      if(rawReales>1&&mapped.length<rawReales*0.5&&G.productos.length>0){setBusy(false);setImportando(false);return showToast(`Solo ${mapped.length} de ${rawReales} filas tienen NOMBRE — parece un mapeo mal asignado. Corrige "Nombre" en el mapeo. Tu base NO se reemplazó.`,"err");}
+     console.log("[TOMFIC import] archivo:",rawData.length,"filas | con NOMBRE:",mapped.length,"| inventario activo:",(G.inventario?.id||"NINGUNO"),(G.inventario?.nombre||""));
      G.productos=mapped;
      rememberSelectedInventory(); // CLAVE: deja _inventarioDatos consistente con G.productos para que el sync NO borre lo recién importado.
     // Subir directamente a la nube y ESPERAR a que termine, antes de permitir refrescos.
@@ -99,6 +100,7 @@ export function VBaseDatos({G,rerender,showToast}){
        // No usar mapped.map(prodCols): Array.map pasa el índice como segundo argumento
        // y prodCols lo interpreta como inventario_id.
        if(mapped.length)await SB.upsertProductosBulk(mapped.map(p=>prodCols(p,G.inventario?.id)),(done,total)=>setImportProgress({done,total}));
+       console.log("[TOMFIC import] subidos a la nube:",mapped.length,"con inventario_id:",(G.inventario?.id||"null"));
        _snap.prods={};mapped.forEach(p=>{_snap.prods[p.id]=JSON.stringify(prodCols(p,G.inventario?.id));}); // marca como ya sincronizado (mismo shape que sube y que lee el sync)
        setPreview(null);setRawData(null);
      }catch(e){console.warn("Error subiendo productos:",e);showToast("Error subiendo a la nube, revisa tu conexión","err");}

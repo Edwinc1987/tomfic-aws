@@ -40,6 +40,7 @@ const doSync=async()=>{
     G.inventarios.forEach(inv=>{const d=G._inventarioDatos[inv.id]||{};(d.productos||[]).forEach(p=>{curP[p.id]=prodCols(p,inv.id);});});
     const cambiados=[];for(const id in curP){const s=JSON.stringify(curP[id]);if(_snap.prods[id]!==s)cambiados.push(curP[id]);}
     const eliminados=[];for(const id in _snap.prods){if(!curP[id])eliminados.push(id);}
+    if(cambiados.length||eliminados.length)console.log("[TOMFIC sync] productos → en memoria(curP):",Object.keys(curP).length,"| cambiados:",cambiados.length,"| ELIMINARIA:",eliminados.length,(eliminados.length&&Object.keys(curP).length<eliminados.length?"⚠ POSIBLE BORRADO MASIVO":""));
     // Anti-borrado DEFINITIVO: el sync jamás hace borrados masivos de productos.
     // Eso solo pasa con "Limpiar base" (_clearBase) o desde el import (que ya
     // maneja la nube directamente). Si un desajuste haría desaparecer toda o casi
