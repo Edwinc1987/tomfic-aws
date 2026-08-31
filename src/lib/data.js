@@ -62,6 +62,9 @@ export const SB={
 
 export const TODAY = () => new Date().toLocaleDateString("es-CO");
 export const HOUR  = () => new Date().toLocaleTimeString("es-CO");
+// Sello de versión: sirve para saber si el navegador corre el código nuevo o uno
+// en caché. Se muestra en el topbar del admin y se imprime en consola al cargar.
+export const APP_VERSION = "2026-08-31 · anti-borrado";
 export const ID    = () => Date.now().toString(36) + Math.random().toString(36).slice(2,5);
 // Slug: minúsculas, sin acentos, [^a-z0-9]→'-'. DEBE coincidir con slugify() en el SQL.
 export const slugify = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"");

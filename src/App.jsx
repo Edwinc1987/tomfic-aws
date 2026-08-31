@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Package, CheckCircle2, AlertTriangle, XCircle, X } from "lucide-react";
-import { supabase, SB, G, STORAGE_KEY, saveLocalCache, saveLocalConfig, slugify, memberEmail, diasHasta, fmtFechaCorta, GRACIA_DIAS } from "@/lib/data";
+import { supabase, SB, G, STORAGE_KEY, saveLocalCache, saveLocalConfig, slugify, memberEmail, diasHasta, fmtFechaCorta, GRACIA_DIAS, APP_VERSION } from "@/lib/data";
 import { loadBootstrap, loadTenantData, loadTenants, doSync, scheduleSync, initSnap, getBusy, getDirty, getSyncing } from "@/lib/sync";
 import OfflineBanner from "@/components/OfflineBanner";
 import SetNewPassword from "@/components/SetNewPassword";
@@ -50,6 +50,7 @@ export default function TomficApp(){
   };
 
   useEffect(()=>{
+    console.log("TOMFIC build:",APP_VERSION);
     (async()=>{
       try{await loadBootstrap();}catch(e){console.error(e);setLoadErr("Error de conexión con la nube");}
       try{
