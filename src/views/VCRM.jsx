@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import Section from "@/components/Section";
-import { diasHasta, fmtFechaCorta } from "@/lib/data";
+import { diasHasta, fmtFechaCorta, HOY, addDias, SB } from "@/lib/data";
 
 const comercialesIniciales = [
   { id: 1, nombre: "Juan Pérez", cargo: "Comercial senior", email: "juan@tomfic.com", telefono: "+57 300 555 0101", meta: 82, oportunidades: 8, estado: "Activo" },
@@ -24,6 +24,7 @@ export function VCRM({ G, showToast, usuario, mode = "dueno", focusTenant, clear
   const [comerciales, setComerciales] = useState(comercialesIniciales);
   const [showCommercialForm, setShowCommercialForm] = useState(false);
   const [newCommercial, setNewCommercial] = useState({ nombre: "", email: "", telefono: "" });
+  const [savingVence, setSavingVence] = useState(false);
   useEffect(() => { if (focusTenant) { openCompany(focusTenant); clearFocus?.(); } }, [focusTenant]);
 
   const tenants = G.tenants || [];
@@ -47,6 +48,21 @@ export function VCRM({ G, showToast, usuario, mode = "dueno", focusTenant, clear
     showToast("Perfil comercial creado");
   };
 
+  // Actualiza la fecha de vencimiento (renovación) del cliente en la nube.
+  const guardarVence = async (fecha) => {
+    if (!selected) return;
+    setSavingVence(true);
+    try {
+      const { error } = await SB.updateTenant(selected.id, { vence: fecha || null });
+      if (error) throw error;
+      const t = (G.tenants || []).find(x => x.id === selected.id); if (t) t.vence = fecha || null;
+      if (G.tenant && G.tenant.id === selected.id) G.tenant.vence = fecha || null;
+      setSelected(s => ({ ...s, vence: fecha || null }));
+      showToast("Fecha de renovación actualizada ✓");
+    } catch (e) { showToast(e.message || "No se pudo actualizar", "err"); }
+    setSavingVence(false);
+  };
+
   if (selected) {
     const payment = paymentState(selected);
     return <Section>
@@ -56,6 +72,19 @@ export function VCRM({ G, showToast, usuario, mode = "dueno", focusTenant, clear
       <div className="grid gap-px overflow-hidden rounded-xl border border-slate-200 bg-slate-200 md:grid-cols-4 mb-5">
         {[[CreditCard, "Servicio", selected.service, "text-indigo-600"], [CalendarDays, "Renovación", fmtFechaCorta(selected.vence), "text-amber-600"], [CheckCircle2, "Estado de pago", payment.label, payment.variant === "success" ? "text-green-600" : "text-amber-600"], [BriefcaseBusiness, "Comercial", selected.commercial, "text-cyan-600"]].map(([Icon, label, value, color]) => <Card key={label} className="p-4"><Icon size={18} className={color} /><div className="mt-2 text-[11px] font-bold uppercase tracking-wide text-slate-500">{label}</div><div className="mt-1 truncate text-sm font-bold text-slate-900">{value || "Sin dato"}</div></Card>)}
       </div>
+      <Card className="p-4 mb-5 border-amber-200 bg-amber-50/40">
+        <div className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-900"><CalendarDays size={16} className="text-amber-600" /> Gestionar renovación (fecha de vencimiento)</div>
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <div className="mb-1 text-[11px] font-bold uppercase tracking-wide text-slate-500">Vence</div>
+            <Input type="date" value={selected.vence || ""} onChange={e => setSelected(s => ({ ...s, vence: e.target.value }))} className="w-[180px] bg-white" />
+          </div>
+          <Button size="sm" disabled={savingVence} onClick={() => guardarVence(selected.vence)}><CheckCircle2 size={14} /> {savingVence ? "Guardando…" : "Guardar fecha"}</Button>
+          <Button size="sm" variant="outline" disabled={savingVence} onClick={() => guardarVence(addDias(selected.vence && selected.vence >= HOY() ? selected.vence : HOY(), 30))}>+30 días</Button>
+          <Button size="sm" variant="outline" disabled={savingVence} onClick={() => guardarVence(addDias(HOY(), 365))}>+1 año</Button>
+        </div>
+        <div className="mt-2 text-[11px] text-slate-500">El cliente verá el cambio la próxima vez que inicie sesión (o al refrescar).</div>
+      </Card>
       <div className="mb-4 grid gap-4 md:grid-cols-3"><Card className="p-4 md:col-span-2"><div className="mb-3 flex items-center justify-between"><h3 className="flex items-center gap-2 text-sm font-bold"><BriefcaseBusiness size={17} className="text-indigo-600" /> Servicios contratados</h3><Button size="sm" variant="outline" onClick={() => showToast("El servicio se añadirá desde la gestión de planes") }><Plus size={14} /> Añadir servicio</Button></div><div className="overflow-x-auto"><table className="w-full text-xs"><thead><tr className="border-b text-left text-slate-500"><th className="py-2">Servicio</th><th className="py-2">Estado</th><th className="py-2">Renovación</th><th className="py-2">Responsable</th></tr></thead><tbody><tr><td className="py-2 font-bold text-slate-800">{selected.service}</td><td className="py-2"><Badge variant="success">Activo</Badge></td><td className="py-2">{fmtFechaCorta(selected.vence)}</td><td className="py-2">{selected.commercial}</td></tr></tbody></table></div></Card><Card className="p-4"><h3 className="mb-3 flex items-center gap-2 text-sm font-bold"><Users size={17} className="text-cyan-600" /> Contactos</h3><div className="rounded-lg bg-slate-50 p-3"><div className="font-semibold text-slate-800">Administrador de la empresa</div><div className="mt-1 flex items-center gap-1 text-xs text-slate-500"><Mail size={12} /> Contacto principal</div></div><Button className="mt-3 w-full" size="sm" variant="outline" onClick={() => showToast("Contacto listo para ser añadido") }><Plus size={14} /> Añadir contacto</Button></Card></div>
       <div className="mb-4 grid gap-4 lg:grid-cols-[1.4fr_1fr]"><Card className="p-5"><h3 className="mb-4 flex items-center gap-2 text-sm font-bold text-slate-900"><BriefcaseBusiness size={17} className="text-indigo-600" /> Oportunidades de servicio</h3><div className="space-y-3"><div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-100 p-3"><div><div className="font-semibold text-slate-800">Renovación {selected.service}</div><div className="text-xs text-slate-500">Seguimiento de continuidad del servicio</div></div><Badge variant={payment.variant}>{payment.label}</Badge></div><div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-100 p-3"><div><div className="font-semibold text-slate-800">Ampliación de cobertura</div><div className="text-xs text-slate-500">Explorar necesidades adicionales del cliente</div></div><Badge variant="secondary">Pendiente</Badge></div></div></Card><Card className="p-5"><h3 className="mb-4 flex items-center gap-2 text-sm font-bold text-slate-900"><MessageSquare size={17} className="text-cyan-600" /> Acción comercial</h3><div className="space-y-4 text-sm"><div className="border-l-2 border-indigo-500 pl-3"><div className="text-[11px] text-slate-500">Hoy · {selected.commercial}</div><div className="font-medium">Preparar contacto de renovación</div></div><div className="border-l-2 border-slate-300 pl-3"><div className="text-[11px] text-slate-500">Actividad pendiente</div><div className="font-medium">Registrar próxima conversación</div></div><Button size="sm" variant="outline" onClick={() => showToast("Actividad agregada al seguimiento") }><Plus size={14} /> Añadir nota</Button></div></Card></div>
       <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
