@@ -123,6 +123,16 @@ export const loadTenantData=async(tid,preferredInvId=null)=>{
      conteos.filter(r=>r.inventario_id===inv.id).forEach(r=>{const{c,caps}=deserConteo(r);d.conteos.push(c);Object.assign(d.capturas,caps);});
      G._inventarioDatos[inv.id]=d;
    });
+   // Limpieza de huérfanos: productos cuyo inventario_id ya no corresponde a NINGÚN
+   // inventario (quedaron de inventarios borrados). Se eliminan de la nube para que
+   // no inflen la base ni tapen (por el límite de filas) a los productos vigentes.
+   // Guardado: solo si conocemos al menos un inventario, para no borrar por un
+   // estado transitorio vacío.
+   if(inventarios.length){
+     const idsValidos=new Set(inventarios.map(i=>i.id));
+     const huerfanos=(productos||[]).filter(p=>p.inventario_id&&!idsValidos.has(p.inventario_id)).map(p=>p.id);
+     if(huerfanos.length){console.log("[TOMFIC load] eliminando",huerfanos.length,"productos huérfanos (de inventarios borrados)");try{await SB.deleteProductosByIds(huerfanos);}catch(e){console.warn("no se pudieron limpiar huérfanos:",e);}}
+   }
    const seleccionado=activos.find(i=>i.id===previo)||activos[0]||null;
    G.inventario=null;G.conteos=[];G.capturas={};G.productos=[];G.localizaciones=[];G.ubicacionesTipos=[];G.localizacionTipos=[];G.alertas=[];
    if(seleccionado)selectInventory(seleccionado.id);

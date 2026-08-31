@@ -114,6 +114,7 @@ export function VInventario({G,rerender,showToast,usuario}){
     try{
       // Borrar de la nube: conteos del inventario + el inventario
       for(const c of G.conteos){try{await SB.deleteConteo(c.id);}catch(e){}}
+      try{await SB.deleteAllProductos(G.tenantId,invId);}catch(e){} // borra su base para no dejar productos huérfanos
       try{await supabase.from("inventarios").delete().eq("id",invId);}catch(e){}
     }catch(e){console.warn("Error al eliminar de la nube:",e);}
     // Limpiar localmente y resetear el snapshot de sincronización

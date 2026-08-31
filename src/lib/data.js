@@ -37,8 +37,18 @@ export const SB={
   // Datos de UNA empresa (tenant). Si tid es null, trae todo (compatibilidad).
   async loadAll(tid){
     const f=(t)=>tid?supabase.from(t).select("*").eq("tenant_id",tid):supabase.from(t).select("*");
-    const [u,p,inv,c]=await Promise.all([f("usuarios"),f("productos"),f("inventarios"),f("conteos")]);
-    return {usuarios:u.data||[],productos:p.data||[],inventarios:inv.data||[],conteos:c.data||[]};
+    const [u,inv,c]=await Promise.all([f("usuarios"),f("inventarios"),f("conteos")]);
+    // productos puede superar el límite de 1000 filas de Supabase → se pagina con range().
+    let productos=[],desde=0;const TAM=1000;
+    for(;;){
+      let q=supabase.from("productos").select("*");if(tid)q=q.eq("tenant_id",tid);
+      const {data,error}=await q.range(desde,desde+TAM-1);
+      if(error)break;
+      productos=productos.concat(data||[]);
+      if(!data||data.length<TAM)break;
+      desde+=TAM;
+    }
+    return {usuarios:u.data||[],productos,inventarios:inv.data||[],conteos:c.data||[]};
   },
   // Empresas (tenants)
   listTenants:()=>supabase.from("tenants").select("*").order("created_at",{ascending:false}),
@@ -64,7 +74,7 @@ export const TODAY = () => new Date().toLocaleDateString("es-CO");
 export const HOUR  = () => new Date().toLocaleTimeString("es-CO");
 // Sello de versión: sirve para saber si el navegador corre el código nuevo o uno
 // en caché. Se muestra en el topbar del admin y se imprime en consola al cargar.
-export const APP_VERSION = "2026-08-31c · fix-sync2";
+export const APP_VERSION = "2026-08-31d · fix-1000";
 export const ID    = () => Date.now().toString(36) + Math.random().toString(36).slice(2,5);
 // Slug: minúsculas, sin acentos, [^a-z0-9]→'-'. DEBE coincidir con slugify() en el SQL.
 export const slugify = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"");
