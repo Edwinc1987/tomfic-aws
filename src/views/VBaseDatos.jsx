@@ -12,7 +12,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { PageHeader } from "@/components/ui/page-header";
 import Section from "@/components/Section";
 import { setBusy, setClearBase, _snap } from "@/lib/sync";
-import { G, SB, prodCols, exportSheet, saveLocalCache, todosConteosCerrados, conteosReales, conteoCompleto, ID } from "@/lib/data";
+import { G, SB, prodCols, exportSheet, saveLocalCache, todosConteosCerrados, conteosReales, conteoCompleto, ID, rememberSelectedInventory } from "@/lib/data";
 
 // Alias de columnas para autodetección + mapeo manual de rescate del importador.
 const _normKey=(k)=>String(k).toUpperCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^A-Z0-9]/g,"");
@@ -92,13 +92,14 @@ export function VBaseDatos({G,rerender,showToast}){
      if(mapped.length===0){setBusy(false);setImportando(false);return showToast("No se detectó la columna NOMBRE en ninguna fila. Corrige el mapeo de columnas. Tu base actual NO se tocó.","err");}
      if(rawReales>1&&mapped.length<rawReales*0.5&&G.productos.length>0){setBusy(false);setImportando(false);return showToast(`Solo ${mapped.length} de ${rawReales} filas tienen NOMBRE — parece un mapeo mal asignado. Corrige "Nombre" en el mapeo. Tu base NO se reemplazó.`,"err");}
      G.productos=mapped;
+     rememberSelectedInventory(); // CLAVE: deja _inventarioDatos consistente con G.productos para que el sync NO borre lo recién importado.
     // Subir directamente a la nube y ESPERAR a que termine, antes de permitir refrescos.
     try{
        await SB.deleteAllProductos(G.tenantId,G.inventario?.id);
        // No usar mapped.map(prodCols): Array.map pasa el índice como segundo argumento
        // y prodCols lo interpreta como inventario_id.
        if(mapped.length)await SB.upsertProductosBulk(mapped.map(p=>prodCols(p,G.inventario?.id)),(done,total)=>setImportProgress({done,total}));
-       _snap.prods={};mapped.forEach(p=>{_snap.prods[p.id]=JSON.stringify(prodCols(p));}); // marca como ya sincronizado
+       _snap.prods={};mapped.forEach(p=>{_snap.prods[p.id]=JSON.stringify(prodCols(p,G.inventario?.id));}); // marca como ya sincronizado (mismo shape que sube y que lee el sync)
        setPreview(null);setRawData(null);
      }catch(e){console.warn("Error subiendo productos:",e);showToast("Error subiendo a la nube, revisa tu conexión","err");}
      saveLocalCache();
@@ -167,15 +168,11 @@ export function VBaseDatos({G,rerender,showToast}){
     {col:"CANTIDAD",desc:"Cantidad en sistema",ej:"12",req:"Recomendado"},
     {col:"COSTO",desc:"Costo unitario",ej:"18500",req:"Recomendado"},
     {col:"NIT",desc:"NIT del proveedor",ej:"860001697",req:"Opcional"},
-    {col:"NOMBRE PROVEEDOR",desc:"Nombre del proveedor",ej:"ZENU",req:"Opcional"},
-    {col:"LOCALIZACION",desc:"Tipo de localización",ej:"NEVERA",req:"Opcional"},
-    {col:"UBICACION",desc:"Tipo de ubicación",ej:"SALA DE VENTAS",req:"Opcional"},
-    {col:"OBSERVACION",desc:"Observación del producto",ej:"IMPORTADO",req:"Opcional"},
   ];
 
   const descargarPlantilla=()=>{
-    const cols=["EAN13","CODIGOINTERNO","NOMBRE PRODUCTO","NOMBRE REFERENCIA","NOMBRE CATEGORIA","NOMBRE SUBCATEGORIA","NOMBRE SUBGRUPO","NOMBRE DETERMINADA","CANTIDAD","COSTO","NIT","NOMBRE PROVEEDOR","LOCALIZACION","UBICACION","OBSERVACION"];
-    const ej=["7701101300176","00009","HAMBURGUESA ZENU X 30 UND","30 und","CARNES FRIAS","HAMBURGUESA","RES","CAVA 1",12,18500,"860001697","ZENU","NEVERA","SALA DE VENTAS","IMPORTADO"];
+    const cols=["EAN13","CODIGOINTERNO","NOMBRE PRODUCTO","NOMBRE REFERENCIA","NOMBRE CATEGORIA","NOMBRE SUBCATEGORIA","NOMBRE SUBGRUPO","NOMBRE DETERMINADA","CANTIDAD","COSTO","NIT"];
+    const ej=["7701101300176","00009","HAMBURGUESA ZENU X 30 UND","30 und","CARNES FRIAS","HAMBURGUESA","RES","CAVA 1",12,18500,"860001697"];
     exportSheet([ej],cols,"plantilla_productos_TOMFIC.xlsx","PRODUCTOS");
     showToast("Plantilla descargada ✓");
   };
