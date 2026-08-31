@@ -12,7 +12,7 @@ import { VUsuarios } from "@/views/VUsuarios";
 import { VHistorial } from "@/views/VHistorial";
 import BannerVencimiento from "@/components/BannerVencimiento";
 import { WhatsAppButton } from "@/components/WhatsAppButton";
-import { saveLocalConfig, selectInventory, APP_VERSION } from "@/lib/data";
+import { saveLocalConfig, selectInventory } from "@/lib/data";
 import { scheduleSync } from "@/lib/sync";
 
 export function ModAdmin({usuario,setUsuario,logout,G,rerender,recargar,showToast,lastSaved,limpiarDatos}){
@@ -81,7 +81,6 @@ export function ModAdmin({usuario,setUsuario,logout,G,rerender,recargar,showToas
             </button>
           )}
            {lastSaved&&<span style={{fontSize:10,color:"#64748b",display:"flex",alignItems:"center",gap:4}}><Cloud size={12}/> {lastSaved}</span>}
-           <span title="Versión del código cargada" style={{fontSize:9,color:"#94a3b8",fontFamily:"monospace",whiteSpace:"nowrap"}}>{APP_VERSION}</span>
            <div style={{display:"flex",alignItems:"center",gap:7,background:"#f8fafc",borderRadius:6,padding:"5px 10px",border:"1px solid #e2e8f0"}}>
              <div style={{width:24,height:24,background:"#2563eb",color:"white",borderRadius:99,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700}}>{usuario.nombre.charAt(0)}</div>
              <span style={{fontSize:12,color:"#475569",fontWeight:600}}>{usuario.nombre}</span>
