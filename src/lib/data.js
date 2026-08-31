@@ -60,6 +60,7 @@ export const SB={
   // SIEMPRE scopeado por empresa. Si no hay tenant, es un NO-OP: nunca un borrado global
   // (con RLS el dueño podría borrar productos de TODAS las empresas → se prohíbe de raíz).
   deleteAllProductos:(tid,invId)=>tid?supabase.from("productos").delete().eq("tenant_id",tid).eq("inventario_id",invId):Promise.resolve({data:null,error:null}),
+  deleteAllProductosTenant:(tid)=>tid?supabase.from("productos").delete().eq("tenant_id",tid):Promise.resolve({data:null,error:null}),
   deleteProductosByIds:async(ids)=>{for(let i=0;i<ids.length;i+=200){const{error}=await supabase.from("productos").delete().in("id",ids.slice(i,i+200));if(error)throw error;}},
   upsertInventario:(inv)=>supabase.from("inventarios").upsert(inv,{onConflict:"id"}),
   upsertConteo:(c)=>supabase.from("conteos").upsert(c,{onConflict:"id"}),
@@ -74,7 +75,7 @@ export const TODAY = () => new Date().toLocaleDateString("es-CO");
 export const HOUR  = () => new Date().toLocaleTimeString("es-CO");
 // Sello de versión: sirve para saber si el navegador corre el código nuevo o uno
 // en caché. Se muestra en el topbar del admin y se imprime en consola al cargar.
-export const APP_VERSION = "2026-08-31d · fix-1000";
+export const APP_VERSION = "2026-08-31e · limpiar-fix";
 export const ID    = () => Date.now().toString(36) + Math.random().toString(36).slice(2,5);
 // Slug: minúsculas, sin acentos, [^a-z0-9]→'-'. DEBE coincidir con slugify() en el SQL.
 export const slugify = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"");

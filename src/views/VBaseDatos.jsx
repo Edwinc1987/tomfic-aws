@@ -249,7 +249,7 @@ export function VBaseDatos({G,rerender,showToast}){
           </Button>
         ))}
         {G.productos.length>0&&(
-          <Button variant="outline" className="text-destructive border-red-200 hover:bg-red-50 hover:text-destructive" onClick={()=>{if(!window.confirm("¿BORRAR toda la base de productos? Esta acción no se puede deshacer."))return;setClearBase(true);G.productos=[];rerender();showToast("Base de datos limpiada","warn");}}>
+          <Button variant="outline" className="text-destructive border-red-200 hover:bg-red-50 hover:text-destructive" onClick={async()=>{if(!window.confirm("¿BORRAR TODA la base de productos? Esta acción no se puede deshacer."))return;setBusy(true);setClearBase(true);try{await SB.deleteAllProductosTenant(G.tenantId);}catch(e){console.warn("Error limpiando base:",e);}G.productos=[];rememberSelectedInventory();_snap.prods={};setClearBase(false);setBusy(false);rerender();showToast("Base de datos limpiada ✓","warn");}}>
             <Trash2 size={15}/> Limpiar base
           </Button>
         )}
