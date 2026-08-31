@@ -42,11 +42,13 @@ const doSync=async()=>{
     const eliminados=[];for(const id in _snap.prods){if(!curP[id])eliminados.push(id);}
     if(cambiados.length||eliminados.length)console.log("[TOMFIC sync] productos → en memoria(curP):",Object.keys(curP).length,"| cambiados:",cambiados.length,"| ELIMINARIA:",eliminados.length,(eliminados.length&&Object.keys(curP).length<eliminados.length?"⚠ POSIBLE BORRADO MASIVO":""));
     // Anti-borrado DEFINITIVO: el sync jamás hace borrados masivos de productos.
-    // Eso solo pasa con "Limpiar base" (_clearBase) o desde el import (que ya
-    // maneja la nube directamente). Si un desajuste haría desaparecer toda o casi
-    // toda la base, se aborta el sync SIN borrar nada — la nube queda intacta.
+    // Solo se borra con "Limpiar base" (_clearBase) o desde el import (que maneja
+    // la nube directo). Ante un desajuste se OMITE la eliminación, pero el sync
+    // SIGUE — así inventarios y conteos sí se guardan (abortarlo los dejaba sin
+    // subir, y por eso los productos importados quedaban huérfanos al recargar).
     if(eliminados.length && !_clearBase && (Object.keys(curP).length===0 || eliminados.length>curP.length)){
-      throw new Error("Sync cancelado: borrado masivo de productos evitado (posible desajuste local/nube).");
+      console.warn("[TOMFIC sync] borrado masivo de",eliminados.length,"productos EVITADO (se omite; el resto del sync continúa)");
+      eliminados.length=0;
     }
     if(cambiados.length)await SB.upsertProductosBulk(cambiados);
     if(eliminados.length)await SB.deleteProductosByIds(eliminados);
@@ -116,6 +118,7 @@ export const loadTenantData=async(tid,preferredInvId=null)=>{
      const filas=productos||[];
      const legacy=filas.filter(p=>!p.inventario_id);
      const propios=filas.filter(p=>p.inventario_id===inv.id);
+     console.log("[TOMFIC load] inv",inv.id,inv.nombre,"→ propios:",propios.length,"| legacy(sin inv):",legacy.length,"| cloud total:",filas.length);
      const d={productos:propios.length?propios:(index===0?legacy:[]),localizaciones:cfg.localizaciones||[],ubicacionesTipos:cfg.ubicacionesTipos||[],localizacionTipos:cfg.localizacionTipos||[],alertas:cfg.alertas||[],conteos:[],capturas:{}};
      conteos.filter(r=>r.inventario_id===inv.id).forEach(r=>{const{c,caps}=deserConteo(r);d.conteos.push(c);Object.assign(d.capturas,caps);});
      G._inventarioDatos[inv.id]=d;
