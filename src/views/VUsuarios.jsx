@@ -1,7 +1,7 @@
 import { useState } from "react";
 import * as XLSX from "xlsx";
 import {
-  Users, UserPlus, Upload, Download, Search, Mail, Smartphone,
+  Users, UserPlus, Upload, Download, Search, Mail, Smartphone, Send,
   Key, ClipboardList, Lightbulb, AlertTriangle, CheckCircle, Trash2, FolderOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,7 @@ export function VUsuarios({usuario,G,rerender,showToast}){
   const [form,setForm]=useState({nombre:"",pass:"",rol:"capturador",correo:"",telefono:"",editId:null});
   const [previewUsuarios,setPreviewUsuarios]=useState(null);
   const [credCreada,setCredCreada]=useState(null); // credencial recién creada/reseteada para compartir
+  const [envioOpen,setEnvioOpen]=useState(false); // modal de envío masivo de accesos
   const [busy,setBusy]=useState(false);
   const [busqUser,setBusqUser]=useState(""); // filtro de la tabla de usuarios
   const [usuarioExistente,setUsuarioExistente]=useState("");
@@ -95,6 +96,13 @@ export function VUsuarios({usuario,G,rerender,showToast}){
   const copiarAcceso=(u)=>{
     navigator.clipboard?.writeText(buildShareMsg(u)).then(()=>showToast("Copiado al portapapeles ✓")).catch(()=>showToast("No se pudo copiar","err"));
   };
+
+  // Envío de accesos por WhatsApp / correo (individual y masivo).
+  // Normaliza el teléfono a formato internacional (Colombia +57 si son 10 dígitos).
+  const waPhone=(tel)=>{let d=String(tel||"").replace(/\D/g,"");if(!d)return"";if(d.length===10)d="57"+d;return d;};
+  const waHref=(u)=>`https://wa.me/${waPhone(u.telefono)}?text=${encodeURIComponent(buildShareMsg(u))}`;
+  const mailHref=(u)=>`mailto:${u.correo}?subject=${encodeURIComponent("Tu acceso a TOMFIC")}&body=${encodeURIComponent(buildShareMsg(u))}`;
+  const copiarTodos=(list)=>{const txt=list.map(u=>buildShareMsg(u)).join("\n\n———\n\n");navigator.clipboard?.writeText(txt).then(()=>showToast(`Copiados ${list.length} accesos ✓`)).catch(()=>showToast("No se pudo copiar","err"));};
 
   const resetClave=async(u)=>{
     const nueva=generarPass(u.nombre,u.telefono);
@@ -204,6 +212,7 @@ export function VUsuarios({usuario,G,rerender,showToast}){
       <div className="flex gap-2.5 mb-3 flex-wrap items-center">
         <Button onClick={()=>{setForm({nombre:"",pass:"",rol:"capturador",correo:"",telefono:"",editId:null});setModal(true);}}><UserPlus size={16}/> Crear Usuario</Button>
         <Button variant="outline" onClick={()=>setModalImport(true)}><Upload size={15}/> Importar desde Excel</Button>
+        <Button variant="outline" onClick={()=>setEnvioOpen(true)}><Send size={15}/> Enviar accesos</Button>
         <div className="relative ml-auto w-full sm:w-64">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/>
           <Input value={busqUser} onChange={e=>setBusqUser(e.target.value)} placeholder="Buscar usuario, correo, rol…" className="pl-9"/>
@@ -406,6 +415,43 @@ export function VUsuarios({usuario,G,rerender,showToast}){
       />
 
       {/* Modal credencial creada / reseteada — mostrar y compartir */}
+      <Dialog open={envioOpen} onOpenChange={setEnvioOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>Enviar accesos al equipo</DialogTitle></DialogHeader>
+          {(()=>{const equipo=(G.usuarios||[]).filter(u=>u.activo!==false&&u.rol!=="admin");return(
+            <div>
+              <div className="flex items-center justify-between gap-2 mb-2.5">
+                <div className="text-xs text-slate-500">{equipo.length} usuario{equipo.length===1?"":"s"} · envía por WhatsApp o correo</div>
+                <Button size="sm" variant="outline" onClick={()=>copiarTodos(equipo)} disabled={equipo.length===0}><ClipboardList size={13}/> Copiar todos</Button>
+              </div>
+              <div className="rounded-lg border divide-y max-h-[360px] overflow-auto">
+                {equipo.length===0?(
+                  <div className="p-5 text-center text-sm text-muted-foreground">No hay capturadores o gerentes activos.</div>
+                ):equipo.map(u=>(
+                  <div key={u.id} className="flex items-center gap-2 px-3 py-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-semibold truncate">{u.nombre} <span className="text-[10px] font-normal text-slate-400 uppercase">{u.rol}</span></div>
+                      <div className="text-[11px] text-slate-400 truncate">{u.telefono||"sin teléfono"} · {u.correo||"sin correo"}</div>
+                    </div>
+                    <a href={u.telefono?waHref(u):undefined} target="_blank" rel="noopener noreferrer"
+                       className={"inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-bold text-white "+(u.telefono?"bg-[#25d366] hover:bg-[#1da851]":"bg-slate-200 !text-slate-400 pointer-events-none")}>
+                      <Smartphone size={13}/> WhatsApp
+                    </a>
+                    <a href={u.correo?mailHref(u):undefined}
+                       className={"inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-bold "+(u.correo?"border border-slate-300 text-slate-700 hover:bg-slate-50":"bg-slate-100 text-slate-300 pointer-events-none")}>
+                      <Mail size={13}/> Correo
+                    </a>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-[11px] text-amber-800">
+                <AlertTriangle size={13} className="shrink-0 mt-0.5"/><span>Cada botón abre WhatsApp o tu correo con el mensaje listo — tú confirmas el envío. Comparte las claves con cuidado; para uno sin teléfono o correo, edítalo y agrégaselo.</span>
+              </div>
+            </div>
+          );})()}
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!credCreada} onOpenChange={(v)=>!v&&setCredCreada(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>Acceso de {credCreada?.nombre}</DialogTitle></DialogHeader>

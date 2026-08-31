@@ -68,7 +68,7 @@ export function VBaseDatos({G,rerender,showToast}){
       const getM=(field,...keys)=>{const k=_ov(field);if(k&&row[k]!==undefined&&row[k]!==null&&String(row[k]).trim()!=="")return String(row[k]).trim();return get(...keys);};
       const getNumM=(field,...keys)=>{const k=_ov(field);if(k&&row[k]!==undefined&&row[k]!==null&&String(row[k]).trim()!=="")return toNum(row[k]);return getNum(...keys);};
       return{
-         id:ID(),
+         id:ID()+"-"+i,
         ean:getM("ean",...IMPORT_ALIAS.ean),
         codigo:getM("codigo",...IMPORT_ALIAS.codigo),
         nombre:getM("nombre",...IMPORT_ALIAS.nombre),
@@ -86,6 +86,11 @@ export function VBaseDatos({G,rerender,showToast}){
         proveedor:get("NOMBRE PROVEEDOR","PROVEEDOR"),
       };
     }).filter(r=>r.nombre);
+     // Seguridad anti-borrado: NUNCA reemplazar la base con una importación rota.
+     // (Si el NOMBRE no se mapeó bien, casi todas las filas se caen del filtro.)
+     const rawReales=rawData.filter(r=>Object.values(r).some(v=>String(v??"").trim()!=="")).length;
+     if(mapped.length===0){setBusy(false);setImportando(false);return showToast("No se detectó la columna NOMBRE en ninguna fila. Corrige el mapeo de columnas. Tu base actual NO se tocó.","err");}
+     if(rawReales>1&&mapped.length<rawReales*0.5&&G.productos.length>0){setBusy(false);setImportando(false);return showToast(`Solo ${mapped.length} de ${rawReales} filas tienen NOMBRE — parece un mapeo mal asignado. Corrige "Nombre" en el mapeo. Tu base NO se reemplazó.`,"err");}
      G.productos=mapped;
     // Subir directamente a la nube y ESPERAR a que termine, antes de permitir refrescos.
     try{
