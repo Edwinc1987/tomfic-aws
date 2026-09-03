@@ -16,7 +16,7 @@ import EstBadge from "@/components/EstBadge";
 import { G, TODAY, ID, conteosReales } from "@/lib/data";
 
 // ── CONTEOS ──
-export function VConteos({G,rerender,showToast,usuario}){
+export function VConteos({G,rerender,showToast,usuario,recargar}){
   const [modal,setModal]=useState(false);
   const [modalMod,setModalMod]=useState(null); // conteo a modificar
   const [form,setForm]=useState({nombre:"",locId:"",usuarioC1:"",usuarioC2:""});
@@ -39,6 +39,7 @@ export function VConteos({G,rerender,showToast,usuario}){
     if(!G.inventario)return showToast("Primero crea un inventario","err");
     if(!form.nombre.trim()||!form.locId||!form.usuarioC1)return showToast("Completa nombre, localización y usuario C1","err");
     const loc=G.localizaciones.find(l=>l.id===form.locId);
+    if(!loc)return showToast("La ubicación ya no está disponible. Actualiza la lista e inténtalo de nuevo.","err");
     if(loc&&locUsada(loc))return showToast("Esta ubicación ya fue utilizada en un conteo","err");
     G.conteos.push({
       id:ID(),nombre:form.nombre,locId:form.locId,

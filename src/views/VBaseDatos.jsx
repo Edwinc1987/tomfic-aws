@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import * as XLSX from "xlsx";
 import {
   Database, Upload, Download, ClipboardList, CheckCircle,
@@ -11,7 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { PageHeader } from "@/components/ui/page-header";
 import Section from "@/components/Section";
-import { setBusy, setClearBase, _snap } from "@/lib/sync";
+import { setBusy, setClearBase, _snap, scheduleSync } from "@/lib/sync";
 import { G, SB, prodCols, exportSheet, saveLocalCache, todosConteosCerrados, conteosReales, conteoCompleto, ID, rememberSelectedInventory } from "@/lib/data";
 
 // Alias de columnas para autodetección + mapeo manual de rescate del importador.
@@ -34,7 +34,13 @@ export function VBaseDatos({G,rerender,showToast}){
   const [rawData,setRawData]=useState(null);
   const [importando,setImportando]=useState(false);
   const [importProgress,setImportProgress]=useState({done:0,total:0});
-  const [colMap,setColMap]=useState({}); // override manual de columnas {campo:"NombreColumnaExcel"}
+   const [colMap,setColMap]=useState({}); // override manual de columnas {campo:"NombreColumnaExcel"}
+   const [page,setPage]=useState(1);
+   const [pagina,setPagina]=useState([]);
+   const [totalCount,setTotalCount]=useState(0);
+   const [loadingProductos,setLoadingProductos]=useState(false);
+   const [productosError,setProductosError]=useState("");
+   const [productosRefresh,setProductosRefresh]=useState(0);
 
   const cargarPreview=(e)=>{
     const file=e.target.files[0];if(!file)return;
@@ -57,9 +63,13 @@ export function VBaseDatos({G,rerender,showToast}){
      setBusy(true);
      setImportando(true);
      setImportProgress({done:0,total:rawData.length});
+     let nubeGuardada=false;
     const normKey=(k)=>String(k).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^A-Z0-9]/g,"");
     const toNum=(v)=>{if(v===undefined||v===null||v==="")return 0;if(typeof v==="number")return isNaN(v)?0:v;let s=String(v).replace(/[^\d.,-]/g,"").trim();if(s==="")return 0;if(s.includes(".")&&s.includes(","))s=s.replace(/\./g,"").replace(",",".");else if(s.includes(","))s=s.replace(",",".");const n=parseFloat(s);return isNaN(n)?0:n;};
-    const mapped=rawData.map((rawRow,i)=>{
+     const mapped=[];
+     for(let start=0;start<rawData.length;start+=500){
+      rawData.slice(start,start+500).forEach((rawRow,offset)=>{
+       const i=start+offset;
       const row={};Object.keys(rawRow).forEach(k=>{row[normKey(k)]=rawRow[k];});
       const get=(...keys)=>{for(const k of keys){const nk=normKey(k);if(row[nk]!==undefined&&row[nk]!==null&&String(row[nk]).trim()!=="")return String(row[nk]).trim();}return "";};
       const getNum=(...keys)=>{for(const k of keys){const nk=normKey(k);if(row[nk]!==undefined&&row[nk]!==null&&String(row[nk]).trim()!=="")return toNum(row[nk]);}return 0;};
@@ -67,7 +77,7 @@ export function VBaseDatos({G,rerender,showToast}){
       const _ov=(field)=>{const c=colMap[field];return c?normKey(c):null;};
       const getM=(field,...keys)=>{const k=_ov(field);if(k&&row[k]!==undefined&&row[k]!==null&&String(row[k]).trim()!=="")return String(row[k]).trim();return get(...keys);};
       const getNumM=(field,...keys)=>{const k=_ov(field);if(k&&row[k]!==undefined&&row[k]!==null&&String(row[k]).trim()!=="")return toNum(row[k]);return getNum(...keys);};
-      return{
+       const producto={
          id:ID()+"-"+i,
         ean:getM("ean",...IMPORT_ALIAS.ean),
         codigo:getM("codigo",...IMPORT_ALIAS.codigo),
@@ -84,32 +94,42 @@ export function VBaseDatos({G,rerender,showToast}){
         costo:getNumM("costo",...IMPORT_ALIAS.costo),
         nit:get("NIT"),
         proveedor:get("NOMBRE PROVEEDOR","PROVEEDOR"),
-      };
-    }).filter(r=>r.nombre);
+       };
+       if(producto.nombre)mapped.push(producto);
+      });
+      setImportProgress({done:Math.min(start+500,rawData.length),total:rawData.length});
+      await new Promise(resolve=>setTimeout(resolve,0));
+     }
      // Seguridad anti-borrado: NUNCA reemplazar la base con una importación rota.
      // (Si el NOMBRE no se mapeó bien, casi todas las filas se caen del filtro.)
      const rawReales=rawData.filter(r=>Object.values(r).some(v=>String(v??"").trim()!=="")).length;
      if(mapped.length===0){setBusy(false);setImportando(false);return showToast("No se detectó la columna NOMBRE en ninguna fila. Corrige el mapeo de columnas. Tu base actual NO se tocó.","err");}
      if(rawReales>1&&mapped.length<rawReales*0.5&&G.productos.length>0){setBusy(false);setImportando(false);return showToast(`Solo ${mapped.length} de ${rawReales} filas tienen NOMBRE — parece un mapeo mal asignado. Corrige "Nombre" en el mapeo. Tu base NO se reemplazó.`,"err");}
      console.log("[TOMFIC import] archivo:",rawData.length,"filas | con NOMBRE:",mapped.length,"| inventario activo:",(G.inventario?.id||"NINGUNO"),(G.inventario?.nombre||""));
-     G.productos=mapped;
+     setImportProgress({done:rawData.length,total:rawData.length+mapped.length});
+       setPage(1);
+      G.productos=mapped;
      rememberSelectedInventory(); // CLAVE: deja _inventarioDatos consistente con G.productos para que el sync NO borre lo recién importado.
     // Subir directamente a la nube y ESPERAR a que termine, antes de permitir refrescos.
     try{
        await SB.deleteAllProductos(G.tenantId,G.inventario?.id);
        // No usar mapped.map(prodCols): Array.map pasa el índice como segundo argumento
        // y prodCols lo interpreta como inventario_id.
-       if(mapped.length)await SB.upsertProductosBulk(mapped.map(p=>prodCols(p,G.inventario?.id)),(done,total)=>setImportProgress({done,total}));
+        if(mapped.length)await SB.upsertProductosBulk(mapped.map(p=>prodCols(p,G.inventario?.id)),(done,total)=>setImportProgress({done:rawData.length+done,total:rawData.length+total}));
        console.log("[TOMFIC import] subidos a la nube:",mapped.length,"con inventario_id:",(G.inventario?.id||"null"));
-       _snap.prods={};mapped.forEach(p=>{_snap.prods[p.id]=JSON.stringify(prodCols(p,G.inventario?.id));}); // marca como ya sincronizado (mismo shape que sube y que lee el sync)
-       setPreview(null);setRawData(null);
-     }catch(e){console.warn("Error subiendo productos:",e);showToast("Error subiendo a la nube, revisa tu conexión","err");}
-     saveLocalCache();
-     setBusy(false);setImportando(false);
+        _snap.prods={};mapped.forEach(p=>{_snap.prods[p.id]=JSON.stringify(prodCols(p,G.inventario?.id));}); // marca como ya sincronizado (mismo shape que sube y que lee el sync)
+        setPreview(null);setRawData(null);
+        nubeGuardada=true;
+      }catch(e){console.warn("Error subiendo productos:",e);showToast("Error subiendo a la nube, revisa tu conexión","err");}
+      if(!nubeGuardada)scheduleSync();
+      saveLocalCache();
+      setProductosRefresh(v=>v+1);
+      setBusy(false);setImportando(false);
     rerender();
     const conCosto=mapped.filter(p=>p.costo>0).length,conSaldo=mapped.filter(p=>p.saldo>0).length;
-    if(conCosto===0||conSaldo===0)showToast(`Importados ${mapped.length}, pero ${conCosto===0?"COSTO":""}${conCosto===0&&conSaldo===0?" y ":""}${conSaldo===0?"SALDO":""} salieron en 0 — revisa el nombre de esas columnas`,"warn");
-    else showToast(`✓ ${mapped.length} productos importados y guardados en la nube`);
+     if(!nubeGuardada)showToast(`Importados ${mapped.length} localmente; la nube sigue pendiente de sincronización`,"warn");
+     else if(conCosto===0||conSaldo===0)showToast(`Importados ${mapped.length}, pero ${conCosto===0?"COSTO":""}${conCosto===0&&conSaldo===0?" y ":""}${conSaldo===0?"SALDO":""} salieron en 0 — revisa el nombre de esas columnas`,"warn");
+     else showToast(`✓ ${mapped.length} productos importados y guardados en la nube`);
   };
 
   // "Sube saldos" (post-toma): actualiza saldo + costo de la base ACTUAL emparejando por
@@ -151,12 +171,27 @@ export function VBaseDatos({G,rerender,showToast}){
     reader.readAsBinaryString(file);
   };
 
-  const [mostrarEstructura,setMostrarEstructura]=useState(false);
-  const cats=[...new Set(G.productos.map(p=>p.categoria).filter(Boolean))].sort();
-  const filtrados=G.productos.filter(p=>{
-    const q=search.toLowerCase();
-    return(!q||(p.nombre.toLowerCase().includes(q)||p.ean.includes(q)||p.codigo.toLowerCase().includes(q)))&&(!catF||p.categoria===catF);
-  });
+   const [mostrarEstructura,setMostrarEstructura]=useState(false);
+   const cats=[...new Set(G.productos.map(p=>p.categoria).filter(Boolean))].sort();
+   const pageSize=50;
+   const pageCount=Math.max(1,Math.ceil(totalCount/pageSize));
+
+   useEffect(()=>{
+     let activo=true;
+     const cargarProductos=async()=>{
+       if(!G.tenantId||!G.inventario?.id){
+         setPagina([]);setTotalCount(0);setProductosError("");return;
+       }
+       setLoadingProductos(true);setProductosError("");
+       const result=await SB.listProductosPage({tenantId:G.tenantId,inventarioId:G.inventario.id,page,pageSize,search,categoria:catF});
+       if(!activo)return;
+       if(result.error){setPagina([]);setTotalCount(0);setProductosError("No se pudieron cargar los productos. Revisa tu conexión e inténtalo de nuevo.");}
+       else{setPagina(result.data);setTotalCount(result.count);}
+       setLoadingProductos(false);
+     };
+     cargarProductos().catch(()=>{if(activo){setPagina([]);setTotalCount(0);setProductosError("No se pudieron cargar los productos. Revisa tu conexión e inténtalo de nuevo.");setLoadingProductos(false);}});
+     return()=>{activo=false;};
+   },[G.tenantId,G.inventario?.id,page,search,catF,productosRefresh]);
 
   const ESTRUCTURA=[
     {col:"EAN13",desc:"Código de barras del producto",ej:"7701101300176",req:"Recomendado"},
@@ -211,7 +246,7 @@ export function VBaseDatos({G,rerender,showToast}){
         title="Base de Datos"
         icon={Database}
         subtitle={cats.length>0?cats.slice(0,3).join(" · ")+(cats.length>3?" …":""):"Sin categorías"}
-        count={G.productos.length}
+         count={totalCount}
         countLabel="productos"
       />
       {/* Acciones */}
@@ -248,8 +283,8 @@ export function VBaseDatos({G,rerender,showToast}){
             <Upload size={15}/> Sube saldos (post-toma)
           </Button>
         ))}
-        {G.productos.length>0&&(
-          <Button variant="outline" className="text-destructive border-red-200 hover:bg-red-50 hover:text-destructive" onClick={async()=>{if(!window.confirm("¿BORRAR TODA la base de productos? Esta acción no se puede deshacer."))return;setBusy(true);setClearBase(true);try{await SB.deleteAllProductosTenant(G.tenantId);}catch(e){console.warn("Error limpiando base:",e);}G.productos=[];rememberSelectedInventory();_snap.prods={};setClearBase(false);setBusy(false);rerender();showToast("Base de datos limpiada ✓","warn");}}>
+       {totalCount>0&&(
+           <Button variant="outline" className="text-destructive border-red-200 hover:bg-red-50 hover:text-destructive" onClick={async()=>{if(!window.confirm("¿BORRAR TODA la base de productos? Esta acción no se puede deshacer."))return;setBusy(true);setClearBase(true);try{await SB.deleteAllProductosTenant(G.tenantId);}catch(e){console.warn("Error limpiando base:",e);}G.productos=[];rememberSelectedInventory();_snap.prods={};setProductosRefresh(v=>v+1);setClearBase(false);setBusy(false);rerender();showToast("Base de datos limpiada ✓","warn");}}>
             <Trash2 size={15}/> Limpiar base
           </Button>
         )}
@@ -359,23 +394,24 @@ export function VBaseDatos({G,rerender,showToast}){
       )}
 
       {/* Filtros y tabla */}
-      {G.productos.length>0&&(
+       {G.inventario&&(
         <>
           <div className="flex gap-3 mb-3.5 flex-wrap items-center">
             <div className="relative flex-1 min-w-[200px]">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"/>
-              <Input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar nombre, código, EAN…" className="pl-9"/>
+               <Input value={search} onChange={e=>{setSearch(e.target.value);setPage(1);}} placeholder="Buscar nombre, código, EAN…" className="pl-9"/>
             </div>
-            <Select value={catF||"all"} onValueChange={v=>setCatF(v==="all"?"":v)}>
+             <Select value={catF||"all"} onValueChange={v=>{setCatF(v==="all"?"":v);setPage(1);}}>
               <SelectTrigger className="w-[200px]"><SelectValue/></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas las categorías</SelectItem>
                 {cats.map(c=><SelectItem key={c} value={c}>{c}</SelectItem>)}
               </SelectContent>
             </Select>
-            <UIBadge variant="secondary" className="bg-sky-100 text-sky-700 h-9 px-3 text-sm rounded-md">{filtrados.length}</UIBadge>
-          </div>
-          <Card className="overflow-hidden">
+             <UIBadge variant="secondary" className="bg-sky-100 text-sky-700 h-9 px-3 text-sm rounded-md">{totalCount}</UIBadge>
+           </div>
+           {productosError&&<div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{productosError}</div>}
+           <Card className="overflow-hidden">
             <div className="overflow-auto max-h-[500px]">
               <table className="w-full text-xs">
                 <thead className="sticky top-0 z-10">
@@ -385,8 +421,10 @@ export function VBaseDatos({G,rerender,showToast}){
                     ))}
                   </tr>
                 </thead>
-                <tbody>
-                  {filtrados.slice(0,500).map((p)=>(
+                 <tbody>
+                   {loadingProductos&&<tr><td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">Cargando productos…</td></tr>}
+                   {!loadingProductos&&!productosError&&!pagina.length&&<tr><td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">No hay productos que coincidan con los filtros.</td></tr>}
+                   {!loadingProductos&&pagina.map((p)=>(
                     <tr key={p.id} className="border-b last:border-0 hover:bg-slate-50 transition-colors">
                       <td className="px-3 py-1.5 font-mono text-primary font-bold whitespace-nowrap">{p.codigo}</td>
                       <td className="px-3 py-1.5 text-muted-foreground text-[10px]">{p.ean}</td>
@@ -399,9 +437,17 @@ export function VBaseDatos({G,rerender,showToast}){
                     </tr>
                   ))}
                 </tbody>
-              </table>
-            </div>
-          </Card>
+               </table>
+             </div>
+             <div className="flex items-center justify-between gap-3 border-t bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                <span>{totalCount?`${(page-1)*pageSize+1}-${Math.min(page*pageSize,totalCount)} de ${totalCount}`:"0 productos"}</span>
+               <div className="flex gap-2">
+                 <Button variant="outline" size="sm" disabled={page===1} onClick={()=>setPage(p=>p-1)}>Anterior</Button>
+                 <span className="flex items-center px-1">Página {page} de {pageCount}</span>
+                 <Button variant="outline" size="sm" disabled={page===pageCount} onClick={()=>setPage(p=>p+1)}>Siguiente</Button>
+               </div>
+             </div>
+           </Card>
         </>
       )}
     </Section>

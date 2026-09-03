@@ -97,6 +97,7 @@ export const setLoadingTenant=(v)=>{_loadingTenant=v;};
 export const loadTenantData=async(tid,preferredInvId=null)=>{
  _loadingTenant=true;
  try{
+   const parseJson=(value,fallback)=>{try{return value?JSON.parse(value):fallback;}catch(e){console.warn("Snapshot inválido ignorado:",e);return fallback;}};
   G.tenantId=tid;
    resetTenantConfig();
    const legacyCfg=await SB.getConfig(`tenant:${tid}:config`);
@@ -137,13 +138,13 @@ export const loadTenantData=async(tid,preferredInvId=null)=>{
    G.inventario=null;G.conteos=[];G.capturas={};G.productos=[];G.localizaciones=[];G.ubicacionesTipos=[];G.localizacionTipos=[];G.alertas=[];
    if(seleccionado)selectInventory(seleccionado.id);
   G.historial=inventarios.filter(i=>i.estado==="cerrado").map(i=>{
-    const cs=i.conteos_snapshot?JSON.parse(i.conteos_snapshot):[];
-    const ca=i.capturas_snapshot?JSON.parse(i.capturas_snapshot):{};
-     const pr=i.productos_snapshot?JSON.parse(i.productos_snapshot):[];
-     const loc=i.localizaciones_snapshot?(typeof i.localizaciones_snapshot==="string"?JSON.parse(i.localizaciones_snapshot):i.localizaciones_snapshot):[];
-     const ubi=i.ubicaciones_tipos_snapshot?(typeof i.ubicaciones_tipos_snapshot==="string"?JSON.parse(i.ubicaciones_tipos_snapshot):i.ubicaciones_tipos_snapshot):[];
-      const ltip=i.localizacion_tipos_snapshot?(typeof i.localizacion_tipos_snapshot==="string"?JSON.parse(i.localizacion_tipos_snapshot):i.localizacion_tipos_snapshot):[];
-      const notas=i.notas_snapshot?(typeof i.notas_snapshot==="string"?JSON.parse(i.notas_snapshot):i.notas_snapshot):[];
+     const cs=parseJson(i.conteos_snapshot,[]);
+     const ca=parseJson(i.capturas_snapshot,{});
+      const pr=parseJson(i.productos_snapshot,[]);
+      const loc=typeof i.localizaciones_snapshot==="string"?parseJson(i.localizaciones_snapshot,[]):(i.localizaciones_snapshot||[]);
+      const ubi=typeof i.ubicaciones_tipos_snapshot==="string"?parseJson(i.ubicaciones_tipos_snapshot,[]):(i.ubicaciones_tipos_snapshot||[]);
+       const ltip=typeof i.localizacion_tipos_snapshot==="string"?parseJson(i.localizacion_tipos_snapshot,[]):(i.localizacion_tipos_snapshot||[]);
+       const notas=typeof i.notas_snapshot==="string"?parseJson(i.notas_snapshot,[]):(i.notas_snapshot||[]);
       return {id:i.id,nombre:i.nombre,tipo:i.tipo,obs:i.obs,fecha:i.fecha,apertura:i.apertura,horaApertura:i.hora_apertura,usuarioApertura:i.usuario_apertura,cierre:i.cierre,horaCierre:i.hora_cierre,usuarioCierre:i.usuario_cierre,conteos:cs,capturas:ca,productos:pr,localizaciones:loc,ubicacionesTipos:ubi,localizacionTipos:ltip,notas,totalProductos:pr.length,totalCapturas:Object.keys(ca).length};
   }).sort((a,b)=>(b.cierre||"").localeCompare(a.cierre||""));
   initSnap();

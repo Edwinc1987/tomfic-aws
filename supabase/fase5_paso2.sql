@@ -370,12 +370,12 @@ create policy appconfig_write on public.app_config for all using (
 -- ╔══════════════════════════════════════════════════════════════════════════╗
 -- ║  ETAPA 3 — HABILITAR RLS  (corre esto SOLO cuando el frontend ya funciona) ║
 -- ╚══════════════════════════════════════════════════════════════════════════╝
--- alter table public.usuarios   enable row level security;
--- alter table public.productos  enable row level security;
--- alter table public.inventarios enable row level security;
--- alter table public.conteos    enable row level security;
--- alter table public.tenants    enable row level security;
--- alter table public.app_config enable row level security;
+alter table public.usuarios   enable row level security;
+alter table public.productos  enable row level security;
+alter table public.inventarios enable row level security;
+alter table public.conteos    enable row level security;
+alter table public.tenants    enable row level security;
+alter table public.app_config enable row level security;
 --
 -- Si algo se rompe, se revierte al instante con:
 --   alter table public.<tabla> disable row level security;

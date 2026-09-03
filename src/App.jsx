@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Package, CheckCircle2, AlertTriangle, XCircle, X } from "lucide-react";
-import { supabase, SB, G, STORAGE_KEY, saveLocalCache, saveLocalConfig, slugify, memberEmail, diasHasta, fmtFechaCorta, GRACIA_DIAS, APP_VERSION } from "@/lib/data";
+import { supabase, SB, G, saveLocalCache, loadLocalCache, clearLocalCache, saveLocalConfig, slugify, memberEmail, diasHasta, fmtFechaCorta, GRACIA_DIAS, APP_VERSION } from "@/lib/data";
 import { loadBootstrap, loadTenantData, loadTenants, doSync, scheduleSync, initSnap, getBusy, getDirty, getSyncing } from "@/lib/sync";
 import OfflineBanner from "@/components/OfflineBanner";
 import SetNewPassword from "@/components/SetNewPassword";
@@ -43,7 +43,7 @@ export default function TomficApp(){
     try{
        if(perfil.rol==="dueno"||perfil.rol==="comercial"){G.tenantId=null;await loadTenants();}
        else{await loadTenantData(perfil.tenant_id,perfil.inventario_id||null);}
-    }catch(e){console.warn("Error cargando datos de la empresa:",e);}
+     }catch(e){console.warn("Error cargando datos de la empresa:",e);await loadLocalCache(perfil.tenant_id);}
     setLoadingTenant(false);
     setUsuario(perfil);
     return true;
@@ -52,7 +52,7 @@ export default function TomficApp(){
   useEffect(()=>{
     console.log("TOMFIC build:",APP_VERSION);
     (async()=>{
-      try{await loadBootstrap();}catch(e){console.error(e);setLoadErr("Error de conexión con la nube");}
+        try{await loadBootstrap();}catch(e){console.error(e);setLoadErr("Error de conexión con la nube");}
       try{
         const {data:{session}}=await supabase.auth.getSession();
         if(session)await afterAuth();
@@ -113,8 +113,8 @@ export default function TomficApp(){
     toastRef.current=setTimeout(()=>setToast(null),3500);
   };
 
-  const limpiarDatos=()=>{
-    localStorage.removeItem(STORAGE_KEY);
+  const limpiarDatos=async()=>{
+    await clearLocalCache();
     window.location.reload();
   };
 

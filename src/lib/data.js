@@ -38,17 +38,32 @@ export const SB={
   async loadAll(tid){
     const f=(t)=>tid?supabase.from(t).select("*").eq("tenant_id",tid):supabase.from(t).select("*");
     const [u,inv,c]=await Promise.all([f("usuarios"),f("inventarios"),f("conteos")]);
-    // productos puede superar el límite de 1000 filas de Supabase → se pagina con range().
-    let productos=[],desde=0;const TAM=1000;
-    for(;;){
-      let q=supabase.from("productos").select("*");if(tid)q=q.eq("tenant_id",tid);
-      const {data,error}=await q.range(desde,desde+TAM-1);
-      if(error)break;
-      productos=productos.concat(data||[]);
-      if(!data||data.length<TAM)break;
-      desde+=TAM;
-    }
+     // Productos puede superar el límite de 1000 filas. Se cargan en páginas
+     // concurrentes limitadas para no hacer 50.000 solicitudes secuenciales.
+     let base=supabase.from("productos").select("*",{count:"exact",head:true});if(tid)base=base.eq("tenant_id",tid);
+     const {count,error:countError}=await base;
+     if(countError)throw countError;
+     const TAM=1000,productos=[];
+     for(let inicio=0;inicio<(count||0);inicio+=TAM*5){
+       const paginas=await Promise.all(Array.from({length:5},(_,i)=>{
+         const desde=inicio+i*TAM;if(desde>=(count||0))return null;
+         let q=supabase.from("productos").select("*");if(tid)q=q.eq("tenant_id",tid);
+         return q.range(desde,Math.min(desde+TAM-1,count-1));
+       }).filter(Boolean));
+       paginas.forEach(({data,error})=>{if(error)throw error;productos.push(...(data||[]));});
+     }
     return {usuarios:u.data||[],productos,inventarios:inv.data||[],conteos:c.data||[]};
+  },
+  // Página de productos para tablas administrativas. No modifica G.productos.
+  async listProductosPage({tenantId,inventarioId,page=1,pageSize=50,search="",categoria=""}){
+    let q=supabase.from("productos").select("*",{count:"exact"});
+    q=q.eq("tenant_id",tenantId).eq("inventario_id",inventarioId);
+    if(categoria)q=q.eq("categoria",categoria);
+    const term=String(search||"").trim().replace(/[%,()\\]/g," ");
+    if(term)q=q.or(["nombre","codigo","ean"].map(col=>`${col}.ilike.%${term}%`).join(","));
+    const from=Math.max(0,page-1)*pageSize;
+    const {data,error,count}=await q.order("nombre",{ascending:true}).order("id",{ascending:true}).range(from,from+pageSize-1);
+    return {data:data||[],count:count||0,error};
   },
   // Empresas (tenants)
   listTenants:()=>supabase.from("tenants").select("*").order("created_at",{ascending:false}),
@@ -56,7 +71,7 @@ export const SB={
   upsertUsuario:(u)=>supabase.from("usuarios").upsert(u,{onConflict:"id"}),
   updateUsuario:(id,patch)=>supabase.from("usuarios").update(patch).eq("id",id),
   deleteUsuario:(id)=>supabase.from("usuarios").delete().eq("id",id),
-   async upsertProductosBulk(prods,onProgress){for(let i=0;i<prods.length;i+=500){const lote=prods.slice(i,i+500);const{error}=await supabase.from("productos").upsert(lote,{onConflict:"id"});if(error)throw error;onProgress?.(Math.min(i+lote.length,prods.length),prods.length);}},
+   async upsertProductosBulk(prods,onProgress){for(let i=0;i<prods.length;i+=500){const lote=prods.slice(i,i+500);const{error}=await supabase.from("productos").upsert(lote,{onConflict:"id"});if(error)throw error;onProgress?.(Math.min(i+lote.length,prods.length),prods.length);await new Promise(resolve=>setTimeout(resolve,0));}},
   // SIEMPRE scopeado por empresa. Si no hay tenant, es un NO-OP: nunca un borrado global
   // (con RLS el dueño podría borrar productos de TODAS las empresas → se prohíbe de raíz).
   deleteAllProductos:(tid,invId)=>tid?supabase.from("productos").delete().eq("tenant_id",tid).eq("inventario_id",invId):Promise.resolve({data:null,error:null}),
@@ -121,6 +136,8 @@ export const HOY=()=>new Date().toISOString().slice(0,10);
 // ─────────────────────────────────────────
 export const STORAGE_KEY = "tomfic_data_v1";
 export const CONFIG_KEY  = "tomfic_config_v1";
+const CACHE_DB = "tomfic_cache_v1";
+const CACHE_STORE = "state";
 
 export const G = {
   productos: [],
@@ -166,8 +183,9 @@ export const serConteo=(c,invId,capSource=G.capturas)=>({
   capturas_data:JSON.stringify(Object.fromEntries(Object.entries(capSource||{}).filter(([,v])=>v.conteoId===c.id))),
 });
 export const deserConteo=(r)=>{
-  const c={id:r.id,nombre:r.nombre,obs:r.obs,tipo:r.tipo,usuarioC1:r.usuario_c1,usuarioC2:r.usuario_c2,usuarioC3:r.usuario_c3,estado:r.estado,locLabel:r.loc_label,locId:r.localizacion_id,ubicacion:r.ubicacion,localizacion:r.localizacion_tipo,nro:r.nro,fechaCreacion:r.fecha_creacion,rondasCerradas:r.rondas_cerradas?JSON.parse(r.rondas_cerradas):[]};
-  let caps={};try{caps=r.capturas_data?JSON.parse(r.capturas_data):{};}catch(e){}
+  const parseJson=(value,fallback)=>{try{return value?JSON.parse(value):fallback;}catch(e){return fallback;}};
+  const c={id:r.id,nombre:r.nombre,obs:r.obs,tipo:r.tipo,usuarioC1:r.usuario_c1,usuarioC2:r.usuario_c2,usuarioC3:r.usuario_c3,estado:r.estado,locLabel:r.loc_label,locId:r.localizacion_id,ubicacion:r.ubicacion,localizacion:r.localizacion_tipo,nro:r.nro,fechaCreacion:r.fecha_creacion,rondasCerradas:parseJson(r.rondas_cerradas,[])};
+  const caps=parseJson(r.capturas_data,{});
   return {c,caps};
 };
 export const serInv=(inv,estado)=>({
@@ -196,7 +214,16 @@ export const conteosReales=()=>G.conteos.filter(c=>c.tipo!=="ajuste");
 export const conteoAjusteActivo=()=>G.conteos.find(c=>c.tipo==="ajuste")||null;
 export const todosConteosCerrados=()=>{const r=conteosReales();return r.length>0&&r.every(conteoCompleto);};
 export const finalAjustado=(prodCaps,sumFinal)=>{const a=prodCaps.filter(c=>c.ronda==="AJU");return a.length?a[a.length-1].cantidad:sumFinal;};
-export const saveLocalCache=()=>{try{localStorage.setItem(STORAGE_KEY,JSON.stringify({productos:G.productos,usuarios:G.usuarios,inventario:G.inventario,inventarios:G.inventarios,conteos:G.conteos,capturas:G.capturas,historial:G.historial,savedAt:new Date().toISOString()}));}catch(e){}};
+const openCache=()=>new Promise((resolve,reject)=>{
+  if(typeof indexedDB==="undefined")return reject(new Error("IndexedDB no disponible"));
+  const req=indexedDB.open(CACHE_DB,1);
+  req.onupgradeneeded=()=>req.result.createObjectStore(CACHE_STORE);
+  req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);
+});
+const cacheKey=(tenantId=G.tenantId)=>`${STORAGE_KEY}:${tenantId||"global"}`;
+export const saveLocalCache=async()=>{try{const db=await openCache();await new Promise((resolve,reject)=>{const tx=db.transaction(CACHE_STORE,"readwrite");tx.objectStore(CACHE_STORE).put({tenantId:G.tenantId,productos:G.productos,usuarios:G.usuarios,inventario:G.inventario,inventarios:G.inventarios,conteos:G.conteos,capturas:G.capturas,historial:G.historial,savedAt:new Date().toISOString()},cacheKey());tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});db.close();}catch(e){}};
+export const loadLocalCache=async(tenantId=null)=>{try{const db=await openCache();const d=await new Promise((resolve,reject)=>{const tx=db.transaction(CACHE_STORE,"readonly");const req=tx.objectStore(CACHE_STORE).get(cacheKey(tenantId));req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});db.close();if(!d||d.tenantId!==(tenantId||null))return false;if(Array.isArray(d.productos))G.productos=d.productos;if(Array.isArray(d.usuarios)&&d.usuarios.length)G.usuarios=d.usuarios;if(d.inventario!==undefined)G.inventario=d.inventario;if(Array.isArray(d.inventarios))G.inventarios=d.inventarios;if(Array.isArray(d.conteos))G.conteos=d.conteos;if(d.capturas)G.capturas=d.capturas;if(Array.isArray(d.historial))G.historial=d.historial;if(d.tenantId)G.tenantId=d.tenantId;return true;}catch(e){return false;}};
+export const clearLocalCache=async()=>{try{const db=await openCache();await new Promise((resolve,reject)=>{const tx=db.transaction(CACHE_STORE,"readwrite");tx.objectStore(CACHE_STORE).clear();tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});db.close();}catch(e){}};
 
 // Las vistas trabajan sobre el inventario seleccionado. Los demás inventarios
 // abiertos permanecen aislados aquí para no mezclar sus conteos y capturas.
