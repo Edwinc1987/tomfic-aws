@@ -412,7 +412,7 @@ export function VBaseDatos({G,rerender,showToast}){
            </div>
            {productosError&&<div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{productosError}</div>}
            <Card className="overflow-hidden">
-            <div className="overflow-auto max-h-[500px]">
+             <div className="overflow-x-auto">
                <table className="view-sticky-table w-full text-xs">
                 <thead className="sticky top-0 z-10">
                   <tr className="bg-slate-50 text-slate-600 border-b border-slate-200">
