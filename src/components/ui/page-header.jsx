@@ -14,7 +14,7 @@ import * as React from "react"
  */
 export function PageHeader({ label, title, subtitle, icon: Icon, count, countLabel, right }) {
   return (
-    <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl bg-gradient-to-br from-slate-900 to-[#1e3a5f] px-5 py-3.5 text-white shadow-sm">
+    <div className="sticky top-0 z-30 mb-4 flex items-center justify-between gap-3 rounded-2xl bg-gradient-to-br from-slate-900 to-[#1e3a5f] px-5 py-3.5 text-white shadow-sm">
       <div className="flex items-center gap-3 min-w-0">
         {Icon && (
           <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center shrink-0">
