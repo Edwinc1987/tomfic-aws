@@ -207,8 +207,9 @@ export const userCols=(u)=>({id:u.id,tenant_id:u.tenant_id||G.tenantId||null,inv
 export const cfgKey=()=>CONFIG_KEY+(G.tenantId?(":"+G.tenantId):"");
 export const saveLocalConfig=()=>{try{localStorage.setItem(cfgKey(),JSON.stringify({localizaciones:G.localizaciones,ubicacionesTipos:G.ubicacionesTipos,localizacionTipos:G.localizacionTipos,alertas:G.alertas}));}catch(e){}};
 export const loadLocalConfig=()=>{try{const raw=localStorage.getItem(cfgKey());if(!raw)return;const d=JSON.parse(raw);if(d.localizaciones)G.localizaciones=d.localizaciones;if(d.ubicacionesTipos&&d.ubicacionesTipos.length)G.ubicacionesTipos=d.ubicacionesTipos;if(d.localizacionTipos&&d.localizacionTipos.length)G.localizacionTipos=d.localizacionTipos;if(d.alertas)G.alertas=d.alertas;}catch(e){}};
+export const DEF_UBIC_TIPOS=["BODEGA","SALA DE VENTAS"];
 export const DEF_LOC_TIPOS=["MUEBLE","LINEAL","NEVERA","PUNTA","JAULA","CAVA"];
-export const resetTenantConfig=()=>{G.localizaciones=[];G.ubicacionesTipos=[];G.localizacionTipos=[...DEF_LOC_TIPOS];G.alertas=[];G.notas=[];};
+export const resetTenantConfig=()=>{G.localizaciones=[];G.ubicacionesTipos=[...DEF_UBIC_TIPOS];G.localizacionTipos=[...DEF_LOC_TIPOS];G.alertas=[];G.notas=[];};
 export const conteoCompleto=(c)=>c.estado==="completado"||c.estado==="cerradoC2"||(c.estado==="cerradoC1"&&c.tipo!=="2conteos");
 export const conteosReales=()=>G.conteos.filter(c=>c.tipo!=="ajuste");
 export const conteoAjusteActivo=()=>G.conteos.find(c=>c.tipo==="ajuste")||null;

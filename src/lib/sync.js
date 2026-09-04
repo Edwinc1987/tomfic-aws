@@ -2,7 +2,7 @@
 // sync.js — Sincronización a la nube (Supabase).
 // Extraído de App.jsx (Fase 2.2 de la modularización).
 // ─────────────────────────────────────────
-import { G, SB, serConteo, serInv, prodCols, userCols, resetTenantConfig, deserConteo, rememberSelectedInventory, selectInventory } from "@/lib/data";
+import { G, SB, serConteo, serInv, prodCols, userCols, resetTenantConfig, deserConteo, rememberSelectedInventory, selectInventory, DEF_UBIC_TIPOS, DEF_LOC_TIPOS } from "@/lib/data";
 
 // --- Snapshot para sincronización por diferencias ---
 export const initSnap=()=>{
@@ -120,7 +120,7 @@ export const loadTenantData=async(tid,preferredInvId=null)=>{
      const legacy=filas.filter(p=>!p.inventario_id);
      const propios=filas.filter(p=>p.inventario_id===inv.id);
      console.log("[TOMFIC load] inv",inv.id,inv.nombre,"→ propios:",propios.length,"| legacy(sin inv):",legacy.length,"| cloud total:",filas.length);
-     const d={productos:propios.length?propios:(index===0?legacy:[]),localizaciones:cfg.localizaciones||[],ubicacionesTipos:cfg.ubicacionesTipos||[],localizacionTipos:cfg.localizacionTipos||[],alertas:cfg.alertas||[],conteos:[],capturas:{}};
+      const d={productos:propios.length?propios:(index===0?legacy:[]),localizaciones:cfg.localizaciones||[],ubicacionesTipos:cfg.ubicacionesTipos?.length?cfg.ubicacionesTipos:[...DEF_UBIC_TIPOS],localizacionTipos:cfg.localizacionTipos?.length?cfg.localizacionTipos:[...DEF_LOC_TIPOS],alertas:cfg.alertas||[],conteos:[],capturas:{}};
      conteos.filter(r=>r.inventario_id===inv.id).forEach(r=>{const{c,caps}=deserConteo(r);d.conteos.push(c);Object.assign(d.capturas,caps);});
      G._inventarioDatos[inv.id]=d;
    });
