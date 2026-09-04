@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ChevronLeft, Landmark, Settings, DollarSign, Calendar, FileText, Users, AlertTriangle, Key, Trash2, Plus } from "lucide-react";
+import { ChevronLeft, Landmark, Settings, DollarSign, Calendar, FileText, Users, AlertTriangle, Key, Trash2, Plus, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,6 +23,7 @@ export function VClienteDetalle({t,showToast,onBack,onChanged}){
   const [delOpen,setDelOpen]=useState(false); // diálogo de "eliminar empresa"
   const [delText,setDelText]=useState("");    // el dueño debe escribir el nombre para confirmar
   const [borrando,setBorrando]=useState(false);
+  const [aprobando,setAprobando]=useState(false);
 
   const cargar=async()=>{
     setLoading(true);
@@ -31,6 +32,17 @@ export function VClienteDetalle({t,showToast,onBack,onChanged}){
     setLoading(false);
   };
   useEffect(()=>{cargar();/* eslint-disable-next-line */},[t.id]);
+
+  const aprobarEmpresa=async()=>{
+    setAprobando(true);
+    try{
+      const {error}=await SB.setTenantActive(t.id,true);if(error)throw error;
+      Object.assign(t,{activo:true});
+      onChanged&&onChanged();
+      showToast("Empresa aprobada ✓");
+    }catch(e){showToast(e.message||"No se pudo aprobar la empresa","err");}
+    setAprobando(false);
+  };
 
   const estado=!meta.vence?{txt:"Sin fecha",v:"secondary"}:meta.vence>=HOY()?{txt:"Al día",v:"success"}:{txt:"Vencido / Debe",v:"destructive"};
 
@@ -86,7 +98,7 @@ export function VClienteDetalle({t,showToast,onBack,onChanged}){
     <Section>
       <div className="mb-4">
         <Button variant="ghost" size="sm" className="text-indigo-200 hover:text-white hover:bg-white/10 mb-2" onClick={onBack}><ChevronLeft size={16}/> Volver a Clientes</Button>
-        <PageHeader label="Ficha del cliente" title={t.nombre} icon={Landmark} right={<UIBadge variant={estado.v} className="text-sm">{estado.txt}</UIBadge>}/>
+         <PageHeader label="Ficha del cliente" title={t.nombre} icon={Landmark} right={<div className="flex items-center gap-2">{!t.activo&&<Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={aprobarEmpresa} disabled={aprobando}><CheckCircle size={14}/> {aprobando?"Aprobando…":"Aprobar empresa"}</Button>}<UIBadge variant={estado.v} className="text-sm">{estado.txt}</UIBadge></div>}/>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
