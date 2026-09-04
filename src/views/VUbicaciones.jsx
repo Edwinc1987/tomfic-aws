@@ -14,6 +14,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import Section from "@/components/Section";
 import { G, ID, TODAY } from "@/lib/data";
+import { doSync, getDirty } from "@/lib/sync";
 
 // ── UBICACIONES (3 niveles) ──
 export function VUbicaciones({G,rerender,showToast}){
@@ -24,6 +25,12 @@ export function VUbicaciones({G,rerender,showToast}){
   const [editForm,setEditFormLoc]=useState({nro:"",observacion:""});
   const [verTipos,setVerTipos]=useState(false);     // panel de tipos, oculto por defecto (libera pantalla)
   const [verRecuperar,setVerRecuperar]=useState(false); // panel de recuperar, oculto por defecto
+
+  const guardarCambios=async()=>{
+    rerender();
+    await doSync();
+    if(getDirty())showToast("El cambio quedó pendiente de sincronizar. Revisa tu conexión.","warn");
+  };
 
   const exportar=(plantilla=false)=>{
     const cols=["UBICACION","LOCALIZACION","NRO","OBSERVACION"];
@@ -40,31 +47,31 @@ export function VUbicaciones({G,rerender,showToast}){
     return `${form.localizacion} ${existentes.length+1}`;
   };
 
-  const agregar=()=>{
+  const agregar=async()=>{
     if(!form.ubicacion||!form.localizacion)return showToast("Selecciona ubicación y localización","err");
     const nro=form.nro||siguienteNro();
     const existe=G.localizaciones.find(l=>l.ubicacion===form.ubicacion&&l.localizacion===form.localizacion&&l.nro===nro);
     if(existe)return showToast("Ya existe esa localización","err");
     G.localizaciones.push({id:ID(),ubicacion:form.ubicacion,localizacion:form.localizacion,nro,observacion:form.observacion});
      setForm({ubicacion:"",localizacion:"",nro:"",observacion:""});
-    rerender();showToast("Localización agregada ✓");
+     await guardarCambios();showToast("Localización agregada ✓");
   };
 
-  const eliminar=(id)=>{
+  const eliminar=async(id)=>{
     G.localizaciones=G.localizaciones.filter(l=>l.id!==id);
-    rerender();showToast("Eliminada ✓","warn");
+    await guardarCambios();showToast("Eliminada ✓","warn");
   };
 
   const agregarUbicTipo=()=>{
     const n=newUbicTipo.trim().toUpperCase();
     if(!n||G.ubicacionesTipos.includes(n))return;
-    G.ubicacionesTipos.push(n);setNewUbicTipo("");rerender();showToast("Tipo de ubicación creado ✓");
+     G.ubicacionesTipos.push(n);setNewUbicTipo("");guardarCambios();showToast("Tipo de ubicación creado ✓");
   };
 
   const agregarLocTipo=()=>{
     const n=newLocTipo.trim().toUpperCase();
     if(!n||G.localizacionTipos.includes(n))return;
-    G.localizacionTipos.push(n);setNewLocTipo("");rerender();showToast("Tipo de localización creado ✓");
+     G.localizacionTipos.push(n);setNewLocTipo("");guardarCambios();showToast("Tipo de localización creado ✓");
   };
 
   // Recupera ubicaciones desde los conteos (activos e historial), que guardan ubicacion/localizacion/nro.
@@ -322,7 +329,7 @@ export function VUbicaciones({G,rerender,showToast}){
             <Button className="flex-1" onClick={()=>{
               if(!editForm.nro.trim())return showToast("El N° no puede estar vacío","err");
               G.localizaciones=G.localizaciones.map(l=>l.id===editLoc.id?{...l,nro:editForm.nro.trim(),observacion:editForm.observacion.trim()}:l);
-              rerender();showToast("Localización actualizada");setEditLoc(null);
+               guardarCambios();showToast("Localización actualizada");setEditLoc(null);
             }}>Guardar</Button>
             <Button variant="outline" className="flex-1" onClick={()=>setEditLoc(null)}>Cancelar</Button>
           </div>
