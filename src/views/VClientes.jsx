@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Users, Plus, ChevronRight, X, Search } from "lucide-react";
+import { Users, Plus, ChevronRight, X, Search, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -114,7 +114,11 @@ export function VClientes({G,rerender,recargar,showToast,focusTenant,clearFocus,
                     <td className="px-3 py-1.5">
                       <div className="flex gap-1.5">
                         <Button size="sm" className="h-7 px-2.5 text-xs" onClick={()=>setSel(t)}><ChevronRight size={13}/> Ingresar</Button>
-                        <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" onClick={()=>toggleActivo(t)}>{t.activo?"Desactivar":"Activar"}</Button>
+                         {t.activo?(
+                           <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" onClick={()=>toggleActivo(t)}>Desactivar</Button>
+                         ):(
+                           <Button size="sm" className="h-7 px-2.5 text-xs bg-emerald-600 hover:bg-emerald-700" onClick={()=>toggleActivo(t)}><CheckCircle size={13}/> Aprobar empresa</Button>
+                         )}
                       </div>
                     </td>
                   </tr>
