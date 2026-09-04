@@ -75,8 +75,26 @@
   tbody tr:nth-child(even) { background-color: #fafbfc; }
   tbody tr:hover { background-color: #f1f5f9; }
 
+  /* Barra de acciones y filtros fija debajo del encabezado de cada vista. */
+  .view-sticky-controls {
+    position: sticky;
+    top: 6.5rem;
+    z-index: 20;
+    background: #f8fafc;
+    padding-top: .35rem;
+    padding-bottom: .35rem;
+  }
+
+  .view-sticky-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: #f8fafc;
+  }
+
   /* Compacta el capturador en escritorio y evita desbordes en móvil. */
   @media (max-width: 640px) {
+    .view-sticky-controls { top: 5.25rem; }
     .cap-count-header,
     .cap-scan-grid,
     .cap-product-meta,

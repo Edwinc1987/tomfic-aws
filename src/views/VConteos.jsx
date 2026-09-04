@@ -115,7 +115,7 @@ export function VConteos({G,rerender,showToast,usuario,recargar}){
         countLabel="conteos"
       />
 
-      <div className="flex items-center gap-3 mb-4 flex-wrap">
+       <div className="view-sticky-controls flex items-center gap-3 mb-4 flex-wrap">
         <Button onClick={()=>setModal(true)} disabled={!G.inventario||G.productos.length===0}><Plus size={15}/> Programar Conteo</Button>
         {!G.inventario&&<span className="inline-flex items-center gap-1.5 rounded-md bg-red-50 px-2.5 py-1.5 text-xs text-destructive"><AlertTriangle size={13}/> Primero crea un inventario.</span>}
         {G.inventario&&G.productos.length===0&&<span className="inline-flex items-center gap-1.5 rounded-md bg-red-50 px-2.5 py-1.5 text-xs text-destructive"><AlertTriangle size={13}/> Primero carga la base de productos.</span>}

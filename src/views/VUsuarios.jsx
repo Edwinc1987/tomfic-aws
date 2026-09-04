@@ -209,7 +209,7 @@ export function VUsuarios({usuario,G,rerender,showToast}){
         count={usuariosInventario.length}
         countLabel="usuarios"
       />
-      <div className="flex gap-2.5 mb-3 flex-wrap items-center">
+       <div className="view-sticky-controls flex gap-2.5 mb-3 flex-wrap items-center">
         <Button onClick={()=>{setForm({nombre:"",pass:"",rol:"capturador",correo:"",telefono:"",editId:null});setModal(true);}}><UserPlus size={16}/> Crear Usuario</Button>
         <Button variant="outline" onClick={()=>setModalImport(true)}><Upload size={15}/> Importar desde Excel</Button>
         <Button variant="outline" onClick={()=>setEnvioOpen(true)}><Send size={15}/> Enviar accesos</Button>

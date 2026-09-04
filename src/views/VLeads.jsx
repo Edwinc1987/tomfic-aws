@@ -25,7 +25,7 @@ export function VLeads({G,showToast}){
   return(
     <Section>
       <PageHeader label="Web pública" title="Leads" icon={UserPlus} count={leads.length} countLabel="leads" subtitle={nuevos?`${nuevos} nuevos sin contactar`:"Prospectos que llegan desde tu web"}/>
-      <div className="mb-3 flex flex-wrap items-center gap-2">
+      <div className="view-sticky-controls mb-3 flex flex-wrap items-center gap-2">
         <div className="relative flex-1 min-w-[200px]"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/><Input value={q} onChange={e=>setQ(e.target.value)} placeholder="Buscar por nombre, email o teléfono…" className="pl-9 bg-white"/></div>
         <select value={fEstado} onChange={e=>setFEstado(e.target.value)} className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700">
           <option value="todos">Todos</option>

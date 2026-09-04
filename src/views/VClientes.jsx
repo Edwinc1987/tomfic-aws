@@ -77,7 +77,7 @@ export function VClientes({G,rerender,recargar,showToast,focusTenant,clearFocus,
       ):(
         <>
         {/* Buscador + filtros */}
-        <div className="mb-3 flex flex-wrap items-center gap-2">
+         <div className="view-sticky-controls mb-3 flex flex-wrap items-center gap-2">
           <div className="relative flex-1 min-w-[200px]">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/>
             <Input value={q} onChange={e=>setQ(e.target.value)} placeholder="Buscar por empresa, NIT o slug…" className="pl-9 bg-white"/>

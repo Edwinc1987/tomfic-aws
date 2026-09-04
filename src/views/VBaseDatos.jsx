@@ -250,7 +250,7 @@ export function VBaseDatos({G,rerender,showToast}){
         countLabel="productos"
       />
       {/* Acciones */}
-      <div className="flex gap-2.5 mb-4 items-center flex-wrap">
+       <div className="view-sticky-controls flex gap-2.5 mb-4 items-center flex-wrap">
         <Button asChild>
           <label className="cursor-pointer">
             <Upload size={15}/> Cargar / Actualizar Excel
@@ -396,7 +396,7 @@ export function VBaseDatos({G,rerender,showToast}){
       {/* Filtros y tabla */}
        {G.inventario&&(
         <>
-          <div className="flex gap-3 mb-3.5 flex-wrap items-center">
+           <div className="view-sticky-controls flex gap-3 mb-3.5 flex-wrap items-center">
             <div className="relative flex-1 min-w-[200px]">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"/>
                <Input value={search} onChange={e=>{setSearch(e.target.value);setPage(1);}} placeholder="Buscar nombre, código, EAN…" className="pl-9"/>
@@ -413,7 +413,7 @@ export function VBaseDatos({G,rerender,showToast}){
            {productosError&&<div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{productosError}</div>}
            <Card className="overflow-hidden">
             <div className="overflow-auto max-h-[500px]">
-              <table className="w-full text-xs">
+               <table className="view-sticky-table w-full text-xs">
                 <thead className="sticky top-0 z-10">
                   <tr className="bg-slate-50 text-slate-600 border-b border-slate-200">
                     {["Código","EAN","Nombre","Referencia","Categoría","Proveedor","Saldo","Costo"].map(h=>(

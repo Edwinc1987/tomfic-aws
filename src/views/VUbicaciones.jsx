@@ -177,7 +177,7 @@ export function VUbicaciones({G,rerender,showToast}){
       />
 
       {/* Barra de acciones: tipos y recuperar quedan OCULTOS por defecto para liberar pantalla */}
-       <div className="mb-3 flex gap-2 flex-wrap">
+       <div className="view-sticky-controls mb-3 flex gap-2 flex-wrap">
         <Button variant="outline" size="sm" onClick={()=>setVerTipos(v=>!v)}><Settings size={14}/> Gestionar tipos {verTipos?<ChevronUp size={14}/>:<ChevronDown size={14}/>}</Button>
         {(G.conteos.length>0||(G.historial||[]).length>0)&&(
           <Button variant="outline" size="sm" onClick={()=>setVerRecuperar(v=>!v)}><RefreshCw size={14}/> Recuperar ubicaciones {verRecuperar?<ChevronUp size={14}/>:<ChevronDown size={14}/>}</Button>
