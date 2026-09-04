@@ -25,6 +25,7 @@ export function VCRM({ G, showToast, usuario, mode = "dueno", focusTenant, clear
   const [showCommercialForm, setShowCommercialForm] = useState(false);
   const [newCommercial, setNewCommercial] = useState({ nombre: "", email: "", telefono: "" });
   const [savingVence, setSavingVence] = useState(false);
+  const [approving, setApproving] = useState(false);
   useEffect(() => { if (focusTenant) { openCompany(focusTenant); clearFocus?.(); } }, [focusTenant]);
 
   const tenants = G.tenants || [];
@@ -63,12 +64,28 @@ export function VCRM({ G, showToast, usuario, mode = "dueno", focusTenant, clear
     setSavingVence(false);
   };
 
+  const aprobarEmpresa = async () => {
+    if (!selected || selected.activo) return;
+    setApproving(true);
+    try {
+      const { error } = await SB.setTenantActive(selected.id, true);
+      if (error) throw error;
+      const tenant = (G.tenants || []).find(x => x.id === selected.id);
+      if (tenant) tenant.activo = true;
+      setSelected(current => ({ ...current, activo: true }));
+      showToast("Empresa aprobada ✓");
+    } catch (e) {
+      showToast(e.message || "No se pudo aprobar la empresa", "err");
+    }
+    setApproving(false);
+  };
+
   if (selected) {
     const payment = paymentState(selected);
     return <Section>
       <Button variant="outline" size="sm" onClick={() => setSelected(null)} className="mb-4"><ArrowLeft size={15} /> Volver al CRM</Button>
       <PageHeader label="Ficha 360°" title={selected.nombre} icon={Building2} subtitle={`${selected.nit || "Sin NIT"} · ${selected.slug || "Sin identificador"}`} />
-      <div className="mb-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex flex-wrap items-start gap-4"><div className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-blue-600 to-cyan-500 text-lg font-extrabold text-white">{selected.nombre.split(" ").map(x => x[0]).join("").slice(0, 2)}</div><div className="min-w-[220px] flex-1"><h2 className="text-lg font-extrabold text-slate-900">{selected.nombre}</h2><div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500"><span>NIT {selected.nit || "sin registrar"}</span><span>{selected.slug || "sin identificador"}</span><span>Cliente activo</span></div><div className="mt-3 flex flex-wrap gap-2"><Badge variant={selected.activo ? "success" : "destructive"}>{selected.activo ? "Activo" : "Inactivo"}</Badge><Badge variant="secondary">{selected.service}</Badge><Badge variant={payment.variant}>{payment.label}</Badge></div></div><div className="flex gap-2"><Button size="sm" onClick={() => showToast("La llamada quedará registrada en la actividad") }><Phone size={14} /> Llamar</Button><Button size="sm" variant="outline" onClick={() => showToast("La conversación se registrará en el seguimiento") }><MessageSquare size={14} /> Registrar contacto</Button></div></div></div>
+       <div className="mb-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex flex-wrap items-start gap-4"><div className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-blue-600 to-cyan-500 text-lg font-extrabold text-white">{selected.nombre.split(" ").map(x => x[0]).join("").slice(0, 2)}</div><div className="min-w-[220px] flex-1"><h2 className="text-lg font-extrabold text-slate-900">{selected.nombre}</h2><div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500"><span>NIT {selected.nit || "sin registrar"}</span><span>{selected.slug || "sin identificador"}</span><span>Cliente activo</span></div><div className="mt-3 flex flex-wrap items-center gap-2"><Badge variant={selected.activo ? "success" : "destructive"}>{selected.activo ? "Activo" : "Inactivo"}</Badge><Badge variant="secondary">{selected.service}</Badge><Badge variant={payment.variant}>{payment.label}</Badge>{!selected.activo&&<Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={aprobarEmpresa} disabled={approving}><CheckCircle2 size={14}/>{approving?"Aprobando…":"Aprobar empresa"}</Button>}</div></div><div className="flex gap-2"><Button size="sm" onClick={() => showToast("La llamada quedará registrada en la actividad") }><Phone size={14} /> Llamar</Button><Button size="sm" variant="outline" onClick={() => showToast("La conversación se registrará en el seguimiento") }><MessageSquare size={14} /> Registrar contacto</Button></div></div></div>
       <div className="grid gap-px overflow-hidden rounded-xl border border-slate-200 bg-slate-200 md:grid-cols-4 mb-5">
         {[[CreditCard, "Servicio", selected.service, "text-indigo-600"], [CalendarDays, "Renovación", fmtFechaCorta(selected.vence), "text-amber-600"], [CheckCircle2, "Estado de pago", payment.label, payment.variant === "success" ? "text-green-600" : "text-amber-600"], [BriefcaseBusiness, "Comercial", selected.commercial, "text-cyan-600"]].map(([Icon, label, value, color]) => <Card key={label} className="p-4"><Icon size={18} className={color} /><div className="mt-2 text-[11px] font-bold uppercase tracking-wide text-slate-500">{label}</div><div className="mt-1 truncate text-sm font-bold text-slate-900">{value || "Sin dato"}</div></Card>)}
       </div>
