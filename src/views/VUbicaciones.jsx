@@ -2,7 +2,7 @@ import { useState } from "react";
 import * as XLSX from "xlsx";
 import {
   MapPin, Settings, ChevronUp, ChevronDown, RefreshCw,
-  AlertTriangle, Plus, Printer, Pencil, Trash2, Download, FileSpreadsheet,
+  AlertTriangle, Plus, Printer, Pencil, Trash2, Download, FileSpreadsheet, Upload,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,6 +39,44 @@ export function VUbicaciones({G,rerender,showToast}){
     const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Ubicaciones");
     XLSX.writeFile(wb,plantilla?"plantilla_ubicaciones.xlsx":"ubicaciones.xlsx");
     showToast(plantilla?"Plantilla descargada ✓":"Ubicaciones exportadas ✓");
+  };
+
+  const importar=async(e)=>{
+    const file=e.target.files?.[0];e.target.value="";if(!file)return;
+    const reader=new FileReader();
+    reader.onload=async(ev)=>{
+      try{
+        const wb=XLSX.read(ev.target.result,{type:"binary"});
+        const ws=wb.Sheets[wb.SheetNames[0]];
+        const rows=XLSX.utils.sheet_to_json(ws,{defval:""});
+        if(!rows.length)return showToast("Archivo vacío","err");
+        const norm=(v)=>String(v||"").trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+        const get=(row,...names)=>{const keys=Object.keys(row);const wanted=names.map(norm);const key=keys.find(k=>wanted.includes(norm(k)));return key?String(row[key]??"").trim():"";};
+        const vistos=new Set(G.localizaciones.map(l=>`${norm(l.ubicacion)}|${norm(l.localizacion)}|${norm(l.nro)}`));
+        const nuevas=[];let omitidas=0;
+        rows.forEach(row=>{
+          const ubicacion=get(row,"UBICACION","TIPO UBICACION","TIPO DE UBICACION");
+          const localizacion=get(row,"LOCALIZACION","TIPO LOCALIZACION","TIPO DE LOCALIZACION");
+          const nro=get(row,"NRO","NUMERO","NUMERO LOCALIZACION","N°");
+          const observacion=get(row,"OBSERVACION","OBSERVACIONES","OBS");
+          if(!ubicacion||!localizacion){omitidas++;return;}
+          const numero=nro||`${localizacion} ${G.localizaciones.filter(l=>norm(l.ubicacion)===norm(ubicacion)&&norm(l.localizacion)===norm(localizacion)).length+nuevas.filter(l=>norm(l.ubicacion)===norm(ubicacion)&&norm(l.localizacion)===norm(localizacion)).length+1}`;
+          const key=`${norm(ubicacion)}|${norm(localizacion)}|${norm(numero)}`;
+          if(vistos.has(key)){omitidas++;return;}
+          vistos.add(key);
+          nuevas.push({id:ID(),ubicacion,localizacion,nro:numero,observacion});
+        });
+        if(!nuevas.length)return showToast("No se encontraron ubicaciones nuevas válidas","err");
+        G.localizaciones.push(...nuevas);
+        nuevas.forEach(l=>{
+          if(!G.ubicacionesTipos.includes(l.ubicacion))G.ubicacionesTipos.push(l.ubicacion);
+          if(!G.localizacionTipos.includes(l.localizacion))G.localizacionTipos.push(l.localizacion);
+        });
+        await guardarCambios();
+        showToast(`${nuevas.length} ubicaciones importadas${omitidas?` · ${omitidas} omitidas`:""} ✓`);
+      }catch(err){console.warn("Error importando ubicaciones:",err);showToast("No se pudo leer el archivo de ubicaciones","err");}
+    };
+    reader.readAsBinaryString(file);
   };
 
   const siguienteNro=()=>{
@@ -182,7 +220,8 @@ export function VUbicaciones({G,rerender,showToast}){
         {(G.conteos.length>0||(G.historial||[]).length>0)&&(
           <Button variant="outline" size="sm" onClick={()=>setVerRecuperar(v=>!v)}><RefreshCw size={14}/> Recuperar ubicaciones {verRecuperar?<ChevronUp size={14}/>:<ChevronDown size={14}/>}</Button>
         )}
-        <Button variant="outline" size="sm" title="Exportar ubicaciones" onClick={()=>exportar()}><Download size={14}/> Exportar</Button>
+         <Button variant="outline" size="sm" title="Importar ubicaciones desde Excel" asChild><label className="cursor-pointer"><Upload size={14}/> Importar<input type="file" accept=".xlsx,.xls" onChange={importar} className="hidden"/></label></Button>
+         <Button variant="outline" size="sm" title="Exportar ubicaciones" onClick={()=>exportar()}><Download size={14}/> Exportar</Button>
         <Button variant="outline" size="sm" title="Descargar plantilla de ubicaciones" onClick={()=>exportar(true)}><FileSpreadsheet size={14}/> Plantilla</Button>
       </div>
 
