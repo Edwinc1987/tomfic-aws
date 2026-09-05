@@ -85,6 +85,10 @@
     padding-bottom: .35rem;
   }
 
+  .view-scroll-container {
+    scrollbar-gutter: stable;
+  }
+
   .view-sticky-table thead {
     position: sticky;
     top: 0;

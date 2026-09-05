@@ -126,7 +126,7 @@ export function ModAdmin({usuario,setUsuario,logout,G,rerender,recargar,showToas
         </div>
 
         {/* CONTENIDO */}
-         <div style={{flex:1,padding:20,overflowY:"auto",minWidth:0,background:"#f8fafc"}}>
+         <div className="view-scroll-container" style={{flex:1,padding:20,overflowY:"auto",minWidth:0,background:"#f8fafc",position:"relative",overscrollBehavior:"contain"}}>
 
           <BannerVencimiento G={G}/>
           {view==="inventario"&&<VInventario {...props}/>}
