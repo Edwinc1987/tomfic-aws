@@ -13,7 +13,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { PageHeader } from "@/components/ui/page-header";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import Section from "@/components/Section";
-import { G, ID, TODAY } from "@/lib/data";
+import { G, ID, TODAY, SB, rememberSelectedInventory } from "@/lib/data";
 import { doSync, getDirty } from "@/lib/sync";
 
 // ── UBICACIONES (3 niveles) ──
@@ -27,9 +27,16 @@ export function VUbicaciones({G,rerender,showToast}){
   const [verRecuperar,setVerRecuperar]=useState(false); // panel de recuperar, oculto por defecto
 
   const guardarCambios=async()=>{
+    rememberSelectedInventory();
     rerender();
+    if(G.tenantId&&G.inventario?.id){
+      const cfg={localizaciones:G.localizaciones,ubicacionesTipos:G.ubicacionesTipos,localizacionTipos:G.localizacionTipos,alertas:G.alertas,notas:(G.notas||[]).filter(n=>n.inventarioId===G.inventario.id)};
+      const {error}=await SB.setConfig(`tenant:${G.tenantId}:inventario:${G.inventario.id}:config`,cfg);
+      if(error){showToast(error.message||"No se pudo guardar la configuración de ubicaciones","err");return false;}
+    }
     await doSync();
     if(getDirty())showToast("El cambio quedó pendiente de sincronizar. Revisa tu conexión.","warn");
+    return true;
   };
 
   const exportar=(plantilla=false)=>{
@@ -72,8 +79,7 @@ export function VUbicaciones({G,rerender,showToast}){
           if(!G.ubicacionesTipos.includes(l.ubicacion))G.ubicacionesTipos.push(l.ubicacion);
           if(!G.localizacionTipos.includes(l.localizacion))G.localizacionTipos.push(l.localizacion);
         });
-        await guardarCambios();
-        showToast(`${nuevas.length} ubicaciones importadas${omitidas?` · ${omitidas} omitidas`:""} ✓`);
+        if(await guardarCambios())showToast(`${nuevas.length} ubicaciones importadas${omitidas?` · ${omitidas} omitidas`:""} ✓`);
       }catch(err){console.warn("Error importando ubicaciones:",err);showToast("No se pudo leer el archivo de ubicaciones","err");}
     };
     reader.readAsBinaryString(file);
@@ -92,24 +98,24 @@ export function VUbicaciones({G,rerender,showToast}){
     if(existe)return showToast("Ya existe esa localización","err");
     G.localizaciones.push({id:ID(),ubicacion:form.ubicacion,localizacion:form.localizacion,nro,observacion:form.observacion});
      setForm({ubicacion:"",localizacion:"",nro:"",observacion:""});
-     await guardarCambios();showToast("Localización agregada ✓");
+     if(await guardarCambios())showToast("Localización agregada ✓");
   };
 
   const eliminar=async(id)=>{
     G.localizaciones=G.localizaciones.filter(l=>l.id!==id);
-    await guardarCambios();showToast("Eliminada ✓","warn");
+    if(await guardarCambios())showToast("Eliminada ✓","warn");
   };
 
-  const agregarUbicTipo=()=>{
+  const agregarUbicTipo=async()=>{
     const n=newUbicTipo.trim().toUpperCase();
     if(!n||G.ubicacionesTipos.includes(n))return;
-     G.ubicacionesTipos.push(n);setNewUbicTipo("");guardarCambios();showToast("Tipo de ubicación creado ✓");
+     G.ubicacionesTipos.push(n);setNewUbicTipo("");if(await guardarCambios())showToast("Tipo de ubicación creado ✓");
   };
 
-  const agregarLocTipo=()=>{
+  const agregarLocTipo=async()=>{
     const n=newLocTipo.trim().toUpperCase();
     if(!n||G.localizacionTipos.includes(n))return;
-     G.localizacionTipos.push(n);setNewLocTipo("");guardarCambios();showToast("Tipo de localización creado ✓");
+     G.localizacionTipos.push(n);setNewLocTipo("");if(await guardarCambios())showToast("Tipo de localización creado ✓");
   };
 
   // Recupera ubicaciones desde los conteos (activos e historial), que guardan ubicacion/localizacion/nro.
@@ -368,7 +374,7 @@ export function VUbicaciones({G,rerender,showToast}){
             <Button className="flex-1" onClick={()=>{
               if(!editForm.nro.trim())return showToast("El N° no puede estar vacío","err");
               G.localizaciones=G.localizaciones.map(l=>l.id===editLoc.id?{...l,nro:editForm.nro.trim(),observacion:editForm.observacion.trim()}:l);
-               guardarCambios();showToast("Localización actualizada");setEditLoc(null);
+               guardarCambios().then(ok=>{if(ok)showToast("Localización actualizada");});setEditLoc(null);
             }}>Guardar</Button>
             <Button variant="outline" className="flex-1" onClick={()=>setEditLoc(null)}>Cancelar</Button>
           </div>
