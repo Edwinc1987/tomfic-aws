@@ -1,5 +1,5 @@
 ﻿import { useState } from "react";
-import * as XLSX from "xlsx";
+import * as XLSX from "xlsx-js-style";
 import {
   Landmark, DollarSign, BarChart2, Scale, AlertTriangle, CheckCircle,
   Package, FileText, ChevronLeft, ChevronRight, Camera, Trash2, Download,

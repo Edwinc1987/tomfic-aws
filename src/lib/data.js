@@ -2,7 +2,7 @@
 // data.js — helpers puros y constantes (sin dependencia de estado ni de React).
 // Extraído de App.jsx (Fase 2.2a de la modularización). Riesgo cero: solo relocaliza.
 // ─────────────────────────────────────────
-import * as XLSX from "xlsx";
+import * as XLSX from "xlsx-js-style";
 import { createClient } from "@supabase/supabase-js";
 
 // Cliente Supabase (nube). Requiere VITE_SUPABASE_URL / VITE_SUPABASE_KEY en .env

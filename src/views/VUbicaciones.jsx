@@ -1,5 +1,5 @@
 import { useState } from "react";
-import * as XLSX from "xlsx";
+import * as XLSX from "xlsx-js-style";
 import {
   MapPin, Settings, ChevronUp, ChevronDown, RefreshCw,
   AlertTriangle, Plus, Printer, Pencil, Trash2, Download, FileSpreadsheet, Upload,

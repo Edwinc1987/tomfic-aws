@@ -1,5 +1,5 @@
 import { useState } from "react";
-import * as XLSX from "xlsx";
+import * as XLSX from "xlsx-js-style";
 import {
   Users, UserPlus, Upload, Download, Search, Mail, Smartphone, Send,
   Key, ClipboardList, Lightbulb, AlertTriangle, CheckCircle, Trash2, FolderOpen,

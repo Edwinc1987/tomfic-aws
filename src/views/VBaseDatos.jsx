@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import * as XLSX from "xlsx";
+import * as XLSX from "xlsx-js-style";
 import {
   Database, Upload, Download, ClipboardList, CheckCircle,
   Trash2, Search, AlertTriangle, Lightbulb,

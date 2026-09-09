@@ -1,5 +1,5 @@
 import { useState } from "react";
-import * as XLSX from "xlsx";
+import * as XLSX from "xlsx-js-style";
 import {
   BarChart2, MapPin, RefreshCw, CheckCircle, Circle, Scale,
   Wrench, FileText, Download, Printer,
@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import Section from "@/components/Section";
 import { G, TODAY, HOUR, exportSheet, SIIGO_AJUSTE_COLS } from "@/lib/data";
+import { exportReporteXLSX } from "@/lib/reporteXLSX";
 
 // ── REPORTES ──
 export function VReportes({G,showToast,usuario}){
@@ -138,6 +139,51 @@ export function VReportes({G,showToast,usuario}){
   };
   const valorAjusteTotal=baseCompleta.reduce((s,c)=>s+c.valDif,0);
 
+  // Exportaciones con estilo (grid ERP): jerarquía por categoría, subtotales y total general.
+  const metaRep=`Inventario ${G.inventario?.nombre||""} · ${TODAY()} ${HOUR()} · Por: ${usuario?.nombre||""}`;
+  const expDiferencia=()=>exportReporteXLSX({
+    title:"Reporte de diferencias — consolidado por producto", meta:metaRep, groupBy:"categoria",
+    columns:[
+      {key:"__nivel",label:"Nivel",type:"text",width:11},
+      {key:"codigo",label:"Código",type:"text",width:12},
+      {key:"nombre",label:"Nombre del producto",type:"text",width:34},
+      {key:"saldo",label:"Saldo sistema",type:"num",width:13},
+      {key:"cantFinal",label:"Físico",type:"num",width:10},
+      {key:"diferencia",label:"Diferencia",type:"num",width:12,colorSign:true},
+      {key:"valDif",label:"Valor diferencia",type:"money",width:16,colorSign:true},
+    ],
+    rows:baseCompleta, fname:`diferencias_inventario_${TODAY().replace(/\//g,"-")}.xlsx`, sheetName:"Diferencias", showToast,
+  });
+  const expCaptura=()=>exportReporteXLSX({
+    title:"Reporte de captura — por producto y estado", meta:metaRep, groupBy:"categoria",
+    columns:[
+      {key:"__nivel",label:"Nivel",type:"text",width:11},
+      {key:"codigo",label:"Código",type:"text",width:12},
+      {key:"nombre",label:"Nombre del producto",type:"text",width:32},
+      {key:"estado",label:"Estado",type:"text",width:14},
+      {key:"c1",label:"C1",type:"num",width:8,subtotal:false},
+      {key:"c2",label:"C2",type:"num",width:8,subtotal:false},
+      {key:"c3",label:"C3",type:"num",width:8,subtotal:false},
+      {key:"cantFinal",label:"Cant. final",type:"num",width:11},
+      {key:"saldo",label:"Saldo",type:"num",width:11,subtotal:false},
+      {key:"diferencia",label:"Diferencia",type:"num",width:12,colorSign:true},
+      {key:"valDif",label:"Valor dif.",type:"money",width:15,colorSign:true},
+    ],
+    rows:capFinal, fname:`captura_inventario_${TODAY().replace(/\//g,"-")}.xlsx`, sheetName:"Captura", showToast,
+  });
+  const expSinConteo=()=>exportReporteXLSX({
+    title:"Reporte de productos sin conteo", meta:metaRep, groupBy:"categoria",
+    columns:[
+      {key:"__nivel",label:"Nivel",type:"text",width:11},
+      {key:"codigo",label:"Código",type:"text",width:12},
+      {key:"nombre",label:"Nombre del producto",type:"text",width:34},
+      {key:"saldo",label:"Saldo sistema",type:"num",width:13},
+      {key:"costo",label:"Costo",type:"money",width:13,subtotal:false},
+      {key:"valSis",label:"Valor sistema",type:"money",width:16},
+    ],
+    rows:sinConteo.map(p=>({...p,valSis:(p.saldo||0)*(p.costo||0)})), fname:`sin_conteo_${TODAY().replace(/\//g,"-")}.xlsx`, sheetName:"Sin conteo", showToast,
+  });
+
   return(
     <Section>
       <PageHeader
@@ -212,7 +258,7 @@ export function VReportes({G,showToast,usuario}){
             <div><div className="font-bold text-sm text-slate-900">Sin Conteo</div><div className="text-[11px] text-muted-foreground">Productos no inventariados</div></div>
           </div>
           <div className="mb-2.5 text-[32px] font-black leading-none tabular-nums" style={{color:"#d97706"}}>{sinConteo.length}</div>
-          <Button className="w-full" onClick={()=>expXLSX(sinConteo.map(p=>[p.codigo,p.nombre,p.referencia,p.categoria,p.subcategoria,p.subgrupo,p.saldo,p.costo,p.nit,p.proveedor]),["CODIGO","NOMBRE","REFERENCIA","CATEGORIA","SUBCATEGORIA","SUBGRUPO","SALDO","COSTO","NIT","PROVEEDOR"],"sin_conteo.xlsx","REPORTE SIN CONTEOS")}><Download size={15}/> Exportar Excel</Button>
+          <Button className="w-full" onClick={expSinConteo} disabled={sinConteo.length===0}><Download size={15}/> Exportar Excel</Button>
         </Card>
 
         {/* Diferencia Inventario */}
@@ -222,7 +268,7 @@ export function VReportes({G,showToast,usuario}){
             <div><div className="font-bold text-sm text-slate-900">Diferencia Inventario</div><div className="text-[11px] text-muted-foreground">Físico vs Sistema · base completa</div></div>
           </div>
           <div className="mb-2.5 text-[32px] font-black leading-none tabular-nums" style={{color:"#2563eb"}}>{baseCompleta.length}</div>
-          <Button className="w-full" onClick={()=>expXLSX(baseCompleta.map(c=>[c.codigo,c.nombre,c.referencia,c.costo||0,c.saldo,c.cantFinal,c.diferencia,Math.round(c.valDif),c.categoria||"",c.subcategoria||"",c.subgrupo||"",c.nit||"",c.proveedor||""]),["CODIGO","NOMBRE","REFERENCIA","COSTO","SALDO","CANTIDAD","DIFERENCIA","VALOR_DIF","CATEGORIA","SUBCATEGORIA","SUBGRUPO","NIT","PROVEEDOR"],"diferencia_inventario.xlsx","DIFERENCIA INVENTARIOS")} disabled={baseCompleta.length===0}><Download size={15}/> Exportar Excel</Button>
+          <Button className="w-full" onClick={expDiferencia} disabled={baseCompleta.length===0}><Download size={15}/> Exportar Excel</Button>
         </Card>
 
         {/* Ajuste */}
@@ -243,11 +289,7 @@ export function VReportes({G,showToast,usuario}){
             <div><div className="font-bold text-sm text-slate-900">Reporte de Captura</div><div className="text-[11px] text-muted-foreground">C1·C2·C3 · una fila por estado</div></div>
           </div>
           <div className="mb-2.5 text-[32px] font-black leading-none tabular-nums" style={{color:"#7c3aed"}}>{capFinal.length}</div>
-          <Button className="w-full" onClick={()=>expXLSX(
-            capFinal.map(c=>[c.ean,c.codigo,c.nombre,c.referencia,c.categoria,c.subcategoria,c.subgrupo,c.ubicacion,c.localizacion,c.nro,c.c1||"",c.c2||"",c.c3||"",c.cantFinal,c.costo,c.fecha||TODAY(),c.estado,c.obs||"",c.usuario,c.nit,c.proveedor]),
-            ["EAN","CODIGO","NOMBRE","REFERENCIA","CATEGORIA","SUBCATEGORIA","SUBGRUPO","UBICACION","LOCALIZACION","N_LOCAL","CONTEO_1","CONTEO_2","CONTEO_3","CANTIDAD_FINAL","COSTO","FECHA","ESTADO","OBS","USUARIO","NIT","PROVEEDOR"],
-            "captura_inventario.xlsx","CAPTURA INVENTARIO"
-          )} disabled={capFinal.length===0}><Download size={15}/> Exportar Excel</Button>
+          <Button className="w-full" onClick={expCaptura} disabled={capFinal.length===0}><Download size={15}/> Exportar Excel</Button>
         </Card>
 
       </div>

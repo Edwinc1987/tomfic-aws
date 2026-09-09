@@ -22,7 +22,8 @@
     "tailwind-merge": "^3.6.0",
     "tailwindcss-animate": "^1.0.7",
     "vite": "^4.4.0",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "xlsx-js-style": "^1.2.0"
   },
   "devDependencies": {
     "autoprefixer": "^10.5.0",
