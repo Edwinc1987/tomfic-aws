@@ -2,7 +2,7 @@ import { useState } from "react";
 import * as XLSX from "xlsx-js-style";
 import {
   BarChart2, MapPin, RefreshCw, CheckCircle, Circle, Scale,
-  Wrench, FileText, Download, Printer,
+  Wrench, FileText, Download, Printer, ChevronLeft, Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -10,10 +10,12 @@ import { PageHeader } from "@/components/ui/page-header";
 import Section from "@/components/Section";
 import { G, TODAY, HOUR, exportSheet, SIIGO_AJUSTE_COLS } from "@/lib/data";
 import { exportReporteXLSX } from "@/lib/reporteXLSX";
+import { ReporteGrid } from "@/components/ReporteGrid";
 
 // ── REPORTES ──
 export function VReportes({G,showToast,usuario}){
   const [verDifs,setVerDifs]=useState(false);
+  const [vista,setVista]=useState(null); // reporte abierto en pantalla: 'diferencias'|'captura'|'sinconteo'
   const caps=Object.values(G.capturas);
 
   const expXLSX=(data,cols,fname,titulo)=>{
@@ -139,50 +141,47 @@ export function VReportes({G,showToast,usuario}){
   };
   const valorAjusteTotal=baseCompleta.reduce((s,c)=>s+c.valDif,0);
 
-  // Exportaciones con estilo (grid ERP): jerarquía por categoría, subtotales y total general.
+  // Config compartida de reportes: MISMA definición para la pantalla (ReporteGrid)
+  // y el Excel (reporteXLSX). Regla de estados: diferencias SIN estado (consolidado),
+  // captura CON estado.
   const metaRep=`Inventario ${G.inventario?.nombre||""} · ${TODAY()} ${HOUR()} · Por: ${usuario?.nombre||""}`;
-  const expDiferencia=()=>exportReporteXLSX({
-    title:"Reporte de diferencias — consolidado por producto", meta:metaRep, groupBy:"categoria",
-    columns:[
-      {key:"__nivel",label:"Nivel",type:"text",width:11},
-      {key:"codigo",label:"Código",type:"text",width:12},
-      {key:"nombre",label:"Nombre del producto",type:"text",width:34},
-      {key:"saldo",label:"Saldo sistema",type:"num",width:13},
-      {key:"cantFinal",label:"Físico",type:"num",width:10},
-      {key:"diferencia",label:"Diferencia",type:"num",width:12,colorSign:true},
-      {key:"valDif",label:"Valor diferencia",type:"money",width:16,colorSign:true},
-    ],
-    rows:baseCompleta, fname:`diferencias_inventario_${TODAY().replace(/\//g,"-")}.xlsx`, sheetName:"Diferencias", showToast,
-  });
-  const expCaptura=()=>exportReporteXLSX({
-    title:"Reporte de captura — por producto y estado", meta:metaRep, groupBy:"categoria",
-    columns:[
-      {key:"__nivel",label:"Nivel",type:"text",width:11},
-      {key:"codigo",label:"Código",type:"text",width:12},
-      {key:"nombre",label:"Nombre del producto",type:"text",width:32},
-      {key:"estado",label:"Estado",type:"text",width:14},
-      {key:"c1",label:"C1",type:"num",width:8,subtotal:false},
-      {key:"c2",label:"C2",type:"num",width:8,subtotal:false},
-      {key:"c3",label:"C3",type:"num",width:8,subtotal:false},
-      {key:"cantFinal",label:"Cant. final",type:"num",width:11},
-      {key:"saldo",label:"Saldo",type:"num",width:11,subtotal:false},
-      {key:"diferencia",label:"Diferencia",type:"num",width:12,colorSign:true},
-      {key:"valDif",label:"Valor dif.",type:"money",width:15,colorSign:true},
-    ],
-    rows:capFinal, fname:`captura_inventario_${TODAY().replace(/\//g,"-")}.xlsx`, sheetName:"Captura", showToast,
-  });
-  const expSinConteo=()=>exportReporteXLSX({
-    title:"Reporte de productos sin conteo", meta:metaRep, groupBy:"categoria",
-    columns:[
-      {key:"__nivel",label:"Nivel",type:"text",width:11},
-      {key:"codigo",label:"Código",type:"text",width:12},
-      {key:"nombre",label:"Nombre del producto",type:"text",width:34},
-      {key:"saldo",label:"Saldo sistema",type:"num",width:13},
-      {key:"costo",label:"Costo",type:"money",width:13,subtotal:false},
-      {key:"valSis",label:"Valor sistema",type:"money",width:16},
-    ],
-    rows:sinConteo.map(p=>({...p,valSis:(p.saldo||0)*(p.costo||0)})), fname:`sin_conteo_${TODAY().replace(/\//g,"-")}.xlsx`, sheetName:"Sin conteo", showToast,
-  });
+  const repCfg={
+    diferencias:{ title:"Reporte de diferencias — consolidado por producto", groupBy:"categoria", sheetName:"Diferencias", nombreArch:"diferencias_inventario", rows:baseCompleta,
+      columns:[
+        {key:"__nivel",label:"Nivel",type:"text",width:11},
+        {key:"codigo",label:"Código",type:"text",width:12},
+        {key:"nombre",label:"Nombre del producto",type:"text",width:34},
+        {key:"saldo",label:"Saldo sistema",type:"num",width:13},
+        {key:"cantFinal",label:"Físico",type:"num",width:10},
+        {key:"diferencia",label:"Diferencia",type:"num",width:12,colorSign:true},
+        {key:"valDif",label:"Valor diferencia",type:"money",width:16,colorSign:true},
+      ]},
+    captura:{ title:"Reporte de captura — por producto y estado", groupBy:"categoria", sheetName:"Captura", nombreArch:"captura_inventario", rows:capFinal,
+      columns:[
+        {key:"__nivel",label:"Nivel",type:"text",width:11},
+        {key:"codigo",label:"Código",type:"text",width:12},
+        {key:"nombre",label:"Nombre del producto",type:"text",width:32},
+        {key:"estado",label:"Estado",type:"estado",width:14},
+        {key:"c1",label:"C1",type:"num",width:8,subtotal:false},
+        {key:"c2",label:"C2",type:"num",width:8,subtotal:false},
+        {key:"c3",label:"C3",type:"num",width:8,subtotal:false},
+        {key:"cantFinal",label:"Cant. final",type:"num",width:11},
+        {key:"saldo",label:"Saldo",type:"num",width:11,subtotal:false},
+        {key:"diferencia",label:"Diferencia",type:"num",width:12,colorSign:true},
+        {key:"valDif",label:"Valor dif.",type:"money",width:15,colorSign:true},
+      ]},
+    sinconteo:{ title:"Reporte de productos sin conteo", groupBy:"categoria", sheetName:"Sin conteo", nombreArch:"sin_conteo",
+      rows:sinConteo.map(p=>({...p,valSis:(p.saldo||0)*(p.costo||0)})),
+      columns:[
+        {key:"__nivel",label:"Nivel",type:"text",width:11},
+        {key:"codigo",label:"Código",type:"text",width:12},
+        {key:"nombre",label:"Nombre del producto",type:"text",width:34},
+        {key:"saldo",label:"Saldo sistema",type:"num",width:13},
+        {key:"costo",label:"Costo",type:"money",width:13,subtotal:false},
+        {key:"valSis",label:"Valor sistema",type:"money",width:16},
+      ]},
+  };
+  const exportar=(key)=>{const r=repCfg[key];exportReporteXLSX({title:r.title,meta:metaRep,columns:r.columns,rows:r.rows,groupBy:r.groupBy,sheetName:r.sheetName,fname:`${r.nombreArch}_${TODAY().replace(/\//g,"-")}.xlsx`,showToast});};
 
   return(
     <Section>
@@ -195,7 +194,14 @@ export function VReportes({G,showToast,usuario}){
         countLabel="productos base"
       />
 
-      <div className="grid gap-4" style={{gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))"}}>
+      {vista&&(
+        <div>
+          <Button variant="outline" size="sm" className="mb-3" onClick={()=>setVista(null)}><ChevronLeft size={15}/> Volver a reportes</Button>
+          <ReporteGrid title={repCfg[vista].title} meta={metaRep} columns={repCfg[vista].columns} rows={repCfg[vista].rows} groupBy={repCfg[vista].groupBy} onExport={()=>exportar(vista)}/>
+        </div>
+      )}
+
+      <div className="grid gap-4" style={{gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",display:vista?"none":undefined}}>
 
         {/* Diferencias de Conteos — expandible */}
         <Card className="p-4">
@@ -258,7 +264,8 @@ export function VReportes({G,showToast,usuario}){
             <div><div className="font-bold text-sm text-slate-900">Sin Conteo</div><div className="text-[11px] text-muted-foreground">Productos no inventariados</div></div>
           </div>
           <div className="mb-2.5 text-[32px] font-black leading-none tabular-nums" style={{color:"#d97706"}}>{sinConteo.length}</div>
-          <Button className="w-full" onClick={expSinConteo} disabled={sinConteo.length===0}><Download size={15}/> Exportar Excel</Button>
+          <Button className="w-full" onClick={()=>setVista("sinconteo")} disabled={sinConteo.length===0}><Eye size={15}/> Ver en pantalla</Button>
+          <Button className="w-full mt-2" variant="outline" onClick={()=>exportar("sinconteo")} disabled={sinConteo.length===0}><Download size={15}/> Excel</Button>
         </Card>
 
         {/* Diferencia Inventario */}
@@ -268,7 +275,8 @@ export function VReportes({G,showToast,usuario}){
             <div><div className="font-bold text-sm text-slate-900">Diferencia Inventario</div><div className="text-[11px] text-muted-foreground">Físico vs Sistema · base completa</div></div>
           </div>
           <div className="mb-2.5 text-[32px] font-black leading-none tabular-nums" style={{color:"#2563eb"}}>{baseCompleta.length}</div>
-          <Button className="w-full" onClick={expDiferencia} disabled={baseCompleta.length===0}><Download size={15}/> Exportar Excel</Button>
+          <Button className="w-full" onClick={()=>setVista("diferencias")} disabled={baseCompleta.length===0}><Eye size={15}/> Ver en pantalla</Button>
+          <Button className="w-full mt-2" variant="outline" onClick={()=>exportar("diferencias")} disabled={baseCompleta.length===0}><Download size={15}/> Excel</Button>
         </Card>
 
         {/* Ajuste */}
@@ -289,7 +297,8 @@ export function VReportes({G,showToast,usuario}){
             <div><div className="font-bold text-sm text-slate-900">Reporte de Captura</div><div className="text-[11px] text-muted-foreground">C1·C2·C3 · una fila por estado</div></div>
           </div>
           <div className="mb-2.5 text-[32px] font-black leading-none tabular-nums" style={{color:"#7c3aed"}}>{capFinal.length}</div>
-          <Button className="w-full" onClick={expCaptura} disabled={capFinal.length===0}><Download size={15}/> Exportar Excel</Button>
+          <Button className="w-full" onClick={()=>setVista("captura")} disabled={capFinal.length===0}><Eye size={15}/> Ver en pantalla</Button>
+          <Button className="w-full mt-2" variant="outline" onClick={()=>exportar("captura")} disabled={capFinal.length===0}><Download size={15}/> Excel</Button>
         </Card>
 
       </div>
