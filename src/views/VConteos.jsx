@@ -75,13 +75,15 @@ export function VConteos({G,rerender,showToast,usuario,recargar}){
   };
 
   const [modalReabrir,setModalReabrir]=useState(null);
-  const reabrirRonda=(c,ronda)=>{
+  const reabrirRonda=async(c,ronda)=>{
     // Después de asignar o cerrar C3 el proceso queda terminado: no se
     // permite reabrir C1, C2 ni C3 desde esta vista.
     if(c.usuarioC3||(c.rondasCerradas||[]).includes("C3")){
       setModalReabrir(null);return showToast("Este conteo ya pasó por C3 y no puede reabrirse","err");
     }
-    const rc=(c.rondasCerradas||[]).filter(r=>r!==ronda);
+    const {data,error}=await SB.reopenConteoRound(c.id,ronda);
+    if(error)return showToast(error.message||"No se pudo reabrir la ronda","err");
+    const rc=Array.isArray(data?.rondas_cerradas)?data.rondas_cerradas:JSON.parse(data?.rondas_cerradas||"[]");
     let nuevoEstado;
     if(ronda==="C1")nuevoEstado="enCurso";
     else if(ronda==="C2")nuevoEstado=rc.includes("C1")?"cerradoC1":"enCurso";
