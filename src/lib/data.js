@@ -180,7 +180,8 @@ export const serConteo=(c,invId,capSource=G.capturas)=>({
   estado:c.estado||"", loc_label:c.locLabel||"", localizacion_id:c.locId||"",
   ubicacion:c.ubicacion||"", localizacion_tipo:c.localizacion||"", nro:c.nro||"",
   fecha_creacion:c.fechaCreacion||TODAY(),
-  rondas_cerradas:JSON.stringify(c.rondasCerradas||[]),
+  // Las rondas se cierran mediante close_count_round para evitar que una
+  // sincronización posterior sobrescriba el cierre de otro usuario.
   capturas_data:JSON.stringify(Object.fromEntries(Object.entries(capSource||{}).filter(([,v])=>v.conteoId===c.id))),
 });
 export const deserConteo=(r)=>{
