@@ -165,7 +165,7 @@ export function VProcesos({G,rerender,showToast,usuario}){
   const asignarC3=(id,u)=>{G.conteos=G.conteos.map(c=>c.id===id?{...c,usuarioC3:u,estado:"enC3"}:c);rerender();showToast("C3 asignado ✓");};
 
   const reabrirRonda=async(c,ronda)=>{
-    const c3Cerrado=(c.rondasCerradas||[]).includes("C3")||(c.usuarioC3&&c.estado==="completado");
+    const c3Cerrado=c.c3Cerrado??((c.rondasCerradas||[]).includes("C3")||(c.usuarioC3&&c.estado==="completado"));
     if(c3Cerrado){
       setModalReabrir(null);return showToast("Este conteo ya pasó por C3 y no puede reabrirse","err");
     }

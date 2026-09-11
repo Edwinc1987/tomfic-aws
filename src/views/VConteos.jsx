@@ -78,7 +78,7 @@ export function VConteos({G,rerender,showToast,usuario,recargar}){
   const reabrirRonda=async(c,ronda)=>{
     // Después de asignar o cerrar C3 el proceso queda terminado: no se
     // permite reabrir C1, C2 ni C3 desde esta vista.
-    const c3Cerrado=(c.rondasCerradas||[]).includes("C3")||(c.usuarioC3&&c.estado==="completado");
+    const c3Cerrado=c.c3Cerrado??((c.rondasCerradas||[]).includes("C3")||(c.usuarioC3&&c.estado==="completado"));
     if(c3Cerrado){
       setModalReabrir(null);return showToast("Este conteo ya pasó por C3 y no puede reabrirse","err");
     }
@@ -103,9 +103,9 @@ export function VConteos({G,rerender,showToast,usuario,recargar}){
   // Qué rondas se pueden reabrir según lo ya cerrado
   const rondasReabribles=(c)=>{
     const r=[];const rc=c.rondasCerradas||[];
-    if(rc.includes("C3")||(c.usuarioC3&&c.estado==="completado"))return r;
-    if(rc.includes("C1")||["cerradoC1","cerradoC2","completado","diferencia","enC3"].includes(c.estado))r.push("C1");
-    if(c.tipo==="2conteos"&&(rc.includes("C2")||["cerradoC2","completado","diferencia"].includes(c.estado)))r.push("C2");
+    if(c.c3Cerrado??(rc.includes("C3")||(c.usuarioC3&&c.estado==="completado")))return r;
+    if((c.c1Cerrado??rc.includes("C1"))||["cerradoC1","cerradoC2","completado","diferencia","enC3"].includes(c.estado))r.push("C1");
+    if(c.tipo==="2conteos"&&((c.c2Cerrado??rc.includes("C2"))||["cerradoC2","completado","diferencia"].includes(c.estado)))r.push("C2");
     if(c.usuarioC3&&c.estado==="completado")r.push("C3");
     return r;
   };
@@ -150,8 +150,8 @@ export function VConteos({G,rerender,showToast,usuario,recargar}){
               <tbody>
                 {conteosReales().map((c)=>{
                   const rc=c.rondasCerradas||[];
-                  const c1Cerrado=rc.includes("C1")||["cerradoC1","cerradoC2","completado","diferencia","enC3"].includes(c.estado);
-                  const c2Cerrado=rc.includes("C2")||["cerradoC2","completado","diferencia"].includes(c.estado);
+                   const c1Cerrado=c.c1Cerrado??(rc.includes("C1")||["cerradoC1","cerradoC2","completado","diferencia","enC3"].includes(c.estado));
+                   const c2Cerrado=c.c2Cerrado??(rc.includes("C2")||["cerradoC2","completado","diferencia"].includes(c.estado));
                   const estCol=stC[c.estado]||"#6b7280";
                   const c3Caps=getCapsRonda(c.id,"C3").length;
                   return(

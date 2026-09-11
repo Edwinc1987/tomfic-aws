@@ -187,7 +187,8 @@ export const serConteo=(c,invId,capSource=G.capturas)=>({
 });
 export const deserConteo=(r)=>{
   const parseJson=(value,fallback)=>{try{return value?JSON.parse(value):fallback;}catch(e){return fallback;}};
-  const c={id:r.id,nombre:r.nombre,obs:r.obs,tipo:r.tipo,usuarioC1:r.usuario_c1,usuarioC2:r.usuario_c2,usuarioC3:r.usuario_c3,estado:r.estado,locLabel:r.loc_label,locId:r.localizacion_id,ubicacion:r.ubicacion,localizacion:r.localizacion_tipo,nro:r.nro,fechaCreacion:r.fecha_creacion,rondasCerradas:parseJson(r.rondas_cerradas,[])};
+  const rondas=parseJson(r.rondas_cerradas,[]);
+  const c={id:r.id,nombre:r.nombre,obs:r.obs,tipo:r.tipo,usuarioC1:r.usuario_c1,usuarioC2:r.usuario_c2,usuarioC3:r.usuario_c3,estado:r.estado,locLabel:r.loc_label,locId:r.localizacion_id,ubicacion:r.ubicacion,localizacion:r.localizacion_tipo,nro:r.nro,fechaCreacion:r.fecha_creacion,rondasCerradas:rondas,c1Cerrado:r.c1_cerrado===true||r.c1_cerrado==="true"||rondas.includes("C1"),c2Cerrado:r.c2_cerrado===true||r.c2_cerrado==="true"||rondas.includes("C2"),c3Cerrado:r.c3_cerrado===true||r.c3_cerrado==="true"||rondas.includes("C3")};
   const caps=parseJson(r.capturas_data,{});
   return {c,caps};
 };

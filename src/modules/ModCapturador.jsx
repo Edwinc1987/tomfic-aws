@@ -303,7 +303,7 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
       nuevoEstado="completado";
     }
 
-      G.conteos=G.conteos.map(c=>c.id===miConteo.id?{...c,estado:nuevoEstado,rondasCerradas}:c);
+      G.conteos=G.conteos.map(c=>c.id===miConteo.id?{...c,estado:nuevoEstado,rondasCerradas,c1Cerrado:rondasCerradas.includes("C1"),c2Cerrado:rondasCerradas.includes("C2"),c3Cerrado:rondasCerradas.includes("C3")}:c);
       G.alertas.push({usuario:usuario.nombre,conteoNombre:miConteo.nombre,conteoId:miConteo.id,ronda:miRonda,hora:HOUR(),leida:false});
       setModalCerrar(false);setConteoActivo(null);setRondaActiva(null);
       rerender();showToast("Conteo terminado ✓");
