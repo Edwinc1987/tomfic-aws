@@ -78,7 +78,8 @@ export function VConteos({G,rerender,showToast,usuario,recargar}){
   const reabrirRonda=async(c,ronda)=>{
     // Después de asignar o cerrar C3 el proceso queda terminado: no se
     // permite reabrir C1, C2 ni C3 desde esta vista.
-    if(c.usuarioC3||(c.rondasCerradas||[]).includes("C3")){
+    const c3Cerrado=(c.rondasCerradas||[]).includes("C3")||(c.usuarioC3&&c.estado==="completado");
+    if(c3Cerrado){
       setModalReabrir(null);return showToast("Este conteo ya pasó por C3 y no puede reabrirse","err");
     }
     const {data,error}=await SB.reopenConteoRound(c.id,ronda);
@@ -102,7 +103,7 @@ export function VConteos({G,rerender,showToast,usuario,recargar}){
   // Qué rondas se pueden reabrir según lo ya cerrado
   const rondasReabribles=(c)=>{
     const r=[];const rc=c.rondasCerradas||[];
-    if(c.usuarioC3||rc.includes("C3"))return r;
+    if(rc.includes("C3")||(c.usuarioC3&&c.estado==="completado"))return r;
     if(rc.includes("C1")||["cerradoC1","cerradoC2","completado","diferencia","enC3"].includes(c.estado))r.push("C1");
     if(c.tipo==="2conteos"&&(rc.includes("C2")||["cerradoC2","completado","diferencia"].includes(c.estado)))r.push("C2");
     if(c.usuarioC3&&c.estado==="completado")r.push("C3");
