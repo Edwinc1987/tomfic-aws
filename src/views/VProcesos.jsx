@@ -181,6 +181,14 @@ export function VProcesos({G,rerender,showToast,usuario}){
     G.conteos=G.conteos.map(x=>x.id===c.id?{...x,estado:nuevoEstado,rondasCerradas:rc}:x);
     setModalReabrir(null);rerender();showToast(`${ronda} reabierto ✓`,"warn");
   };
+  const rondasReabribles=(c)=>{
+    const rc=c.rondasCerradas||[];
+    if(c.c3Cerrado===true||rc.includes("C3")||(c.usuarioC3&&c.estado==="completado"))return [];
+    const r=[];
+    if(c.c1Cerrado===true||rc.includes("C1")||["cerradoC1","cerradoC2","completado","diferencia","enC3"].includes(c.estado))r.push("C1");
+    if(c.tipo==="2conteos"&&c.usuarioC2&&(c.c2Cerrado===true||rc.includes("C2")||["cerradoC2","completado","diferencia"].includes(c.estado)))r.push("C2");
+    return r;
+  };
 
   const agregarUsuarioExtra=(conteoId,u)=>{setUsuariosExtra(prev=>{const curr=prev[conteoId]||[];if(curr.includes(u))return prev;return{...prev,[conteoId]:[...curr,u]};});showToast(`${u} agregado ✓`);};
   const quitarUsuarioExtra=(conteoId,u)=>{setUsuariosExtra(prev=>({...prev,[conteoId]:(prev[conteoId]||[]).filter(x=>x!==u)}));};
@@ -249,7 +257,7 @@ export function VProcesos({G,rerender,showToast,usuario}){
           {modalReabrir&&(<>
             <div className="text-sm text-muted-foreground -mt-1">Selecciona la ronda que quieres reabrir para que el usuario pueda seguir capturando.</div>
             <div className="flex flex-col gap-2.5">
-              {["C1","C2","C3"].filter(r=>{
+              {rondasReabribles(modalReabrir).filter(r=>{
                 const c=modalReabrir;
                 if(r==="C1") return true;
                 if(r==="C2") return c.tipo==="2conteos"&&c.usuarioC2;
@@ -571,7 +579,7 @@ export function VProcesos({G,rerender,showToast,usuario}){
                            <Button variant="outline" size="icon" className="h-8 w-8" title="Más acciones" onClick={()=>setMenuAcciones(menuAcciones===c.id?null:c.id)}><MoreHorizontal size={16}/></Button>
                            {menuAcciones===c.id&&<div className="absolute right-0 top-9 z-30 flex min-w-[150px] flex-col rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
                              <button className="flex items-center gap-2 rounded-md px-3 py-2 text-left text-xs hover:bg-slate-50" onClick={()=>{imprimirConteo(c);setMenuAcciones(null);}}><Printer size={14}/> Imprimir</button>
-                             {["cerradoC1","cerradoC2","completado","diferencia","enC3"].includes(c.estado)&&<button className="flex items-center gap-2 rounded-md px-3 py-2 text-left text-xs text-amber-700 hover:bg-amber-50" onClick={()=>{setModalReabrir(c);setMenuAcciones(null);}}><RefreshCw size={14}/> Reabrir</button>}
+                             {rondasReabribles(c).length>0&&<button className="flex items-center gap-2 rounded-md px-3 py-2 text-left text-xs text-amber-700 hover:bg-amber-50" onClick={()=>{setModalReabrir(c);setMenuAcciones(null);}}><RefreshCw size={14}/> Reabrir</button>}
                            </div>}
                          </div>
                        </td>
