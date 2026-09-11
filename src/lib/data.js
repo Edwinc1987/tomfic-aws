@@ -218,10 +218,10 @@ export const resetTenantConfig=()=>{G.localizaciones=[];G.ubicacionesTipos=[...D
 // (que pone el servidor al cerrar cada ronda); solo cae en el estado para datos viejos.
 export const rondaCerrada=(c,ronda)=>{
   if(!c)return false;
+  const rc=c.rondasCerradas;
+  if(Array.isArray(rc)&&rc.length)return rc.includes(ronda); // arreglo no vacío = autoritativo (cierre y reapertura lo actualizan)
   const flag=ronda==="C1"?c.c1Cerrado:ronda==="C2"?c.c2Cerrado:c.c3Cerrado;
   if(typeof flag==="boolean")return flag;
-  const rc=c.rondasCerradas;
-  if(Array.isArray(rc)&&rc.length)return rc.includes(ronda);
   // Legacy por estado (conteos viejos sin rondasCerradas): cerradoC2 antiguo = completo.
   if(ronda==="C1")return ["cerradoC1","cerradoC2","completado","diferencia","enC3"].includes(c.estado);
   if(ronda==="C2")return ["cerradoC2","completado","diferencia"].includes(c.estado);

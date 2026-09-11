@@ -177,7 +177,7 @@ export function VProcesos({G,rerender,showToast,usuario}){
     if(ronda==="C1")nuevoEstado="enCurso";
     else if(ronda==="C2")nuevoEstado=rc.includes("C1")?"cerradoC1":"enCurso";
     else if(ronda==="C3")nuevoEstado="diferencia";
-    G.conteos=G.conteos.map(x=>x.id===c.id?{...x,estado:nuevoEstado,rondasCerradas:rc}:x);
+    G.conteos=G.conteos.map(x=>x.id===c.id?{...x,estado:nuevoEstado,rondasCerradas:rc,c1Cerrado:rc.includes("C1"),c2Cerrado:rc.includes("C2"),c3Cerrado:rc.includes("C3")}:x);
     setModalReabrir(null);rerender();showToast(`${ronda} reabierto ✓`,"warn");
   };
   const rondasReabribles=(c)=>{
