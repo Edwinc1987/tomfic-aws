@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Package, CheckCircle2, AlertTriangle, XCircle, X } from "lucide-react";
-import { supabase, SB, G, saveLocalCache, loadLocalCache, clearLocalCache, saveLocalConfig, slugify, memberEmail, diasHasta, fmtFechaCorta, GRACIA_DIAS, APP_VERSION } from "@/lib/data";
+import { SB, G, saveLocalCache, loadLocalCache, clearLocalCache, saveLocalConfig, slugify, memberEmail, diasHasta, fmtFechaCorta, GRACIA_DIAS, APP_VERSION } from "@/lib/data";
+import { authService } from "@/core/auth/authService";
 import { loadBootstrap, loadTenantData, loadTenants, doSync, scheduleSync, initSnap, getBusy, getDirty, getSyncing } from "@/lib/sync";
 import OfflineBanner from "@/components/OfflineBanner";
 import SetNewPassword from "@/components/SetNewPassword";
@@ -26,17 +27,17 @@ export default function TomficApp(){
   const [loadErr,setLoadErr]=useState("");
 
   const afterAuth=async()=>{
-    const {data:{user:au}}=await supabase.auth.getUser();
+    const {data:{user:au}}=await authService.getUser();
     if(!au)return false;
     const {data:perfil}=await SB.loadMyProfile(au.id);
-    if(!perfil){await supabase.auth.signOut();setLoginErr("Tu usuario no tiene perfil. Contacta al administrador.");return false;}
-    if(perfil.activo===false){await supabase.auth.signOut();setLoginErr("Tu usuario está inactivo.");return false;}
+     if(!perfil){await authService.signOut();setLoginErr("Tu usuario no tiene perfil. Contacta al administrador.");return false;}
+     if(perfil.activo===false){await authService.signOut();setLoginErr("Tu usuario está inactivo.");return false;}
     G.tenant=null;
     if(perfil.rol!=="dueno"&&perfil.rol!=="comercial"){
       const {data:ten}=await SB.loadTenant(perfil.tenant_id);
-      if(!ten||ten.activo===false){await supabase.auth.signOut();setLoginErr("Tu empresa está pendiente de aprobación o ha sido suspendida.");return false;}
+       if(!ten||ten.activo===false){await authService.signOut();setLoginErr("Tu empresa está pendiente de aprobación o ha sido suspendida.");return false;}
       const d=diasHasta(ten.vence);
-      if(d!==null&&d+GRACIA_DIAS<0){await supabase.auth.signOut();setLoginErr(`Tu plan venció el ${fmtFechaCorta(ten.vence)}. Contacta a tu proveedor para renovar el servicio.`);return false;}
+       if(d!==null&&d+GRACIA_DIAS<0){await authService.signOut();setLoginErr(`Tu plan venció el ${fmtFechaCorta(ten.vence)}. Contacta a tu proveedor para renovar el servicio.`);return false;}
       G.tenant=ten;
     }
     setLoadingTenant(true);
@@ -54,12 +55,12 @@ export default function TomficApp(){
     (async()=>{
         try{await loadBootstrap();}catch(e){console.error(e);setLoadErr("Error de conexión con la nube");}
       try{
-        const {data:{session}}=await supabase.auth.getSession();
+         const {data:{session}}=await authService.getSession();
         if(session)await afterAuth();
       }catch(e){console.warn(e);}
       setLoading(false);
     })();
-    const {data:sub}=supabase.auth.onAuthStateChange((event)=>{
+     const {data:sub}=authService.onAuthStateChange((event)=>{
       if(event==="SIGNED_OUT"){G.tenantId=null;G.tenant=null;setUsuario(null);}
       if(event==="PASSWORD_RECOVERY"){setRecovery(true);}
     });
@@ -131,7 +132,7 @@ export default function TomficApp(){
       email=memberEmail(usr,emp);
     }
     setLoadingTenant(true);
-    const {error}=await supabase.auth.signInWithPassword({email,password:pass});
+     const {error}=await authService.signIn(email,pass);
     if(error){
       setLoadingTenant(false);
       return setLoginErr(loginForm.tab==="admin"?"Email o contraseña incorrectos":"Empresa, usuario o contraseña incorrectos");
@@ -152,7 +153,7 @@ export default function TomficApp(){
   };
 
   const logout=async()=>{
-    try{await supabase.auth.signOut();}catch(e){}
+     try{await authService.signOut();}catch(e){}
     G.tenantId=null;G.tenants=[];G.productos=[];G.conteos=[];G.capturas={};G.inventario=null;G.inventarios=[];G._inventarioDatos={};G.historial=[];G.notas=[];
     setEntrar(false);setLoginForm({tab:"equipo",empresa:"",user:"",email:"",pass:""});setLoginErr("");
     setUsuario(null);

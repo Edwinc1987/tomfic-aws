@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import Section from "@/components/Section";
 import { setBusy, initSnap } from "@/lib/sync";
-import { G, TODAY, HOUR, ID, finalAjustado, supabase, SB, rememberSelectedInventory, selectInventory } from "@/lib/data";
+import { G, TODAY, HOUR, ID, finalAjustado, SB, rememberSelectedInventory, selectInventory } from "@/lib/data";
 
 // ── INVENTARIO ──
 export function VInventario({G,rerender,showToast,usuario}){
@@ -115,7 +115,7 @@ export function VInventario({G,rerender,showToast,usuario}){
       // Borrar de la nube: conteos del inventario + el inventario
       for(const c of G.conteos){try{await SB.deleteConteo(c.id);}catch(e){}}
       try{await SB.deleteAllProductos(G.tenantId,invId);}catch(e){} // borra su base para no dejar productos huérfanos
-      try{await supabase.from("inventarios").delete().eq("id",invId);}catch(e){}
+       try{await SB.deleteInventario(invId);}catch(e){}
     }catch(e){console.warn("Error al eliminar de la nube:",e);}
     // Limpiar localmente y resetear el snapshot de sincronización
     G.inventarios=G.inventarios.filter(i=>i.id!==invId);
