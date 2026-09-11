@@ -214,7 +214,28 @@ export const loadLocalConfig=()=>{try{const raw=localStorage.getItem(cfgKey());i
 export const DEF_UBIC_TIPOS=["BODEGA","SALA DE VENTAS"];
 export const DEF_LOC_TIPOS=["MUEBLE","LINEAL","NEVERA","PUNTA","JAULA","CAVA"];
 export const resetTenantConfig=()=>{G.localizaciones=[];G.ubicacionesTipos=[...DEF_UBIC_TIPOS];G.localizacionTipos=[...DEF_LOC_TIPOS];G.alertas=[];G.notas=[];};
-export const conteoCompleto=(c)=>c.estado==="completado"||c.estado==="cerradoC2"||(c.estado==="cerradoC1"&&c.tipo!=="2conteos");
+// Fuente ÚNICA de verdad de "ronda cerrada": prioriza los flags/rondasCerradas
+// (que pone el servidor al cerrar cada ronda); solo cae en el estado para datos viejos.
+export const rondaCerrada=(c,ronda)=>{
+  if(!c)return false;
+  const flag=ronda==="C1"?c.c1Cerrado:ronda==="C2"?c.c2Cerrado:c.c3Cerrado;
+  if(typeof flag==="boolean")return flag;
+  const rc=c.rondasCerradas;
+  if(Array.isArray(rc)&&rc.length)return rc.includes(ronda);
+  // Legacy por estado (conteos viejos sin rondasCerradas): cerradoC2 antiguo = completo.
+  if(ronda==="C1")return ["cerradoC1","cerradoC2","completado","diferencia","enC3"].includes(c.estado);
+  if(ronda==="C2")return ["cerradoC2","completado","diferencia"].includes(c.estado);
+  return c.estado==="completado";
+};
+// Un conteo está COMPLETO cuando cerró TODAS sus rondas requeridas. Ya NO se usa
+// "cerradoC2" como sinónimo de completo (eso hacía que cerrar UNA ronda cerrara las dos).
+export const conteoCompleto=(c)=>{
+  if(!c||c.tipo==="ajuste")return false;
+  if(c.tipo==="1conteo")return c.estado==="completado"||rondaCerrada(c,"C1");
+  if(rondaCerrada(c,"C3")||c.estado==="completado")return true;
+  if(c.estado==="diferencia"||c.estado==="enC3")return false; // ambas cerradas pero falta el desempate C3
+  return rondaCerrada(c,"C1")&&rondaCerrada(c,"C2");
+};
 export const conteosReales=()=>G.conteos.filter(c=>c.tipo!=="ajuste");
 export const conteoAjusteActivo=()=>G.conteos.find(c=>c.tipo==="ajuste")||null;
 export const todosConteosCerrados=()=>{const r=conteosReales();return r.length>0&&r.every(conteoCompleto);};

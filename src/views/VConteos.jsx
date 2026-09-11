@@ -13,7 +13,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import Section from "@/components/Section";
 import EstBadge from "@/components/EstBadge";
-import { G, TODAY, ID, conteosReales } from "@/lib/data";
+import { G, TODAY, ID, conteosReales, rondaCerrada, conteoCompleto } from "@/lib/data";
 
 // ── CONTEOS ──
 export function VConteos({G,rerender,showToast,usuario,recargar}){
@@ -104,14 +104,14 @@ export function VConteos({G,rerender,showToast,usuario,recargar}){
   const rondasReabribles=(c)=>{
     const r=[];const rc=c.rondasCerradas||[];
     if(rc.includes("C3"))return r;
-    if(c.c1Cerrado===true||rc.includes("C1")||["cerradoC1","cerradoC2","completado","diferencia","enC3"].includes(c.estado))r.push("C1");
-    if(c.tipo==="2conteos"&&(c.c2Cerrado===true||rc.includes("C2")||["cerradoC2","completado","diferencia"].includes(c.estado)))r.push("C2");
+    if(rondaCerrada(c,"C1"))r.push("C1");
+    if(c.tipo==="2conteos"&&rondaCerrada(c,"C2"))r.push("C2");
     if(c.usuarioC3&&c.estado==="completado")r.push("C3");
     return r;
   };
 
   const stC={pendiente:"#64748b",enCurso:"#2563eb",cerradoC1:"#d97706",cerradoC2:"#16a34a",diferencia:"#dc2626",enC3:"#7c3aed",completado:"#16a34a"};
-  const stL={pendiente:"Pendiente",enCurso:"En curso",cerradoC1:"C1 cerrado",cerradoC2:"Completado",diferencia:"Diferencia",enC3:"En C3",completado:"Completado"};
+  const stL={pendiente:"Pendiente",enCurso:"En curso",cerradoC1:"C1 cerrado",cerradoC2:"C2 cerrado",diferencia:"Diferencia",enC3:"En C3",completado:"Completado"};
 
   return(
     <Section>
@@ -150,8 +150,8 @@ export function VConteos({G,rerender,showToast,usuario,recargar}){
               <tbody>
                 {conteosReales().map((c)=>{
                   const rc=c.rondasCerradas||[];
-                   const c1Cerrado=c.c1Cerrado===true||rc.includes("C1")||["cerradoC1","cerradoC2","completado","diferencia","enC3"].includes(c.estado);
-                   const c2Cerrado=c.c2Cerrado===true||rc.includes("C2")||["cerradoC2","completado","diferencia"].includes(c.estado);
+                   const c1Cerrado=rondaCerrada(c,"C1");
+                   const c2Cerrado=rondaCerrada(c,"C2");
                   const estCol=stC[c.estado]||"#6b7280";
                   const c3Caps=getCapsRonda(c.id,"C3").length;
                   return(
@@ -197,7 +197,7 @@ export function VConteos({G,rerender,showToast,usuario,recargar}){
                           </button>
                         ):<span className="text-slate-300 text-[11px]">—</span>}
                       </td>
-                       <td className="px-3 py-1.5"><span title={stL[c.estado]||c.estado} aria-label={stL[c.estado]||c.estado} className="inline-flex h-7 w-7 items-center justify-center rounded-full" style={{background:estCol+"22",color:estCol}}>{c.estado==="completado"||c.estado==="cerradoC1"||c.estado==="cerradoC2"?<CheckCircle size={15}/>:c.estado==="diferencia"?<AlertTriangle size={15}/>:<RefreshCw size={14}/>}</span></td>
+                       <td className="px-3 py-1.5"><span title={stL[c.estado]||c.estado} aria-label={stL[c.estado]||c.estado} className="inline-flex h-7 w-7 items-center justify-center rounded-full" style={{background:estCol+"22",color:estCol}}>{conteoCompleto(c)?<CheckCircle size={15}/>:c.estado==="diferencia"?<AlertTriangle size={15}/>:<RefreshCw size={14}/>}</span></td>
                       <td className="px-3 py-1.5 whitespace-nowrap">
                         <div className="flex gap-1.5 items-center">
                            <Button variant="outline" size="icon" className="h-7 w-7" title="Modificar" aria-label="Modificar" onClick={()=>{setModalMod(c);setModForm({obs:c.obs||"",usuarioC1:c.usuarioC1,usuarioC2:c.usuarioC2||""});}}><Pencil size={13}/></Button>

@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import Section from "@/components/Section";
 import { setBusy, initSnap } from "@/lib/sync";
-import { G, TODAY, HOUR, ID, finalAjustado, SB, rememberSelectedInventory, selectInventory } from "@/lib/data";
+import { G, TODAY, HOUR, ID, finalAjustado, SB, rememberSelectedInventory, selectInventory, rondaCerrada, conteoCompleto } from "@/lib/data";
 
 // ── INVENTARIO ──
 export function VInventario({G,rerender,showToast,usuario}){
@@ -25,15 +25,16 @@ export function VInventario({G,rerender,showToast,usuario}){
   // Determina qué conteos NO están completados (para bloquear el cierre)
   const estadoConteo=(c)=>{
     // ¿completo? un conteo está completo solo si su estado final es "completado"
-    if(c.estado==="completado")return null; // ok, completo
+    if(conteoCompleto(c))return null; // ok, completo (todas las rondas requeridas cerradas)
     // Razón por la que no está completo:
     if(c.estado==="pendiente")return "sin iniciar";
-    if(c.estado==="enCurso")return "C1 en curso";
-    if(c.estado==="cerradoC1")return c.tipo==="2conteos"?"falta C2":null; // si es 1 conteo, cerradoC1 = completo
-    if(c.estado==="cerradoC2")return null; // 2 conteos sin diferencia = completo
     if(c.estado==="diferencia")return "tiene diferencias, falta C3";
     if(c.estado==="enC3")return "C3 en curso";
-    return "incompleto";
+    if(c.tipo==="2conteos"){
+      const c1=rondaCerrada(c,"C1"),c2=rondaCerrada(c,"C2");
+      return c1&&!c2?"falta C2":c2&&!c1?"falta C1":"C1 en curso";
+    }
+    return "C1 en curso";
   };
   const conteosIncompletos=()=>G.conteos.filter(c=>c.tipo!=="ajuste").map(c=>({c,razon:estadoConteo(c)})).filter(x=>x.razon!==null);
   const crear=()=>{
@@ -128,7 +129,7 @@ export function VInventario({G,rerender,showToast,usuario}){
     setEliminando(false);setModalEliminar(false);setBusy(false);
     rerender();showToast("Inventario eliminado por completo ✓","warn");
   };
-  const st=G.conteos.reduce((a,c)=>{if(c.estado==="completado"||c.estado==="cerradoC2")a.comp++;if(c.estado==="diferencia")a.dif++;return a;},{comp:0,dif:0});
+  const st=G.conteos.reduce((a,c)=>{if(conteoCompleto(c))a.comp++;if(c.estado==="diferencia")a.dif++;return a;},{comp:0,dif:0});
   return(
     <Section>
       {!G.inventario?(

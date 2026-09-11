@@ -3,7 +3,7 @@ import { Package, BarChart2, FileText, Landmark, AlertTriangle, Scale, DollarSig
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PageHeader } from "@/components/ui/page-header";
 import BannerVencimiento from "@/components/BannerVencimiento";
-import { G, nU, getStInv, getKPIsInv, TODAY, HOUR, ID, selectInventory } from "@/lib/data";
+import { G, nU, getStInv, getKPIsInv, TODAY, HOUR, ID, selectInventory, rondaCerrada } from "@/lib/data";
 
 export function ModGerente({usuario,setUsuario,logout,G,rerender,recargar,showToast}){
   const [view,setView]=useState("resumen");
@@ -225,9 +225,9 @@ return()=>clearInterval(t);
                               <td style={{padding:"10px 14px",fontWeight:700,color:"#0f172a"}}>{c.nombre}</td>
                               <td style={{padding:"10px 14px",fontSize:12,color:"#64748b"}}>{c.locLabel||"—"}</td>
                               <td style={{padding:"10px 14px",color:"#2563eb",fontWeight:600}}>{c.usuarioC1||"—"}</td>
-                              <td style={{padding:"10px 14px"}}>{c.usuarioC1?<span style={{background:["cerradoC1","cerradoC2","completado"].includes(c.estado)?"#f0fdf4":"#fffbeb",color:["cerradoC1","cerradoC2","completado"].includes(c.estado)?"#16a34a":"#d97706",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:700}}>{["cerradoC1","cerradoC2","completado"].includes(c.estado)?"OK":"En curso"}</span>:"—"}</td>
+                              <td style={{padding:"10px 14px"}}>{c.usuarioC1?<span style={{background:rondaCerrada(c,"C1")?"#f0fdf4":"#fffbeb",color:rondaCerrada(c,"C1")?"#16a34a":"#d97706",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:700}}>{rondaCerrada(c,"C1")?"OK":"En curso"}</span>:"—"}</td>
                               <td style={{padding:"10px 14px",color:"#16a34a",fontWeight:600}}>{c.usuarioC2||"N/A"}</td>
-                              <td style={{padding:"10px 14px"}}>{c.usuarioC2?<span style={{background:["cerradoC2","completado"].includes(c.estado)?"#f0fdf4":"#fffbeb",color:["cerradoC2","completado"].includes(c.estado)?"#16a34a":"#d97706",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:700}}>{["cerradoC2","completado"].includes(c.estado)?"OK":"Pendiente"}</span>:"—"}</td>
+                              <td style={{padding:"10px 14px"}}>{c.usuarioC2?<span style={{background:rondaCerrada(c,"C2")?"#f0fdf4":"#fffbeb",color:rondaCerrada(c,"C2")?"#16a34a":"#d97706",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:700}}>{rondaCerrada(c,"C2")?"OK":"Pendiente"}</span>:"—"}</td>
                               <td style={{padding:"10px 14px"}}><span style={{background:c.estado==="completado"?"#f0fdf4":c.estado==="diferencia"?"#fef2f2":"#f8fafc",color:c.estado==="completado"?"#16a34a":c.estado==="diferencia"?"#dc2626":"#64748b",borderRadius:6,padding:"3px 8px",fontSize:11,fontWeight:700}}>{c.estado}</span></td>
                             </tr>
                           ))}
@@ -504,9 +504,9 @@ return()=>clearInterval(t);
                                   <td style={{padding:"10px 14px",fontWeight:700,color:"#0f172a"}}>{c.nombre}</td>
                                   <td style={{padding:"10px 14px",fontSize:12,color:"#64748b"}}>{c.locLabel||"—"}</td>
                                   <td style={{padding:"10px 14px",color:"#2563eb",fontWeight:600}}>{c.usuarioC1||"—"}</td>
-                                  <td style={{padding:"10px 14px"}}>{c.usuarioC1?<span style={{background:["cerradoC1","cerradoC2","completado"].includes(c.estado)?"#f0fdf4":"#fffbeb",color:["cerradoC1","cerradoC2","completado"].includes(c.estado)?"#16a34a":"#d97706",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:700}}>{["cerradoC1","cerradoC2","completado"].includes(c.estado)?"OK":"En curso"}</span>:"—"}</td>
+                                  <td style={{padding:"10px 14px"}}>{c.usuarioC1?<span style={{background:rondaCerrada(c,"C1")?"#f0fdf4":"#fffbeb",color:rondaCerrada(c,"C1")?"#16a34a":"#d97706",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:700}}>{rondaCerrada(c,"C1")?"OK":"En curso"}</span>:"—"}</td>
                                   <td style={{padding:"10px 14px",color:"#16a34a",fontWeight:600}}>{c.usuarioC2||"N/A"}</td>
-                                  <td style={{padding:"10px 14px"}}>{c.usuarioC2?<span style={{background:["cerradoC2","completado"].includes(c.estado)?"#f0fdf4":"#fffbeb",color:["cerradoC2","completado"].includes(c.estado)?"#16a34a":"#d97706",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:700}}>{["cerradoC2","completado"].includes(c.estado)?"OK":"Pendiente"}</span>:"—"}</td>
+                                  <td style={{padding:"10px 14px"}}>{c.usuarioC2?<span style={{background:rondaCerrada(c,"C2")?"#f0fdf4":"#fffbeb",color:rondaCerrada(c,"C2")?"#16a34a":"#d97706",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:700}}>{rondaCerrada(c,"C2")?"OK":"Pendiente"}</span>:"—"}</td>
                                   <td style={{padding:"10px 14px"}}><span style={{background:c.estado==="completado"?"#f0fdf4":c.estado==="diferencia"?"#fef2f2":"#f8fafc",color:c.estado==="completado"?"#16a34a":c.estado==="diferencia"?"#dc2626":"#64748b",borderRadius:6,padding:"3px 8px",fontSize:11,fontWeight:700}}>{c.estado}</span></td>
                                 </tr>
                               ))}

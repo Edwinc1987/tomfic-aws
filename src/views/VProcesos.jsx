@@ -14,7 +14,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { PageHeader } from "@/components/ui/page-header";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import EstBadge from "@/components/EstBadge";
-import { G, TODAY, ID, conteosReales, conteoAjusteActivo, todosConteosCerrados } from "@/lib/data";
+import { G, TODAY, ID, conteosReales, conteoAjusteActivo, todosConteosCerrados, rondaCerrada, conteoCompleto } from "@/lib/data";
 
 // ── PROCESOS ──
 export function VProcesos({G,rerender,showToast,usuario}){
@@ -74,20 +74,19 @@ export function VProcesos({G,rerender,showToast,usuario}){
   const conteosVis=conteosReales(); // excluye el conteo de ajuste de las vistas normales
   const ajuste=conteoAjusteActivo();
   const totalConteos=conteosVis.length;
-  const conteosCompletos=conteosVis.filter(c=>{
-    if(c.tipo==="1conteo") return ["cerradoC1","completado"].includes(c.estado);
-    return ["completado","cerradoC2"].includes(c.estado);
-  }).length;
+  const conteosCompletos=conteosVis.filter(conteoCompleto).length;
   const pct=totalConteos?Math.round(conteosCompletos/totalConteos*100):0;
 
   // Pendientes por completar (ahora se muestran dentro del botón "Alertas").
-  const conteosPend=G.conteos.filter(c=>c.estado!=="completado"&&c.tipo!=="ajuste").map(c=>{
+  const conteosPend=G.conteos.filter(c=>c.tipo!=="ajuste"&&!conteoCompleto(c)).map(c=>{
     let razon="";
     if(c.estado==="pendiente")razon="Sin iniciar";
-    else if(c.estado==="enCurso")razon="C1 en curso";
-    else if(c.estado==="cerradoC1")razon=c.tipo==="2conteos"?"Falta C2":"";
     else if(c.estado==="diferencia")razon="Tiene diferencias, falta C3";
     else if(c.estado==="enC3")razon="C3 en curso";
+    else if(c.tipo==="2conteos"){
+      const c1=rondaCerrada(c,"C1"),c2=rondaCerrada(c,"C2");
+      razon=c1&&!c2?"Falta C2":c2&&!c1?"Falta C1":"C1 en curso";
+    } else razon="C1 en curso";
     return {c,razon};
   }).filter(x=>x.razon!=="");
   // Ubicaciones sin conteo: comparar por RUTA (ubicación›localización›nro), NO por id.
@@ -185,8 +184,8 @@ export function VProcesos({G,rerender,showToast,usuario}){
     const rc=c.rondasCerradas||[];
     if(rc.includes("C3"))return [];
     const r=[];
-    if(c.c1Cerrado===true||rc.includes("C1")||["cerradoC1","cerradoC2","completado","diferencia","enC3"].includes(c.estado))r.push("C1");
-    if(c.tipo==="2conteos"&&c.usuarioC2&&(c.c2Cerrado===true||rc.includes("C2")||["cerradoC2","completado","diferencia"].includes(c.estado)))r.push("C2");
+    if(rondaCerrada(c,"C1"))r.push("C1");
+    if(c.tipo==="2conteos"&&c.usuarioC2&&rondaCerrada(c,"C2"))r.push("C2");
     return r;
   };
 
@@ -299,8 +298,8 @@ export function VProcesos({G,rerender,showToast,usuario}){
         {[
            {l:"Productos",v:total,c:"#2563eb",icon:Package,detail:[`${total} productos cargados en la base.`]},
            {l:"Total conteos",v:totalConteos,c:"#475569",icon:ClipboardList,detail:conteosVis.map(c=>c.nombre)},
-           {l:"Completados",v:conteosCompletos,total:totalConteos,c:"#16a34a",icon:CheckCircle,detail:conteosVis.filter(c=>["completado","cerradoC2","cerradoC1"].includes(c.estado)).map(c=>c.nombre)},
-           {l:"En progreso",v:totalConteos-conteosCompletos,total:totalConteos,c:"#0891b2",icon:Settings,detail:conteosVis.filter(c=>!["completado","cerradoC2","cerradoC1"].includes(c.estado)).map(c=>`${c.nombre} · ${c.estado}`)},
+           {l:"Completados",v:conteosCompletos,total:totalConteos,c:"#16a34a",icon:CheckCircle,detail:conteosVis.filter(conteoCompleto).map(c=>c.nombre)},
+           {l:"En progreso",v:totalConteos-conteosCompletos,total:totalConteos,c:"#0891b2",icon:Settings,detail:conteosVis.filter(c=>!conteoCompleto(c)).map(c=>`${c.nombre} · ${c.estado}`)},
            {l:"Con diferencia",v:G.conteos.filter(c=>c.tipo==="2conteos"&&getDifsConteo(c).length>0).length,c:"#dc2626",icon:AlertTriangle,detail:conteosVis.filter(c=>getDifsConteo(c).length>0).map(c=>`${c.nombre} · ${getDifsConteo(c).length} productos`)},
            {l:"Alertas",v:nAlertas+totalPend,c:"#7c3aed",icon:Bell,detail:[...G.alertas.filter(a=>!a.leida).map(a=>`${a.usuario} terminó ${a.ronda} · ${a.conteoNombre}`),...conteosPend.map(x=>`${x.c.nombre} · ${x.razon}`),...locSinConteo.map(l=>`${l.ubicacion} › ${l.localizacion} › ${l.nro} · sin conteo`)]},
          ].map(s=>(
@@ -491,10 +490,9 @@ export function VProcesos({G,rerender,showToast,usuario}){
                   const c3s=caps.filter(x=>x.conteoId===c.id&&x.ronda==="C3");
                   const difs=getDifsConteo(c);
 
-                  // C1 cerrado si estado es cerradoC1/completado/diferencia/enC3/cerradoC2
-                  const c1Cerrado=["cerradoC1","cerradoC2","completado","diferencia","enC3"].includes(c.estado);
-                  // C2 cerrado solo si estado avanzó más allá de cerradoC1
-                  const c2Cerrado=["cerradoC2","completado","diferencia","enC3"].includes(c.estado);
+                  // Fuente de verdad: rondasCerradas (no el estado sobrecargado).
+                  const c1Cerrado=rondaCerrada(c,"C1");
+                  const c2Cerrado=c.tipo==="2conteos"&&rondaCerrada(c,"C2");
                   // Hay diferencia real
                   const hayDifs=difs.length>0&&c1Cerrado&&c2Cerrado;
 
