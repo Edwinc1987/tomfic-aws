@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Package, ClipboardList, Database, MapPin, FolderOpen, Radio, BarChart2, Users, Landmark, Bell, RefreshCw, Cloud, Menu, ChevronRight, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -31,16 +31,6 @@ export function ModAdmin({usuario,setUsuario,logout,G,rerender,recargar,showToas
     {id:"usuarios",icon:Users,           label:"Usuarios",group:"CONFIGURAR"},
   ];
   const props={usuario,setUsuario,G,rerender,recargar,showToast};
-
-  useEffect(()=>{
-    const t=setInterval(()=>{
-      const el=document.activeElement;
-      const tag=el&&el.tagName?el.tagName.toUpperCase():"";
-      if(tag==="INPUT"||tag==="SELECT"||tag==="TEXTAREA")return;
-      recargar();
-    },10000);
-    return ()=>clearInterval(t);
-  },[]);
 
   const navActual=nav.find(n=>n.id===view);
 
