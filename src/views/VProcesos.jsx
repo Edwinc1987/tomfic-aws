@@ -165,6 +165,9 @@ export function VProcesos({G,rerender,showToast,usuario}){
   const asignarC3=(id,u)=>{G.conteos=G.conteos.map(c=>c.id===id?{...c,usuarioC3:u,estado:"enC3"}:c);rerender();showToast("C3 asignado ✓");};
 
   const reabrirRonda=(c,ronda)=>{
+    if(c.usuarioC3||(c.rondasCerradas||[]).includes("C3")){
+      setModalReabrir(null);return showToast("Este conteo ya pasó por C3 y no puede reabrirse","err");
+    }
     // Debe QUITAR la ronda de rondasCerradas (no solo cambiar estado); si no, el capturador
     // la sigue viendo cerrada y no la puede abrir. Misma lógica que en Conteos.
     const rc=(c.rondasCerradas||[]).filter(r=>r!==ronda);

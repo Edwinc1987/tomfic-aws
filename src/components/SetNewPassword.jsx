@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Eye, EyeOff, AlertTriangle, Key } from "lucide-react";
-import { supabase } from "@/lib/data";
+import { authService } from "@/core/auth/authService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,9 +16,9 @@ export default function SetNewPassword({onDone}){
     if(p1.length<6)return setErr("La contraseña debe tener al menos 6 caracteres.");
     if(p1!==p2)return setErr("Las contraseñas no coinciden.");
     setBusy(true);
-    const {error}=await supabase.auth.updateUser({password:p1});
+    const {error}=await authService.updatePassword(p1);
     if(error){setBusy(false);return setErr(error.message||"No se pudo actualizar la contraseña.");}
-    try{await supabase.auth.signOut();}catch(e){}
+    try{await authService.signOut();}catch(e){}
     setBusy(false);
     onDone&&onDone();
   };

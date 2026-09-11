@@ -270,7 +270,9 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
   const cerrarConteo=()=>{
     if(!miConteo||!miRonda||!soyPrincipal(miConteo))return;
     // Marcar esta ronda como cerrada independientemente
-    const rondasCerradas=[...getRondasCerradas(miConteo),miRonda];
+    // Se conserva el cierre de las otras rondas; solo se agrega la ronda
+    // actual y se evita duplicarla si hubo un refresco concurrente.
+    const rondasCerradas=[...new Set([...getRondasCerradas(miConteo),miRonda])];
     let nuevoEstado=miConteo.estado;
 
     if(miRonda==="C1"){

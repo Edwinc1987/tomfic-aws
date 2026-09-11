@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Eye, EyeOff, AlertTriangle, Cloud, ChevronLeft, Package, Users, BarChart2, Landmark } from "lucide-react";
-import { supabase } from "@/lib/data";
+import { authService } from "@/core/auth/authService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,7 +16,7 @@ export function Login({lf,setLf,err,onLogin,lastSaved,onBack}){
     setRecMsg(null);
     if(!email||!email.includes("@"))return setRecMsg({ok:false,txt:"Escribe un email válido."});
     setRecBusy(true);
-    const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:window.location.origin});
+     const {error}=await authService.resetPassword(email,window.location.origin);
     setRecBusy(false);
     setRecMsg(error
       ?{ok:false,txt:"No se pudo enviar: "+(error.message||"intenta de nuevo")}
