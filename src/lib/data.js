@@ -79,6 +79,7 @@ export const SB={
   deleteProductosByIds:async(ids)=>{for(let i=0;i<ids.length;i+=200){const{error}=await supabase.from("productos").delete().in("id",ids.slice(i,i+200));if(error)throw error;}},
   upsertInventario:(inv)=>supabase.from("inventarios").upsert(inv,{onConflict:"id"}),
   upsertConteo:(c)=>supabase.from("conteos").upsert(c,{onConflict:"id"}),
+  closeConteoRound:(id,ronda)=>supabase.rpc("close_count_round",{p_count_id:id,p_round:ronda}),
   deleteConteo:(id)=>supabase.from("conteos").delete().eq("id",id),
   deleteInventario:(id)=>supabase.from("inventarios").delete().eq("id",id),
   // Configuración global key/value (ej: contenido de la landing). Tabla: app_config(key text pk, value jsonb)

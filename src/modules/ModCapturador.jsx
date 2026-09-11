@@ -267,13 +267,13 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
     rerender();showToast(`✓ ${p.nombre} — ${cantidad}`);
   };
 
-  const cerrarConteo=()=>{
+  const cerrarConteo=async()=>{
     if(!miConteo||!miRonda||!soyPrincipal(miConteo))return;
-    // Marcar esta ronda como cerrada independientemente
-    // Se conserva el cierre de las otras rondas; solo se agrega la ronda
-    // actual y se evita duplicarla si hubo un refresco concurrente.
-    const rondasCerradas=[...new Set([...getRondasCerradas(miConteo),miRonda])];
-    let nuevoEstado=miConteo.estado;
+    try{
+      const {data,error}=await SB.closeConteoRound(miConteo.id,miRonda);
+      if(error)throw error;
+      const rondasCerradas=Array.isArray(data?.rondas_cerradas)?data.rondas_cerradas:JSON.parse(data?.rondas_cerradas||"[]");
+      let nuevoEstado=miConteo.estado;
 
     if(miRonda==="C1"){
       // Si C2 también ya cerró, comparar
@@ -303,10 +303,11 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
       nuevoEstado="completado";
     }
 
-    G.conteos=G.conteos.map(c=>c.id===miConteo.id?{...c,estado:nuevoEstado,rondasCerradas}:c);
-    G.alertas.push({usuario:usuario.nombre,conteoNombre:miConteo.nombre,conteoId:miConteo.id,ronda:miRonda,hora:HOUR(),leida:false});
-    setModalCerrar(false);setConteoActivo(null);setRondaActiva(null);
-    rerender();showToast("Conteo terminado ✓");
+      G.conteos=G.conteos.map(c=>c.id===miConteo.id?{...c,estado:nuevoEstado,rondasCerradas}:c);
+      G.alertas.push({usuario:usuario.nombre,conteoNombre:miConteo.nombre,conteoId:miConteo.id,ronda:miRonda,hora:HOUR(),leida:false});
+      setModalCerrar(false);setConteoActivo(null);setRondaActiva(null);
+      rerender();showToast("Conteo terminado ✓");
+    }catch(e){showToast(e.message||"No se pudo cerrar esta ronda. Ejecuta la actualización SQL e inténtalo de nuevo.","err");}
   };
 
   const rcol={C1:"#2563eb",C2:"#16a34a",C3:"#7c3aed"};
