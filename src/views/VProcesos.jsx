@@ -165,7 +165,7 @@ export function VProcesos({G,rerender,showToast,usuario}){
   const asignarC3=(id,u)=>{G.conteos=G.conteos.map(c=>c.id===id?{...c,usuarioC3:u,estado:"enC3"}:c);rerender();showToast("C3 asignado ✓");};
 
   const reabrirRonda=async(c,ronda)=>{
-    const c3Cerrado=c.c3Cerrado===true||(c.rondasCerradas||[]).includes("C3")||(c.usuarioC3&&c.estado==="completado");
+    const c3Cerrado=(c.rondasCerradas||[]).includes("C3");
     if(c3Cerrado){
       setModalReabrir(null);return showToast("Este conteo ya pasó por C3 y no puede reabrirse","err");
     }
@@ -183,7 +183,7 @@ export function VProcesos({G,rerender,showToast,usuario}){
   };
   const rondasReabribles=(c)=>{
     const rc=c.rondasCerradas||[];
-    if(c.c3Cerrado===true||rc.includes("C3")||(c.usuarioC3&&c.estado==="completado"))return [];
+    if(rc.includes("C3"))return [];
     const r=[];
     if(c.c1Cerrado===true||rc.includes("C1")||["cerradoC1","cerradoC2","completado","diferencia","enC3"].includes(c.estado))r.push("C1");
     if(c.tipo==="2conteos"&&c.usuarioC2&&(c.c2Cerrado===true||rc.includes("C2")||["cerradoC2","completado","diferencia"].includes(c.estado)))r.push("C2");
