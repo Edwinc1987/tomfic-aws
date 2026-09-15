@@ -1,0 +1,165 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum CompanyStage {
+  PROSPECTO
+  DEMO
+  PRUEBA
+  ACTIVO
+  EN_RIESGO
+  SUSPENDIDO
+  RETIRADO
+}
+
+enum UserRole {
+  OWNER
+  ADMIN
+  MANAGER
+  CAPTURER
+  COMMERCIAL
+}
+
+enum CountRoundName {
+  C1
+  C2
+  C3
+}
+
+enum CountRoundStatus {
+  OPEN
+  CLOSED
+}
+
+model Tenant {
+  id           String       @id @default(uuid())
+  name         String
+  taxId        String       @unique
+  stage        CompanyStage @default(PROSPECTO)
+  plan         String       @default("basico")
+  monthlyPrice Decimal      @default(0) @db.Decimal(12, 2)
+  expiresAt    DateTime?
+  active       Boolean      @default(false)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  users        User[]
+  inventories  Inventory[]
+  products     Product[]
+  counts       Count[]
+  payments     Payment[]
+
+  @@index([stage])
+  @@index([active])
+}
+
+model User {
+  id           String      @id @default(uuid())
+  tenantId     String
+  tenant       Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name         String
+  email        String      @unique
+  role         UserRole
+  active       Boolean     @default(true)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  rounds       CountRound[]
+
+  @@index([tenantId, role])
+}
+
+model Inventory {
+  id           String      @id @default(uuid())
+  tenantId     String
+  tenant       Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name         String
+  status       String      @default("OPEN")
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  products     Product[]
+  counts       Count[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, status])
+}
+
+model Product {
+  id           String    @id @default(uuid())
+  tenantId     String
+  tenant       Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  inventoryId  String
+  inventory    Inventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+  code         String    @default("")
+  barcode      String    @default("")
+  name         String
+  balance      Decimal   @default(0) @db.Decimal(14, 3)
+  cost         Decimal   @default(0) @db.Decimal(14, 2)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  captures     Capture[]
+
+  @@index([tenantId, inventoryId, name])
+  @@index([tenantId, inventoryId, code])
+  @@index([tenantId, inventoryId, barcode])
+}
+
+model Count {
+  id           String      @id @default(uuid())
+  tenantId     String
+  tenant       Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  inventoryId  String
+  inventory    Inventory   @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+  name         String
+  location     String
+  status       String      @default("PENDING")
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  rounds       CountRound[]
+
+  @@index([tenantId, inventoryId, status])
+}
+
+model CountRound {
+  id           String          @id @default(uuid())
+  countId      String
+  count        Count           @relation(fields: [countId], references: [id], onDelete: Cascade)
+  name         CountRoundName
+  status       CountRoundStatus @default(OPEN)
+  assignedToId String?
+  assignedTo   User?           @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+  closedAt     DateTime?
+  captures     Capture[]
+
+  @@unique([countId, name])
+  @@index([assignedToId, status])
+}
+
+model Capture {
+  id           String     @id @default(uuid())
+  operationId  String     @unique
+  productId    String
+  product      Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  roundId      String
+  round        CountRound @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  quantity     Decimal    @db.Decimal(14, 3)
+  condition    String     @default("BUENO")
+  capturedAt   DateTime   @default(now())
+
+  @@index([roundId, productId])
+}
+
+model Payment {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  amount    Decimal  @db.Decimal(12, 2)
+  paidAt    DateTime @default(now())
+  receiptKey String?
+  note      String?
+
+  @@index([tenantId, paidAt])
+}
