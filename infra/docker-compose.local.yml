@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: tomfic-aws-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: tomfic_dev
+      POSTGRES_USER: tomfic
+      POSTGRES_PASSWORD: tomfic_local_only
+    ports:
+      - "5433:5432"
+    volumes:
+      - tomfic_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tomfic -d tomfic_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  tomfic_postgres_data:
