@@ -10,6 +10,7 @@ export function CrmPage({ tenantId }) {
   const [payments, setPayments] = useState([]);
   const [tickets, setTickets] = useState([]);
   const [health, setHealth] = useState(null);
+  const [audit, setAudit] = useState([]);
   const [stage, setStage] = useState("");
   const [contactName, setContactName] = useState("");
   const [activityTitle, setActivityTitle] = useState("");
@@ -21,13 +22,14 @@ export function CrmPage({ tenantId }) {
     if (!tenantId) return;
     try {
       setError("");
-      const [profileData, dashboardData, contactsData, activitiesData, paymentsData, ticketsData, healthData] = await Promise.all([
+      const [profileData, dashboardData, contactsData, activitiesData, paymentsData, ticketsData, healthData, auditData] = await Promise.all([
         crmApi.profile(tenantId), crmApi.dashboard(tenantId), crmApi.contacts(tenantId),
-        crmApi.activities(tenantId), crmApi.payments(tenantId), crmApi.tickets(tenantId), crmApi.health(tenantId),
+        crmApi.activities(tenantId), crmApi.payments(tenantId), crmApi.tickets(tenantId), crmApi.health(tenantId), crmApi.audit(tenantId),
       ]);
       setProfile(profileData); setStage(profileData.stage || ""); setDashboard(dashboardData);
       setContacts(contactsData); setActivities(activitiesData); setPayments(paymentsData);
       setTickets(ticketsData); setHealth(healthData);
+      setAudit(auditData);
     } catch (loadError) { setError(loadError.message || "No se pudo cargar el CRM"); }
   };
 
@@ -39,7 +41,7 @@ export function CrmPage({ tenantId }) {
   const addTicket = async () => { if (!ticketTitle.trim()) return; await crmApi.createTicket(tenantId, { title: ticketTitle, priority: "MEDIUM" }); setTicketTitle(""); await load(); };
   const updateStage = async () => { if (!stage) return; await crmApi.changeStage(tenantId, stage); await load(); };
 
-  const tabs = [["activities", "Actividades"], ["contacts", "Contactos"], ["payments", "Pagos"], ["tickets", "Soporte"], ["health", "Salud"]];
+  const tabs = [["activities", "Actividades"], ["contacts", "Contactos"], ["payments", "Pagos"], ["tickets", "Soporte"], ["health", "Salud"], ["audit", "Auditoría"]];
   return <section aria-label="CRM" className="space-y-4">
     <header className="flex flex-wrap items-end justify-between gap-3">
       <div><p className="text-xs font-semibold uppercase tracking-wide text-indigo-600">Panel del dueño</p><h1 className="text-2xl font-bold text-slate-900">{profile?.name || "CRM de clientes"}</h1><p className="text-sm text-slate-500">Ficha 360 · {profile?.stage || "Cargando etapa"} · Plan {profile?.plan || "—"}</p></div>
@@ -53,6 +55,7 @@ export function CrmPage({ tenantId }) {
     {tab === "payments" && <Panel title="Pagos" input={paymentAmount} setInput={setPaymentAmount} placeholder="Monto del pago" action={addPayment} actionLabel="Registrar pago" type="number" items={payments} render={payment => <><span className="font-semibold">{payment.amount}</span><span className="text-xs text-slate-500">{String(payment.paidAt).slice(0, 10)}</span></>} />}
     {tab === "tickets" && <Panel title="Soporte" input={ticketTitle} setInput={setTicketTitle} placeholder="Nuevo ticket de soporte" action={addTicket} actionLabel="Crear ticket" items={tickets} render={ticket => <><div><div className="font-semibold">{ticket.title}</div><div className="text-xs text-slate-500">{ticket.description || "Sin descripción"}</div></div><span className="text-xs uppercase text-amber-700">{ticket.status}</span></>} />}
     {tab === "health" && <div className="rounded-lg border bg-white p-5">{health ? <><div className="text-xs font-bold uppercase text-slate-500">Riesgo</div><div className="mt-1 text-2xl font-extrabold text-indigo-700">{health.risk}</div><div className="mt-4 grid grid-cols-3 gap-3 text-center"><Metric label="Score" value={health.score} /><Metric label="Usuarios" value={health.activeUsers} /><Metric label="Inventarios" value={health.activeInventories} /></div></> : <div className="text-sm text-slate-500">Aún no hay datos de salud para esta empresa.</div>}</div>}
+    {tab === "audit" && <div className="rounded-lg border bg-white p-5"><h2 className="mb-4 text-lg font-bold">Historial de cambios</h2><div className="space-y-3">{audit.length ? audit.map(event => <div key={event.id} className="border-l-2 border-indigo-500 pl-3"><div className="font-semibold text-slate-800">{event.action}</div><div className="text-xs text-slate-500">{event.entityType} · {String(event.createdAt).replace("T", " ").slice(0, 19)}</div></div>) : <div className="text-sm text-slate-500">No hay eventos registrados.</div>}</div></div>}
   </section>;
 }
 
