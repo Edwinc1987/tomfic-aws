@@ -28,7 +28,7 @@ export class CrmController{
   changeStage(@Req() request:{auth:{userId:string;tenantId:string;role:string}},@Body() body:{stage?:string}){
     requirePermission(request.auth,"tenant:manage");
     if(!body.stage?.trim())throw new BadRequestException("stage es obligatorio");
-    return this.repository.changeStage(request.auth.tenantId,body.stage.trim());
+    return this.repository.changeStage(request.auth.tenantId,request.auth.userId,body.stage.trim());
   }
 
   @Get("contacts")
@@ -38,7 +38,7 @@ export class CrmController{
   createContact(@Req() request:{auth:{userId:string;tenantId:string;role:string}},@Body() body:{name?:string;email?:string;phone?:string;position?:string}){
     requirePermission(request.auth,"tenant:manage");
     if(!body.name?.trim())throw new BadRequestException("name es obligatorio");
-    return this.repository.createContact(request.auth.tenantId,{name:body.name,email:body.email,phone:body.phone,position:body.position});
+    return this.repository.createContact(request.auth.tenantId,request.auth.userId,{name:body.name,email:body.email,phone:body.phone,position:body.position});
   }
 
   @Get("activities")
@@ -48,7 +48,7 @@ export class CrmController{
   createActivity(@Req() request:{auth:{userId:string;tenantId:string;role:string}},@Body() body:{type?:string;title?:string;description?:string;dueAt?:string;ownerId?:string}){
     requirePermission(request.auth,"tenant:manage");
     if(!body.type?.trim()||!body.title?.trim())throw new BadRequestException("type y title son obligatorios");
-    return this.repository.createActivity(request.auth.tenantId,{type:body.type,title:body.title,description:body.description,dueAt:body.dueAt,ownerId:body.ownerId});
+    return this.repository.createActivity(request.auth.tenantId,request.auth.userId,{type:body.type,title:body.title,description:body.description,dueAt:body.dueAt,ownerId:body.ownerId});
   }
 
   @Post("notes")
@@ -65,7 +65,7 @@ export class CrmController{
   registerPayment(@Req() request:{auth:{userId:string;tenantId:string;role:string}},@Body() body:{amount?:number;paidAt?:string;receiptKey?:string;note?:string}){
     requirePermission(request.auth,"billing:read");
     if(!(Number(body.amount)>0))throw new BadRequestException("amount debe ser mayor que cero");
-    return this.repository.registerPayment(request.auth.tenantId,{amount:Number(body.amount),paidAt:body.paidAt,receiptKey:body.receiptKey,note:body.note});
+    return this.repository.registerPayment(request.auth.tenantId,request.auth.userId,{amount:Number(body.amount),paidAt:body.paidAt,receiptKey:body.receiptKey,note:body.note});
   }
 
   @Get("tickets")
@@ -75,7 +75,7 @@ export class CrmController{
   createTicket(@Req() request:{auth:{userId:string;tenantId:string;role:string}},@Body() body:{title?:string;description?:string;priority?:string}){
     requirePermission(request.auth,"tenant:manage");
     if(!body.title?.trim())throw new BadRequestException("title es obligatorio");
-    return this.repository.createTicket(request.auth.tenantId,{title:body.title,description:body.description,priority:body.priority});
+    return this.repository.createTicket(request.auth.tenantId,request.auth.userId,{title:body.title,description:body.description,priority:body.priority});
   }
 
   @Get("health")
