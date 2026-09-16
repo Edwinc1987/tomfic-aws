@@ -23,5 +23,6 @@ const rolePermissions:Record<string,Permission[]>={
 export const can=(context:AuthContext,permission:Permission)=>rolePermissions[context.role.toUpperCase()]?.includes(permission)??false;
 
 export const requirePermission=(context:AuthContext,permission:Permission)=>{
-  if(!can(context,permission))throw new Error(`Permiso insuficiente: ${permission}`);
+  if(!can(context,permission))throw new ForbiddenException(`Permiso insuficiente: ${permission}`);
 };
+import { ForbiddenException } from "@nestjs/common";
