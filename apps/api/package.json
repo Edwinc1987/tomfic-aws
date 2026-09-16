@@ -7,7 +7,7 @@
     "dev": "tsx watch src/main.ts",
     "start": "tsx src/main.ts",
     "test": "vitest run",
-    "test:db": "cross-env RUN_DB_TESTS=1 vitest run src/features/counts/infrastructure/count-concurrency.integration.test.ts src/features/counts/infrastructure/capture-idempotency.integration.test.ts src/features/inventories/infrastructure/inventory-isolation.integration.test.ts",
+    "test:db": "cross-env RUN_DB_TESTS=1 vitest run src/features/counts/infrastructure/count-concurrency.integration.test.ts src/features/counts/infrastructure/capture-idempotency.integration.test.ts src/features/counts/infrastructure/count-tenant-isolation.integration.test.ts src/features/inventories/infrastructure/inventory-isolation.integration.test.ts src/features/products/infrastructure/product-isolation.integration.test.ts",
     "seed": "prisma db seed"
   },
   "dependencies": {
