@@ -7,6 +7,7 @@ import CamScanner from "@/components/CamScanner";
 import BtnNotas from "@/components/BtnNotas";
 import SyncStatus from "@/components/SyncStatus";
 import { G, SB, supabase, ID, TODAY, HOUR, conteoCompleto, nU, getStInv, card, inp, selectInventory } from "@/lib/data";
+import { useCaptureOutbox } from "@/features/counts/hooks/useCaptureOutbox";
 
 function EstBadge({e}){
   const m={BUENO:["#dcfce7","#166534"],VENCIDO:["#fee2e2","#dc2626"],AVERIADO:["#fef3c7","#92400e"],"NO APTO VENTA":["#fee2e2","#991b1b"],BAJAS:["#fef9c3","#854d0e"],"SIN REVISAR":["#f1f5f9","#475569"]};
@@ -31,6 +32,8 @@ const comprimirFoto=(file)=>new Promise((resolve,reject)=>{
 });
 
 export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,showToast}){
+  const outboxEnabled=import.meta.env.VITE_CAPTURE_OUTBOX_ENABLED==="true";
+  const captureOutbox=useCaptureOutbox({tenantId:G.tenantId,apiUrl:import.meta.env.VITE_API_URL||"http://localhost:3000",headers:{"x-tenant-id":G.tenantId||"","x-user-id":usuario?.id||usuario?.nombre||"","x-user-role":usuario?.rol||"CAPTURER"}});
   const [conteoActivo,setConteoActivo]=useState(()=>{try{return sessionStorage.getItem("tomfic_cap_conteo")||null;}catch(e){return null;}});
   const [rondaActiva,setRondaActiva]=useState(()=>{try{return sessionStorage.getItem("tomfic_cap_ronda")||null;}catch(e){return null;}}); // ronda elegida cuando el usuario tiene varias
   const [scanInput,setScanInput]=useState("");
@@ -64,6 +67,7 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
   const [soloDif,setSoloDif]=useState(true); // ajuste: por defecto solo productos con diferencia
   const scanRef=useRef(null);
   const unidadesRef=useRef(null);
+  const queueRemoteCapture=(capture)=>{if(outboxEnabled)void captureOutbox.capture(capture);};
 
   // Auto-refresco desde la nube cada 10s. Se pausa si el capturador está
   // escribiendo una captura o tiene la cámara abierta, para no interrumpir.
@@ -215,6 +219,7 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
        estado:form.estado,obs:form.obs,fotos:form.fotos||[],
       usuario:usuario.nombre,fecha:TODAY(),hora:HOUR(),
     };
+    queueRemoteCapture({operationId:key,productId:productoActivo.id,countId:miConteo.id,round:miRonda,quantity:total,condition:form.estado});
     rerender();showToast(`✓ ${productoActivo.nombre} — ${total} und`);
      setProductoActivo(null);resetForm();
     setEditCap(null);
@@ -243,6 +248,7 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
        estado:form.estado,obs:form.obs?("(ajuste) "+form.obs):"Ajuste: resta de unidades",fotos:form.fotos||[],
       usuario:usuario.nombre,fecha:TODAY(),hora:HOUR(),ajuste:true,
     };
+    queueRemoteCapture({operationId:key,productId:productoActivo.id,countId:miConteo.id,round:miRonda,quantity:-cant,condition:form.estado});
     rerender();showToast(`➖ ${productoActivo.nombre} — restadas ${cant} und (queda ${totalAnt-cant})`);
      setProductoActivo(null);resetForm();
     setEditCap(null);
@@ -263,6 +269,7 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
       cantidad,estado:"BUENO",obs:"",
       usuario:usuario.nombre,fecha:TODAY(),hora:HOUR(),
     };
+    queueRemoteCapture({operationId:key,productId:p.id,countId:miConteo.id,round:"C3",quantity,condition:"BUENO"});
     setC3Vals(prev=>({...prev,[p.id]:""}));
     rerender();showToast(`✓ ${p.nombre} — ${cantidad}`);
   };
