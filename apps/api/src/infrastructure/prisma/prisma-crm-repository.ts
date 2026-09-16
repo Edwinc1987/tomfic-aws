@@ -62,4 +62,12 @@ export class PrismaCrmRepository implements CrmRepository{
       return payment;
     });
   }
+
+  listTickets(tenantId:string){return this.db.supportTicket.findMany({where:{tenantId},orderBy:{createdAt:"desc"},take:100});}
+
+  createTicket(tenantId:string,input:{title:string;description?:string;priority?:string}){
+    return this.db.supportTicket.create({data:{tenantId,title:input.title.trim(),description:input.description?.trim()||null,priority:(input.priority||"MEDIUM") as any}});
+  }
+
+  getHealth(tenantId:string){return this.db.customerHealth.findUnique({where:{tenantId}});}
 }

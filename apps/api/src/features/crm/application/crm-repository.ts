@@ -9,4 +9,7 @@ export interface CrmRepository{
   createNote(tenantId:string,authorId:string,body:string):Promise<unknown>;
   listPayments(tenantId:string):Promise<unknown[]>;
   registerPayment(tenantId:string,input:{amount:number;paidAt?:string;receiptKey?:string;note?:string}):Promise<unknown>;
+  listTickets(tenantId:string):Promise<unknown[]>;
+  createTicket(tenantId:string,input:{title:string;description?:string;priority?:string}):Promise<unknown>;
+  getHealth(tenantId:string):Promise<unknown>;
 }

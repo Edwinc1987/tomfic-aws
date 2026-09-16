@@ -60,4 +60,17 @@ export class CrmController{
     if(!(Number(body.amount)>0))throw new BadRequestException("amount debe ser mayor que cero");
     return this.repository.registerPayment(request.auth.tenantId,{amount:Number(body.amount),paidAt:body.paidAt,receiptKey:body.receiptKey,note:body.note});
   }
+
+  @Get("tickets")
+  tickets(@Req() request:{auth:{tenantId:string}}){return this.repository.listTickets(request.auth.tenantId);}
+
+  @Post("tickets")
+  createTicket(@Req() request:{auth:{userId:string;tenantId:string;role:string}},@Body() body:{title?:string;description?:string;priority?:string}){
+    requirePermission(request.auth,"tenant:manage");
+    if(!body.title?.trim())throw new BadRequestException("title es obligatorio");
+    return this.repository.createTicket(request.auth.tenantId,{title:body.title,description:body.description,priority:body.priority});
+  }
+
+  @Get("health")
+  health(@Req() request:{auth:{tenantId:string}}){return this.repository.getHealth(request.auth.tenantId);}
 }
