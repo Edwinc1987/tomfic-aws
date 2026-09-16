@@ -9,4 +9,6 @@ export const crmApi={
   createContact:(tenantId,body)=>apiRequest("/v1/crm/contacts",{method:"POST",headers:{...headers(tenantId),"x-user-role":"ADMIN"},body}),
   activities:(tenantId)=>apiRequest("/v1/crm/activities",{headers:headers(tenantId)}),
   createActivity:(tenantId,body)=>apiRequest("/v1/crm/activities",{method:"POST",headers:{...headers(tenantId),"x-user-role":"ADMIN"},body}),
+  payments:(tenantId)=>apiRequest("/v1/crm/payments",{headers:headers(tenantId)}),
+  createPayment:(tenantId,body)=>apiRequest("/v1/crm/payments",{method:"POST",headers:{...headers(tenantId),"x-user-role":"ADMIN"},body}),
 };
