@@ -4,12 +4,15 @@ import { PrismaProductRepository } from "./infrastructure/prisma/prisma-product-
 import { ApiAuthGuard } from "./core/auth/cognito-auth.guard";
 import { InventoriesController } from "./features/inventories/presentation/inventories.controller";
 import { PrismaInventoryRepository } from "./infrastructure/prisma/prisma-inventory-repository";
+import { CountsController } from "./features/counts/presentation/counts.controller";
+import { PrismaCountRepository } from "./infrastructure/prisma/prisma-count-repository";
 
 @Module({
-  controllers:[ProductsController,InventoriesController],
+  controllers:[ProductsController,InventoriesController,CountsController],
   providers:[
     {provide:"ProductRepository",useClass:PrismaProductRepository},
     {provide:"InventoryRepository",useClass:PrismaInventoryRepository},
+    {provide:"CountRepository",useClass:PrismaCountRepository},
     ApiAuthGuard,
   ],
 })
