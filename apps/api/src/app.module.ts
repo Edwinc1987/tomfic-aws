@@ -1,4 +1,6 @@
 import { Module } from "@nestjs/common";
+import { APP_GUARD } from "@nestjs/core";
+import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import { ProductsController } from "./features/products/presentation/products.controller";
 import { PrismaProductRepository } from "./infrastructure/prisma/prisma-product-repository";
 import { ApiAuthGuard } from "./core/auth/cognito-auth.guard";
@@ -13,6 +15,7 @@ import { PrismaCrmRepository } from "./infrastructure/prisma/prisma-crm-reposito
 import { PrismaAuditRepository } from "./infrastructure/prisma/prisma-audit-repository";
 
 @Module({
+  imports:[ThrottlerModule.forRoot([{ttl:60000,limit:100}])],
   controllers:[ProductsController,InventoriesController,CountsController,CapturesController,CrmController],
   providers:[
     {provide:"ProductRepository",useClass:PrismaProductRepository},
@@ -21,6 +24,7 @@ import { PrismaAuditRepository } from "./infrastructure/prisma/prisma-audit-repo
     {provide:"CaptureRepository",useClass:PrismaCaptureRepository},
     {provide:"CrmRepository",useClass:PrismaCrmRepository},
     {provide:"AuditRepository",useClass:PrismaAuditRepository},
+    {provide:APP_GUARD,useClass:ThrottlerGuard},
     ApiAuthGuard,
   ],
 })
