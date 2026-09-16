@@ -13,10 +13,11 @@ import { PrismaCaptureRepository } from "./infrastructure/prisma/prisma-capture-
 import { CrmController } from "./features/crm/presentation/crm.controller";
 import { PrismaCrmRepository } from "./infrastructure/prisma/prisma-crm-repository";
 import { PrismaAuditRepository } from "./infrastructure/prisma/prisma-audit-repository";
+import { HealthController } from "./core/health/health.controller";
 
 @Module({
   imports:[ThrottlerModule.forRoot([{ttl:60000,limit:100}])],
-  controllers:[ProductsController,InventoriesController,CountsController,CapturesController,CrmController],
+  controllers:[HealthController,ProductsController,InventoriesController,CountsController,CapturesController,CrmController],
   providers:[
     {provide:"ProductRepository",useClass:PrismaProductRepository},
     {provide:"InventoryRepository",useClass:PrismaInventoryRepository},
