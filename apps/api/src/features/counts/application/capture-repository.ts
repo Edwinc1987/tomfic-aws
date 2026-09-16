@@ -1,10 +1,12 @@
-import { Capture } from "@prisma/client";
+import { Capture, CountRoundName } from "@prisma/client";
 
 export type CaptureInput={
   operationId:string;
   tenantId:string;
   productId:string;
-  roundId:string;
+  roundId?:string;
+  countId?:string;
+  round?:CountRoundName;
   quantity:number;
   condition:string;
 };

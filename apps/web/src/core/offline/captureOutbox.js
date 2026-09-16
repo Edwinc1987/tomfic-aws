@@ -1,10 +1,10 @@
 import { enqueueOperation, listPendingOperations, markOperationDone, markOperationRetry } from "./outbox";
 
-export const queueCapture=({operationId,tenantId,productId,roundId,quantity,condition="BUENO"})=>enqueueOperation({
+export const queueCapture=({operationId,tenantId,productId,roundId,countId,round,quantity,condition="BUENO"})=>enqueueOperation({
   operationId,
   tenantId,
   type:"CAPTURE",
-  payload:{operationId,productId,roundId,quantity,condition},
+  payload:{operationId,productId,roundId,countId,round,quantity,condition},
 });
 
 const retryAt=(attempts)=>new Date(Date.now()+Math.min(60000,1000*2**attempts).valueOf()).toISOString();
