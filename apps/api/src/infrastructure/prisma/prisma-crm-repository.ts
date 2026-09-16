@@ -75,5 +75,19 @@ export class PrismaCrmRepository implements CrmRepository{
     return this.db.$transaction(async(tx)=>{const ticket=await tx.supportTicket.create({data:{tenantId,title:input.title.trim(),description:input.description?.trim()||null,priority:(input.priority||"MEDIUM") as any}});await this.writeAudit(tx,tenantId,actorId,"TICKET_CREATED","SUPPORT_TICKET",ticket.id);return ticket;});
   }
 
-  getHealth(tenantId:string){return this.db.customerHealth.findUnique({where:{tenantId}});}
+  async getHealth(tenantId:string){
+    const since=new Date();since.setDate(since.getDate()-30);
+    const [activeUsers,activeInventories,recentActivities]=await Promise.all([
+      this.db.user.count({where:{tenantId,active:true}}),
+      this.db.inventory.count({where:{tenantId,status:"OPEN"}}),
+      this.db.crmActivity.count({where:{tenantId,createdAt:{gte:since}}}),
+    ]);
+    const score=Math.min(100,activeUsers*10+activeInventories*20+recentActivities*5);
+    const risk=score>=70?"HEALTHY":score>=40?"WATCH":score>=15?"AT_RISK":"CRITICAL";
+    return this.db.customerHealth.upsert({
+      where:{tenantId},
+      create:{tenantId,score,risk,activeUsers,activeInventories,lastActivityAt:recentActivities?new Date():null},
+      update:{score,risk,activeUsers,activeInventories,lastActivityAt:recentActivities?new Date():null},
+    });
+  }
 }
