@@ -4,6 +4,8 @@ import { VitePWA } from 'vite-plugin-pwa'
 import { fileURLToPath, URL } from 'node:url'
 
 export default defineConfig({
+  // Keep the existing repository-root .env convention after moving the app.
+  envDir: fileURLToPath(new URL('../../', import.meta.url)),
   plugins: [
     react(),
     // PWA: instala un service worker que precachea la app (JS/CSS/HTML/SVG) para

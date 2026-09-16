@@ -21,15 +21,15 @@ React 18 + Vite 4 + Supabase + Tailwind v3 + shadcn/ui + lucide-react + xlsx.
 Tailwind es **v3** (no v4) porque el proyecto usa Vite 4. Alias `@/` → `./src`.
 
 ## Estructura
-- `src/App.jsx` — **monolito** (~5700 líneas), casi toda la app. Componentes
+- `apps/web/src/App.jsx` — **monolito** (~5700 líneas), casi toda la app. Componentes
   principales: `Login`, `ModAdmin`, `ModCapturador`, `ModGerente`, `PanelDueno`,
   y vistas `VBaseDatos`, `VConteos`, `VProcesos`, `VUbicaciones`, `VUsuarios`,
   `VClientes`, `VClienteDetalle`, `VPaginaWeb`, `VLeads`, `VPagos`, `VResumen`.
-- `src/Landing.jsx` — web pública (landing). Componente `Logo` (ícono de marca).
-- `src/landingContent.js` — contenido editable de la landing (hero, about,
+- `apps/web/src/Landing.jsx` — web pública (landing). Componente `Logo` (ícono de marca).
+- `apps/web/src/landingContent.js` — contenido editable de la landing (hero, about,
   features, steps, casos, articulos, planes, contacto) + `mergeLanding`.
 - `supabase/*.sql` — scripts SQL de referencia (multi-tenant, RPCs, RLS, etc.).
-- `public/` — favicon.svg, og-image.svg, robots.txt, sitemap.xml.
+- `apps/web/public/` — favicon.svg, og-image.svg, robots.txt, sitemap.xml.
 
 ## Supabase (producción)
 Proyecto ref `tyulypjzfiabaywusopd`. Multi-tenant con Supabase Auth + RLS.
@@ -52,7 +52,7 @@ sincroniza a la nube. Datos scopeados por `tenant_id`.
   navy `#0f172a`. Tema CLARO (capturadores trabajan con luz directa).
 - **Morado `#7c3aed` = ajuste/desempate** (rol semántico oficial): badge "AJUSTE",
   ronda C3 y botones del conteo de ajuste. No es un desvío de marca.
-- Fuente única de la paleta en `src/theme.js` (`import { C } from "@/theme"`).
+- Fuente única de la paleta en `apps/web/src/theme.js` (`import { C } from "@/theme"`).
   Código nuevo debe usarla; los estilos inline viejos se migran incremental.
 - Accesibilidad: sobre fondo BLANCO, texto gris mínimo `slate-500 #64748b` (AA);
   `slate-400 #94a3b8` solo sobre fondos OSCUROS (navbar/sidebar).
@@ -76,7 +76,7 @@ sincroniza a la nube. Datos scopeados por `tenant_id`.
   cliente Parte 2 (Mi plan + subir soporte de pago, requiere SQL + bucket
   Storage); fotos/evidencia en el capturador; dark theme real del capturador
   (hoy es `filter:invert`); `xlsx` con `import()` dinámico; migrar estilos inline
-  a `src/theme.js`.
+  a `apps/web/src/theme.js`.
 - 🚧 **Multi-inventario** (prioridad del dueño): permitir VARIOS inventarios
   activos a la vez (hoy `crear()` bloquea con "Ya hay un inventario activo").
   Plan: columna `inventario_id` en `conteos` + `limite_inventarios` en `tenants`
