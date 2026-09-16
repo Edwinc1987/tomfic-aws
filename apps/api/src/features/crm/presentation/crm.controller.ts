@@ -44,4 +44,14 @@ export class CrmController{
     if(!body.body?.trim())throw new BadRequestException("body es obligatorio");
     return this.repository.createNote(request.auth.tenantId,request.auth.userId,body.body);
   }
+
+  @Get("payments")
+  payments(@Req() request:{auth:{tenantId:string}}){return this.repository.listPayments(request.auth.tenantId);}
+
+  @Post("payments")
+  registerPayment(@Req() request:{auth:{userId:string;tenantId:string;role:string}},@Body() body:{amount?:number;paidAt?:string;receiptKey?:string;note?:string}){
+    requirePermission(request.auth,"billing:read");
+    if(!(Number(body.amount)>0))throw new BadRequestException("amount debe ser mayor que cero");
+    return this.repository.registerPayment(request.auth.tenantId,{amount:Number(body.amount),paidAt:body.paidAt,receiptKey:body.receiptKey,note:body.note});
+  }
 }

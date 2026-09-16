@@ -6,4 +6,6 @@ export interface CrmRepository{
   listActivities(tenantId:string):Promise<unknown[]>;
   createActivity(tenantId:string,input:{type:string;title:string;description?:string;dueAt?:string;ownerId?:string}):Promise<unknown>;
   createNote(tenantId:string,authorId:string,body:string):Promise<unknown>;
+  listPayments(tenantId:string):Promise<unknown[]>;
+  registerPayment(tenantId:string,input:{amount:number;paidAt?:string;receiptKey?:string;note?:string}):Promise<unknown>;
 }
