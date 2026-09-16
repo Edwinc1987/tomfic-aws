@@ -1,10 +1,10 @@
 import { BadRequestException, Controller, Get, Inject, Query, Req, UseGuards } from "@nestjs/common";
-import { DevAuthGuard } from "../../../core/auth/dev-auth.guard";
+import { ApiAuthGuard } from "../../../core/auth/cognito-auth.guard";
 import { listProducts } from "../application/list-products";
 import { ProductRepository } from "../application/product-repository";
 
 @Controller("v1/products")
-@UseGuards(DevAuthGuard)
+@UseGuards(ApiAuthGuard)
 export class ProductsController{
   private readonly list;
 
