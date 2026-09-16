@@ -15,7 +15,7 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
+      - run: npm install --include=optional
       - run: npm run build:web
       - run: npm run test:offline
 
@@ -43,7 +43,7 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
+      - run: npm install --include=optional
       - run: npm run build:api
       - run: npm run test:api
       - run: npm --workspace @tomfic/api exec prisma migrate deploy
