@@ -3,6 +3,8 @@
   "private": true,
   "version": "0.1.0",
   "scripts": {
+    "prebuild": "prisma generate",
+    "pretest": "prisma generate",
     "build": "tsc --noEmit",
     "dev": "tsx watch src/main.ts",
     "start": "tsx src/main.ts",
