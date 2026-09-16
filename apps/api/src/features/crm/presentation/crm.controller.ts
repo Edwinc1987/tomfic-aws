@@ -2,11 +2,18 @@ import { BadRequestException, Body, Controller, Get, Inject, Post, Req, UseGuard
 import { ApiAuthGuard } from "../../../core/auth/cognito-auth.guard";
 import { requirePermission } from "../../../core/auth/authorization";
 import { CrmRepository } from "../application/crm-repository";
+import { AuditRepository } from "../application/audit-repository";
 
 @Controller("v1/crm")
 @UseGuards(ApiAuthGuard)
 export class CrmController{
-  constructor(@Inject("CrmRepository") private readonly repository:CrmRepository){}
+  constructor(@Inject("CrmRepository") private readonly repository:CrmRepository,@Inject("AuditRepository") private readonly audit:AuditRepository){}
+
+  @Get("audit")
+  auditEvents(@Req() request:{auth:{userId:string;tenantId:string;role:string}}){
+    requirePermission(request.auth,"tenant:manage");
+    return this.audit.list(request.auth.tenantId);
+  }
 
   @Get("dashboard")
   dashboard(@Req() request:{auth:{userId:string;tenantId:string;role:string}}){

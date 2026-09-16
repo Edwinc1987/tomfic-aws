@@ -15,4 +15,5 @@ export const crmApi={
   tickets:(tenantId)=>apiRequest("/v1/crm/tickets",{headers:headers(tenantId)}),
   createTicket:(tenantId,body)=>apiRequest("/v1/crm/tickets",{method:"POST",headers:{...headers(tenantId),"x-user-role":"ADMIN"},body}),
   health:(tenantId)=>apiRequest("/v1/crm/health",{headers:headers(tenantId)}),
+  audit:(tenantId)=>apiRequest("/v1/crm/audit",{headers:{...headers(tenantId),"x-user-role":"ADMIN"}}),
 };
