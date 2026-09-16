@@ -4,6 +4,10 @@ import { CrmRepository } from "../../features/crm/application/crm-repository";
 export class PrismaCrmRepository implements CrmRepository{
   constructor(private readonly db=new PrismaClient()){}
 
+  getCompany(tenantId:string){return this.db.tenant.findUnique({where:{id:tenantId},select:{id:true,name:true,taxId:true,stage:true,plan:true,monthlyPrice:true,expiresAt:true,active:true}});}
+
+  changeStage(tenantId:string,stage:string){return this.db.tenant.update({where:{id:tenantId},data:{stage:stage as any},select:{id:true,name:true,stage:true}});}
+
   listContacts(tenantId:string){return this.db.contact.findMany({where:{tenantId},orderBy:{name:"asc"}});}
 
   createContact(tenantId:string,input:{name:string;email?:string;phone?:string;position?:string}){

@@ -8,6 +8,16 @@ import { CrmRepository } from "../application/crm-repository";
 export class CrmController{
   constructor(@Inject("CrmRepository") private readonly repository:CrmRepository){}
 
+  @Get("profile")
+  profile(@Req() request:{auth:{tenantId:string}}){return this.repository.getCompany(request.auth.tenantId);}
+
+  @Post("profile/stage")
+  changeStage(@Req() request:{auth:{userId:string;tenantId:string;role:string}},@Body() body:{stage?:string}){
+    requirePermission(request.auth,"tenant:manage");
+    if(!body.stage?.trim())throw new BadRequestException("stage es obligatorio");
+    return this.repository.changeStage(request.auth.tenantId,body.stage.trim());
+  }
+
   @Get("contacts")
   contacts(@Req() request:{auth:{tenantId:string}}){return this.repository.listContacts(request.auth.tenantId);}
 
