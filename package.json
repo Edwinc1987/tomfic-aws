@@ -13,6 +13,7 @@
     "build:web": "npm --workspace @tomfic/web run build",
     "build:api": "npm --workspace @tomfic/api run build",
     "test:offline": "npm --workspace @tomfic/web run test:offline",
-    "test:api": "npm --workspace @tomfic/api run test"
+    "test:api": "npm --workspace @tomfic/api run test",
+    "test:db": "npm --workspace @tomfic/api run test:db"
   }
 }

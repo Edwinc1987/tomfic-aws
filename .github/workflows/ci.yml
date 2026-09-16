@@ -21,6 +21,22 @@ jobs:
 
   api:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: tomfic
+          POSTGRES_PASSWORD: tomfic_test
+          POSTGRES_DB: tomfic_test
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U tomfic -d tomfic_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://tomfic:tomfic_test@localhost:5433/tomfic_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -30,6 +46,8 @@ jobs:
       - run: npm ci
       - run: npm run build:api
       - run: npm run test:api
+      - run: npm --workspace @tomfic/api exec prisma migrate deploy
+      - run: npm run test:db
 
   infrastructure:
     runs-on: ubuntu-latest
