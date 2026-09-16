@@ -36,6 +36,28 @@ enum CountRoundStatus {
   CLOSED
 }
 
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_CUSTOMER
+  RESOLVED
+  CLOSED
+}
+
+enum HealthRisk {
+  HEALTHY
+  WATCH
+  AT_RISK
+  CRITICAL
+}
+
 model Tenant {
   id           String       @id @default(uuid())
   name         String
@@ -55,6 +77,8 @@ model Tenant {
   contacts     Contact[]
   activities   CrmActivity[]
   notes        CompanyNote[]
+  tickets      SupportTicket[]
+  health       CustomerHealth?
 
   @@index([stage])
   @@index([active])
@@ -73,6 +97,7 @@ model User {
   rounds       CountRound[]
   activities   CrmActivity[]
   notes        CompanyNote[]
+  assignedTickets SupportTicket[]
 
   @@index([tenantId, role])
 }
@@ -212,4 +237,34 @@ model CompanyNote {
   updatedAt DateTime @updatedAt
 
   @@index([tenantId, createdAt])
+}
+
+model SupportTicket {
+  id          String         @id @default(uuid())
+  tenantId    String
+  tenant      Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  priority    TicketPriority  @default(MEDIUM)
+  status      TicketStatus    @default(OPEN)
+  assignedToId String?
+  assignedTo  User?          @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  resolvedAt  DateTime?
+
+  @@index([tenantId, status, priority])
+  @@index([assignedToId, status])
+}
+
+model CustomerHealth {
+  id             String     @id @default(uuid())
+  tenantId       String     @unique
+  tenant         Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  score          Int        @default(0)
+  risk           HealthRisk @default(HEALTHY)
+  lastActivityAt DateTime?
+  activeUsers    Int        @default(0)
+  activeInventories Int     @default(0)
+  updatedAt      DateTime   @updatedAt
 }
