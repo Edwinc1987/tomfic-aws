@@ -2,6 +2,8 @@ import * as cdk from 'aws-cdk-lib/core';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
+import * as ec2 from 'aws-cdk-lib/aws-ec2';
+import * as rds from 'aws-cdk-lib/aws-rds';
 import { Construct } from 'constructs';
 // import * as sqs from 'aws-cdk-lib/aws-sqs';
 
@@ -41,6 +43,26 @@ export class InfraStack extends cdk.Stack {
     });
     new cdk.CfnOutput(this,"ImportQueueUrl",{value:importQueue.queueUrl});
     new cdk.CfnOutput(this,"StorageBucketName",{value:storageBucket.bucketName});
+
+    // RDS is opt-in until the budget, backup, and network plan are approved.
+    if(process.env.ENABLE_RDS==="true"){
+      const vpc=new ec2.Vpc(this,"TomficVpc",{maxAzs:2,natGateways:0,subnetConfiguration:[{name:"database",subnetType:ec2.SubnetType.PRIVATE_ISOLATED,cidrMask:24}]});
+      const database=new rds.DatabaseInstance(this,"TomficDatabase",{
+        engine:rds.DatabaseInstanceEngine.postgres({version:rds.PostgresEngineVersion.VER_16_3}),
+        vpc,
+        vpcSubnets:{subnetType:ec2.SubnetType.PRIVATE_ISOLATED},
+        instanceType:ec2.InstanceType.of(ec2.InstanceClass.T4G,ec2.InstanceSize.MICRO),
+        allocatedStorage:20,
+        maxAllocatedStorage:100,
+        databaseName:"tomfic",
+        credentials:rds.Credentials.fromGeneratedSecret("tomfic_admin"),
+        publiclyAccessible:false,
+        multiAz:false,
+        deletionProtection:false,
+        removalPolicy:cdk.RemovalPolicy.SNAPSHOT,
+      });
+      new cdk.CfnOutput(this,"DatabaseEndpoint",{value:database.dbInstanceEndpointAddress});
+    }
 
     // example resource
     // const queue = new sqs.Queue(this, 'InfraQueue', {
