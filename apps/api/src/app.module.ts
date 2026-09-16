@@ -8,14 +8,17 @@ import { CountsController } from "./features/counts/presentation/counts.controll
 import { PrismaCountRepository } from "./infrastructure/prisma/prisma-count-repository";
 import { CapturesController } from "./features/counts/presentation/captures.controller";
 import { PrismaCaptureRepository } from "./infrastructure/prisma/prisma-capture-repository";
+import { CrmController } from "./features/crm/presentation/crm.controller";
+import { PrismaCrmRepository } from "./infrastructure/prisma/prisma-crm-repository";
 
 @Module({
-  controllers:[ProductsController,InventoriesController,CountsController,CapturesController],
+  controllers:[ProductsController,InventoriesController,CountsController,CapturesController,CrmController],
   providers:[
     {provide:"ProductRepository",useClass:PrismaProductRepository},
     {provide:"InventoryRepository",useClass:PrismaInventoryRepository},
     {provide:"CountRepository",useClass:PrismaCountRepository},
     {provide:"CaptureRepository",useClass:PrismaCaptureRepository},
+    {provide:"CrmRepository",useClass:PrismaCrmRepository},
     ApiAuthGuard,
   ],
 })
