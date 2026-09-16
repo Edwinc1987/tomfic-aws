@@ -1,4 +1,5 @@
 export interface CrmRepository{
+  dashboard(tenantId:string,role:string):Promise<unknown>;
   getCompany(tenantId:string):Promise<unknown>;
   changeStage(tenantId:string,stage:string):Promise<unknown>;
   listContacts(tenantId:string):Promise<unknown[]>;

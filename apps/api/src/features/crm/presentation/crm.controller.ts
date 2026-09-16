@@ -8,6 +8,12 @@ import { CrmRepository } from "../application/crm-repository";
 export class CrmController{
   constructor(@Inject("CrmRepository") private readonly repository:CrmRepository){}
 
+  @Get("dashboard")
+  dashboard(@Req() request:{auth:{userId:string;tenantId:string;role:string}}){
+    requirePermission(request.auth,"reports:read");
+    return this.repository.dashboard(request.auth.tenantId,request.auth.role);
+  }
+
   @Get("profile")
   profile(@Req() request:{auth:{tenantId:string}}){return this.repository.getCompany(request.auth.tenantId);}
 

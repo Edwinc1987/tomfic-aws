@@ -4,6 +4,21 @@ import { CrmRepository } from "../../features/crm/application/crm-repository";
 export class PrismaCrmRepository implements CrmRepository{
   constructor(private readonly db=new PrismaClient()){}
 
+  async dashboard(tenantId:string,role:string){
+    const global=role.toUpperCase()==="OWNER"||role.toUpperCase()==="COMMERCIAL";
+    const where=global?{}:{id:tenantId};
+    const companies=await this.db.tenant.findMany({where,select:{id:true,name:true,stage:true,active:true,expiresAt:true,monthlyPrice:true}});
+    const now=new Date();const soon=new Date(now);soon.setDate(soon.getDate()+30);
+    return{
+      totalCompanies:companies.length,
+      activeCompanies:companies.filter(company=>company.active).length,
+      byStage:companies.reduce<Record<string,number>>((acc,company)=>{acc[company.stage]=(acc[company.stage]||0)+1;return acc;},{}),
+      renewalsNext30Days:companies.filter(company=>company.expiresAt&&company.expiresAt>=now&&company.expiresAt<=soon).length,
+      overdue:companies.filter(company=>company.expiresAt&&company.expiresAt<now).length,
+      monthlyRevenue:companies.reduce((total,company)=>total+Number(company.monthlyPrice||0),0),
+    };
+  }
+
   getCompany(tenantId:string){return this.db.tenant.findUnique({where:{id:tenantId},select:{id:true,name:true,taxId:true,stage:true,plan:true,monthlyPrice:true,expiresAt:true,active:true}});}
 
   changeStage(tenantId:string,stage:string){return this.db.tenant.update({where:{id:tenantId},data:{stage:stage as any},select:{id:true,name:true,stage:true}});}
