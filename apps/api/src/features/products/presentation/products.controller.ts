@@ -1,8 +1,10 @@
-import { BadRequestException, Controller, Get, Headers, Inject, Query } from "@nestjs/common";
+import { BadRequestException, Controller, Get, Inject, Query, Req, UseGuards } from "@nestjs/common";
+import { DevAuthGuard } from "../../../core/auth/dev-auth.guard";
 import { listProducts } from "../application/list-products";
 import { ProductRepository } from "../application/product-repository";
 
 @Controller("v1/products")
+@UseGuards(DevAuthGuard)
 export class ProductsController{
   private readonly list;
 
@@ -12,13 +14,13 @@ export class ProductsController{
 
   @Get()
   getProducts(
-    @Headers("x-tenant-id") tenantId:string|undefined,
+    @Req() request:{auth:{tenantId:string}},
     @Query("inventoryId") inventoryId:string|undefined,
     @Query("page") page="1",
     @Query("pageSize") pageSize="50",
     @Query("search") search?:string,
   ){
-    if(!tenantId||!inventoryId)throw new BadRequestException("tenantId e inventoryId son obligatorios");
-    return this.list({tenantId,inventoryId,page:Number(page),pageSize:Number(pageSize),search});
+    if(!inventoryId)throw new BadRequestException("inventoryId es obligatorio");
+    return this.list({tenantId:request.auth.tenantId,inventoryId,page:Number(page),pageSize:Number(pageSize),search});
   }
 }
