@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { CompanyStage, PrismaClient } from "@prisma/client";
 import { CrmRepository } from "../../features/crm/application/crm-repository";
 
 export class PrismaCrmRepository implements CrmRepository{
@@ -21,7 +21,22 @@ export class PrismaCrmRepository implements CrmRepository{
 
   getCompany(tenantId:string){return this.db.tenant.findUnique({where:{id:tenantId},select:{id:true,name:true,taxId:true,stage:true,plan:true,monthlyPrice:true,expiresAt:true,active:true}});}
 
-  changeStage(tenantId:string,stage:string){return this.db.tenant.update({where:{id:tenantId},data:{stage:stage as any},select:{id:true,name:true,stage:true}});}
+  async changeStage(tenantId:string,stage:string){
+    const next=stage.toUpperCase() as CompanyStage;
+    if(!Object.values(CompanyStage).includes(next))throw new Error("Etapa comercial inválida");
+    const current=await this.db.tenant.findUniqueOrThrow({where:{id:tenantId},select:{stage:true}});
+    const transitions:Record<CompanyStage,CompanyStage[]>={
+      PROSPECTO:[CompanyStage.DEMO,CompanyStage.RETIRADO],
+      DEMO:[CompanyStage.PRUEBA,CompanyStage.ACTIVO,CompanyStage.EN_RIESGO,CompanyStage.RETIRADO],
+      PRUEBA:[CompanyStage.ACTIVO,CompanyStage.EN_RIESGO,CompanyStage.RETIRADO],
+      ACTIVO:[CompanyStage.EN_RIESGO,CompanyStage.SUSPENDIDO,CompanyStage.RETIRADO],
+      EN_RIESGO:[CompanyStage.ACTIVO,CompanyStage.SUSPENDIDO,CompanyStage.RETIRADO],
+      SUSPENDIDO:[CompanyStage.ACTIVO,CompanyStage.RETIRADO],
+      RETIRADO:[],
+    };
+    if(current.stage!==next&&!transitions[current.stage].includes(next))throw new Error(`Transición inválida: ${current.stage} → ${next}`);
+    return this.db.tenant.update({where:{id:tenantId},data:{stage:next},select:{id:true,name:true,stage:true}});
+  }
 
   listContacts(tenantId:string){return this.db.contact.findMany({where:{tenantId},orderBy:{name:"asc"}});}
 
