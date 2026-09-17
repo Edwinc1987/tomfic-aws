@@ -46,6 +46,7 @@ jobs:
           cache: npm
       - run: npm install --force --package-lock=false
       - run: npm run build:api
+      - run: npx --workspace @tomfic/api prisma migrate deploy
       - run: npm run test:api
       - run: npm run test:db
 
@@ -60,7 +61,16 @@ jobs:
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: infra/package-lock.json
       - run: npm ci
-      - run: cd .. && npm install --force --package-lock=false && cd apps/api && npx prisma generate && npx tsc && mkdir -p dist/prisma && cp prisma/schema.prisma dist/prisma/ && cp -r prisma/migrations dist/prisma/ && cd ../../infra
+      - name: Build API dist for CDK
+        run: |
+          cd ..
+          npm install --force --package-lock=false
+          cd apps/api
+          npx prisma generate
+          npx tsc
+          mkdir -p dist/prisma
+          cp prisma/schema.prisma dist/prisma/
+          cp -r prisma/migrations dist/prisma/
+          cd ../../infra
       - run: npx cdk synth
