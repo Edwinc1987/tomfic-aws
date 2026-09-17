@@ -19,6 +19,7 @@
     "@nestjs/swagger": "^11.2.0",
     "@nestjs/throttler": "^6.4.0",
     "@prisma/client": "^6.16.0",
+    "@vendia/serverless-express": "^4.12.6",
     "aws-jwt-verify": "^5.1.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2"
