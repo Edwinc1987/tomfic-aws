@@ -5,6 +5,10 @@ import { ReportRepository } from "../../features/reports/application/report-repo
 export class PrismaReportRepository implements ReportRepository{
   constructor(private readonly db=new PrismaClient()){}
 
+  listTemplates(tenantId:string){return this.db.reportTemplate.findMany({where:{tenantId},orderBy:{updatedAt:"desc"}});}
+
+  saveTemplate(tenantId:string,name:string,layout:unknown){return this.db.reportTemplate.upsert({where:{tenantId_name:{tenantId,name}},create:{tenantId,name,layout:layout as any},update:{layout:layout as any}});}
+
   async inventoryResult(tenantId:string,inventoryId:string){
     const [products,counts]=await Promise.all([
       this.db.product.findMany({where:{tenantId,inventoryId},orderBy:{name:"asc"}}),

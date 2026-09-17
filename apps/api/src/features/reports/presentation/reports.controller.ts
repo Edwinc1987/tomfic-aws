@@ -1,5 +1,6 @@
-import { BadRequestException, Controller, Get, Inject, Query, Req, UseGuards } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Get, Inject, Post, Query, Req, UseGuards } from "@nestjs/common";
 import { ApiAuthGuard } from "../../../core/auth/cognito-auth.guard";
+import { requirePermission } from "../../../core/auth/authorization";
 import { ReportRepository } from "../application/report-repository";
 
 @Controller("v1/reports")

@@ -80,6 +80,7 @@ model Tenant {
   tickets      SupportTicket[]
   health       CustomerHealth?
   auditEvents  AuditEvent[]
+  reportTemplates ReportTemplate[]
   captureComments CaptureComment[]
   captureEvidence CaptureEvidence[]
 
@@ -322,4 +323,17 @@ model AuditEvent {
   @@index([tenantId, createdAt])
   @@index([entityType, entityId])
   @@index([actorId, createdAt])
+}
+
+model ReportTemplate {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
+  layout    Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, name])
+  @@index([tenantId, updatedAt])
 }
