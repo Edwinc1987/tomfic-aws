@@ -16,4 +16,16 @@ export class PrismaCaptureRepository implements CaptureRepository{
       return tx.capture.create({data:{operationId:input.operationId,productId:input.productId,roundId:round.id,quantity:input.quantity,condition:input.condition}});
     });
   }
+
+  async addComment(tenantId:string,authorId:string,captureId:string,body:string){
+    const capture=await this.db.capture.findFirst({where:{id:captureId,product:{tenantId}}});
+    if(!capture)throw new Error("Captura no encontrada para esta empresa");
+    return this.db.captureComment.create({data:{captureId,tenantId,authorId,body:body.trim()}});
+  }
+
+  async addEvidence(tenantId:string,userId:string,captureId:string,input:{storageKey:string;fileName:string;contentType:string}){
+    const capture=await this.db.capture.findFirst({where:{id:captureId,product:{tenantId}}});
+    if(!capture)throw new Error("Captura no encontrada para esta empresa");
+    return this.db.captureEvidence.create({data:{captureId,tenantId,uploadedById:userId,storageKey:input.storageKey,fileName:input.fileName,contentType:input.contentType}});
+  }
 }
