@@ -14,12 +14,14 @@ import { CrmController } from "./features/crm/presentation/crm.controller";
 import { PrismaCrmRepository } from "./infrastructure/prisma/prisma-crm-repository";
 import { PrismaAuditRepository } from "./infrastructure/prisma/prisma-audit-repository";
 import { HealthController } from "./core/health/health.controller";
+import { ReportsController } from "./features/reports/presentation/reports.controller";
+import { PrismaReportRepository } from "./infrastructure/prisma/prisma-report-repository";
 import { StorageController } from "./core/storage/storage.controller";
 import { S3StorageService } from "./core/storage/s3-storage.service";
 
 @Module({
   imports:[ThrottlerModule.forRoot([{ttl:60000,limit:100}])],
-  controllers:[HealthController,StorageController,ProductsController,InventoriesController,CountsController,CapturesController,CrmController],
+  controllers:[HealthController,StorageController,ProductsController,InventoriesController,CountsController,CapturesController,CrmController,ReportsController],
   providers:[
     {provide:"ProductRepository",useClass:PrismaProductRepository},
     {provide:"InventoryRepository",useClass:PrismaInventoryRepository},
@@ -29,6 +31,7 @@ import { S3StorageService } from "./core/storage/s3-storage.service";
     {provide:"AuditRepository",useClass:PrismaAuditRepository},
     {provide:APP_GUARD,useClass:ThrottlerGuard},
     S3StorageService,
+    {provide:"ReportRepository",useClass:PrismaReportRepository},
     ApiAuthGuard,
   ],
 })
