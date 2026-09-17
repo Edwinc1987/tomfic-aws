@@ -1,6 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { designer } from "ankareport";
-import "ankareport/dist/ankareport.css";
 
 const dataSource=[
   {label:"Número de inventario",field:"inventoryNumber"},
@@ -31,8 +29,13 @@ export function ReportDesignerPage({onSave}){
   const [saved,setSaved]=useState(null);
   useEffect(()=>{
     if(!elementRef.current)return undefined;
-    const instance=designer({element:elementRef.current,dataSource,layout:initialLayout,onSaveButtonClick:layout=>{setSaved(layout);onSave?.(layout);}});
-    return()=>{instance?.element?.replaceChildren?.();};
+    let instance;
+    let disposed=false;
+    Promise.all([import("ankareport"),import("ankareport/dist/ankareport.css")]).then(([module])=>{
+      if(disposed)return;
+      instance=module.designer({element:elementRef.current,dataSource,layout:initialLayout,onSaveButtonClick:layout=>{setSaved(layout);onSave?.(layout);}});
+    });
+    return()=>{disposed=true;instance?.element?.replaceChildren?.();};
   },[onSave]);
   return <section className="space-y-4"><header><p className="text-xs font-semibold uppercase tracking-wide text-indigo-600">Reportes</p><h1 className="text-2xl font-bold text-slate-900">Diseñador de actas de inventario</h1><p className="text-sm text-slate-500">Diseña una plantilla reutilizable para PDF y Excel.</p></header><div ref={elementRef} className="min-h-[680px] overflow-hidden rounded-xl border border-slate-200 bg-white"/>{saved&&<p className="text-xs text-green-700">Plantilla guardada en memoria. Se persistirá mediante el repositorio de reportes.</p>}</section>;
 }
