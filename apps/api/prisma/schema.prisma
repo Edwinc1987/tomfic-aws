@@ -80,6 +80,8 @@ model Tenant {
   tickets      SupportTicket[]
   health       CustomerHealth?
   auditEvents  AuditEvent[]
+  captureComments CaptureComment[]
+  captureEvidence CaptureEvidence[]
 
   @@index([stage])
   @@index([active])
@@ -100,6 +102,8 @@ model User {
   notes        CompanyNote[]
   assignedTickets SupportTicket[]
   auditEvents  AuditEvent[]
+  captureComments CaptureComment[]
+  captureEvidence CaptureEvidence[]
 
   @@index([tenantId, role])
 }
@@ -180,8 +184,40 @@ model Capture {
   quantity     Decimal    @db.Decimal(14, 3)
   condition    String     @default("BUENO")
   capturedAt   DateTime   @default(now())
+  comments     CaptureComment[]
+  evidence     CaptureEvidence[]
 
   @@index([roundId, productId])
+}
+
+model CaptureComment {
+  id         String   @id @default(uuid())
+  captureId  String
+  capture    Capture  @relation(fields: [captureId], references: [id], onDelete: Cascade)
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  authorId   String?
+  author     User?    @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  body       String
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId, captureId, createdAt])
+}
+
+model CaptureEvidence {
+  id          String   @id @default(uuid())
+  captureId   String
+  capture     Capture  @relation(fields: [captureId], references: [id], onDelete: Cascade)
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  uploadedById String?
+  uploadedBy  User?    @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  storageKey  String
+  fileName    String
+  contentType String
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId, captureId, createdAt])
 }
 
 model Payment {
