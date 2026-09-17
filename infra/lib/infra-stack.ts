@@ -86,6 +86,7 @@ export class InfraStack extends cdk.Stack {
       },
     });
     storageBucket.grantReadWrite(apiLambda);
+    importQueue.grantSendMessages(apiLambda);
     if(database){database.secret?.grantRead(apiLambda);}
 
     const apiLogs=new logs.LogGroup(this,"TomficApiLogs",{logGroupName:"/aws/lambda/tomfic-api",retention:cdk.RetentionDays.TWO_WEEKS,removalPolicy:cdk.RemovalPolicy.DESTROY});
@@ -102,5 +103,23 @@ export class InfraStack extends cdk.Stack {
       cognitoDomain:{domainPrefix:"tomfic-aws-auth"},
     });
     new cdk.CfnOutput(this,"UserPoolDomain",{value:userPoolDomain.domainName});
+
+    const importProcessorLambda=new lambda.Function(this,"ImportProcessorLambda",{
+      runtime:lambda.Runtime.NODEJS_20_X,
+      handler:"import-lambda.handler",
+      code:lambda.Code.fromAsset(path.join(__dirname,"../../apps/api/dist"),{
+        bundling:{image:lambda.Runtime.NODEJS_20_X.bundlingImage,command:["sh","-c","npm install --omit=dev && cp -r node_modules /asset-output && cp -r prisma /asset-output && cp -r src /asset-output"],volumes:[{hostVolume:path.join(__dirname,"../../apps/api/node_modules"),containerPath:"/var/task/node_modules"}],localBundling:true},
+      }),
+      memorySize:1536,
+      timeout:cdk.Duration.minutes(5),
+      environment:{
+        DATABASE_URL:database?`postgresql://tomfic_admin:${database.secret?.secretValue?.unsafeUnwrap()||"changeme"}@${database.dbInstanceEndpointAddress}:${database.dbInstanceEndpointPort}/tomfic`:"postgresql://postgres:postgres@localhost:5432/tomfic_dev",
+        STORAGE_BUCKET:storageBucket.bucketName,
+        NODE_ENV:"production",
+      },
+    });
+    storageBucket.grantReadWrite(importProcessorLambda);
+    if(database){database.secret?.grantRead(importProcessorLambda);}
+    importProcessorLambda.addEventSource(new lambda.SqsEventSource(importQueue,{batchSize:1,batchWindow:cdk.Duration.seconds(10)}));
   }
 }

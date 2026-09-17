@@ -10,11 +10,12 @@ export type Permission=
   |"counts:capture"
   |"counts:close"
   |"reports:read"
-  |"billing:read";
+  |"billing:read"
+  |"import:create";
 
 const rolePermissions:Record<string,Permission[]>={
-  OWNER:["tenant:manage","users:manage","products:read","products:write","inventories:manage","counts:read","counts:capture","counts:close","reports:read","billing:read"],
-  ADMIN:["users:manage","products:read","products:write","inventories:manage","counts:read","counts:capture","counts:close","reports:read","billing:read"],
+  OWNER:["tenant:manage","users:manage","products:read","products:write","inventories:manage","counts:read","counts:capture","counts:close","reports:read","billing:read","import:create"],
+  ADMIN:["users:manage","products:read","products:write","inventories:manage","counts:read","counts:capture","counts:close","reports:read","billing:read","import:create"],
   MANAGER:["products:read","inventories:manage","counts:read","counts:close","reports:read"],
   CAPTURER:["products:read","counts:read","counts:capture"],
   COMMERCIAL:["tenant:manage","billing:read","reports:read"],
