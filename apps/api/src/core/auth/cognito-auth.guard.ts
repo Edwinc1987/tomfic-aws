@@ -17,9 +17,11 @@ export class ApiAuthGuard implements CanActivate{
     if(!header.startsWith("Bearer "))throw new UnauthorizedException("Token requerido");
     try{
       const payload=await this.verifier.verify(header.slice(7));
-      const tenantId=String(payload["custom:tenant_id"]||payload["tenant_id"]||"");
-      if(!tenantId)throw new UnauthorizedException("El token no tiene tenant_id");
-      request.auth={userId:String(payload.sub),tenantId,role:String(payload["custom:role"]||payload["cognito:groups"]?.[0]||"USER")};
+      const groups=Array.isArray(payload["cognito:groups"])?payload["cognito:groups"]:[];
+      const role=groups[0]||"ADMIN";
+      const tenantId=String(request.headers["x-tenant-id"]||"").trim()||String(payload.sub||"");
+      if(!tenantId)throw new UnauthorizedException("Se requiere x-tenant-id header");
+      request.auth={userId:String(payload.sub),email:String(payload.email||""),tenantId,role};
       return true;
     }catch(error){
       if(error instanceof UnauthorizedException)throw error;

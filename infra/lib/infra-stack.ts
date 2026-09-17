@@ -21,9 +21,12 @@ export class InfraStack extends cdk.Stack {
       signInAliases:{email:true},
       passwordPolicy:{minLength:12,requireLowercase:true,requireUppercase:true,requireDigits:true,requireSymbols:true},
       standardAttributes:{email:{required:true,mutable:true}},
-      customAttributes:{tenant_id:new cognito.StringAttribute({mutable:true}),role:new cognito.StringAttribute({mutable:true})},
       removalPolicy:cdk.RemovalPolicy.RETAIN,
     });
+    userPool.addGroup(new cognito.CfnUserPoolGroup(this,"OwnerGroup",{userPoolId:userPool.userPoolId,groupName:"OWNER",precedence:0}));
+    userPool.addGroup(new cognito.CfnUserPoolGroup(this,"AdminGroup",{userPoolId:userPool.userPoolId,groupName:"ADMIN",precedence:1}));
+    userPool.addGroup(new cognito.CfnUserPoolGroup(this,"ManagerGroup",{userPoolId:userPool.userPoolId,groupName:"MANAGER",precedence:2}));
+    userPool.addGroup(new cognito.CfnUserPoolGroup(this,"CapturerGroup",{userPoolId:userPool.userPoolId,groupName:"CAPTURER",precedence:3}));
     const userPoolClient=userPool.addClient("TomficWebClient",{authFlows:{userPassword:true,userSrp:true},oAuth:{scopes:[cognito.OAuthScope.OPENID,cognito.OAuthScope.PROFILE,cognito.OAuthScope.EMAIL]}});
     new cdk.CfnOutput(this,"UserPoolId",{value:userPool.userPoolId});
     new cdk.CfnOutput(this,"UserPoolClientId",{value:userPoolClient.userPoolClientId});
@@ -95,12 +98,6 @@ export class InfraStack extends cdk.Stack {
       defaultCorsPreflightOptions:{allowOrigins:apigw.Cors.ALL_ORIGINS,allowMethods:apigw.Cors.ALL_METHODS,allowHeaders:["Content-Type","Authorization","x-tenant-id","x-user-role","x-user-id"]},
     });
     new cdk.CfnOutput(this,"ApiUrl",{value:api.url});
-
-    const userPoolDomain=new cognito.UserPoolDomain(this,"TomficUserPoolDomain",{
-      userPool,
-      cognitoDomain:{domainPrefix:"tomfic-aws-auth"},
-    });
-    new cdk.CfnOutput(this,"UserPoolDomain",{value:userPoolDomain.domainName});
 
     const importProcessorLambda=new lambda.Function(this,"ImportProcessorLambda",{
       runtime:lambda.Runtime.NODEJS_24_X,

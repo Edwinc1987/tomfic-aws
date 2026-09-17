@@ -58,6 +58,7 @@ export default defineConfig({
           if (id.includes('node_modules')) {
             if (id.includes('xlsx')) return 'xlsx';
             if (id.includes('@zxing')) return 'zxing';
+            if (id.includes('ankareport')) return 'ankareport';
           }
         },
       },
