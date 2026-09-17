@@ -6,6 +6,7 @@
     "prebuild": "prisma generate",
     "pretest": "prisma generate",
     "build": "tsc --noEmit",
+    "package": "tsc && cp -r prisma dist/prisma 2>nul & copy prisma\\*.prisma dist\\prisma\\ 2>nul & copy prisma.config.ts dist\\ 2>nul",
     "dev": "tsx watch src/main.ts",
     "start": "tsx src/main.ts",
     "test": "vitest run",

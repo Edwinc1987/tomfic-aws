@@ -5,9 +5,9 @@ import * as sqs from 'aws-cdk-lib/aws-sqs';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as rds from 'aws-cdk-lib/aws-rds';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as lambdaEvents from 'aws-cdk-lib/aws-lambda-event-sources';
 import * as apigw from 'aws-cdk-lib/aws-apigateway';
 import * as logs from 'aws-cdk-lib/aws-logs';
-import * as iam from 'aws-cdk-lib/aws-iam';
 import { Construct } from 'constructs';
 import * as path from 'path';
 
@@ -69,11 +69,9 @@ export class InfraStack extends cdk.Stack {
     }
 
     const apiLambda=new lambda.Function(this,"TomficApiLambda",{
-      runtime:lambda.Runtime.NODEJS_20_X,
+      runtime:lambda.Runtime.NODEJS_24_X,
       handler:"lambda.handler",
-      code:lambda.Code.fromAsset(path.join(__dirname,"../../apps/api/dist"),{
-        bundling:{image:lambda.Runtime.NODEJS_20_X.bundlingImage,command:["sh","-c","npm install --omit=dev && cp -r node_modules /asset-output && cp -r prisma /asset-output && cp -r src /asset-output"],volumes:[{hostVolume:path.join(__dirname,"../../apps/api/node_modules"),containerPath:"/var/task/node_modules"}],localBundling:true},
-      }),
+      code:lambda.Code.fromAsset(path.join(__dirname,"../../apps/api/dist")),
       memorySize:1024,
       timeout:cdk.Duration.seconds(30),
       environment:{
@@ -89,7 +87,7 @@ export class InfraStack extends cdk.Stack {
     importQueue.grantSendMessages(apiLambda);
     if(database){database.secret?.grantRead(apiLambda);}
 
-    const apiLogs=new logs.LogGroup(this,"TomficApiLogs",{logGroupName:"/aws/lambda/tomfic-api",retention:cdk.RetentionDays.TWO_WEEKS,removalPolicy:cdk.RemovalPolicy.DESTROY});
+    const apiLogs=new logs.LogGroup(this,"TomficApiLogs",{logGroupName:"/aws/lambda/tomfic-api",retention:logs.RetentionDays.TWO_WEEKS,removalPolicy:cdk.RemovalPolicy.DESTROY});
     const api=new apigw.LambdaRestApi(this,"TomficApiGateway",{
       handler:apiLambda,
       proxy:true,
@@ -105,11 +103,9 @@ export class InfraStack extends cdk.Stack {
     new cdk.CfnOutput(this,"UserPoolDomain",{value:userPoolDomain.domainName});
 
     const importProcessorLambda=new lambda.Function(this,"ImportProcessorLambda",{
-      runtime:lambda.Runtime.NODEJS_20_X,
+      runtime:lambda.Runtime.NODEJS_24_X,
       handler:"import-lambda.handler",
-      code:lambda.Code.fromAsset(path.join(__dirname,"../../apps/api/dist"),{
-        bundling:{image:lambda.Runtime.NODEJS_20_X.bundlingImage,command:["sh","-c","npm install --omit=dev && cp -r node_modules /asset-output && cp -r prisma /asset-output && cp -r src /asset-output"],volumes:[{hostVolume:path.join(__dirname,"../../apps/api/node_modules"),containerPath:"/var/task/node_modules"}],localBundling:true},
-      }),
+      code:lambda.Code.fromAsset(path.join(__dirname,"../../apps/api/dist")),
       memorySize:1536,
       timeout:cdk.Duration.minutes(5),
       environment:{
@@ -120,6 +116,6 @@ export class InfraStack extends cdk.Stack {
     });
     storageBucket.grantReadWrite(importProcessorLambda);
     if(database){database.secret?.grantRead(importProcessorLambda);}
-    importProcessorLambda.addEventSource(new lambda.SqsEventSource(importQueue,{batchSize:1,batchWindow:cdk.Duration.seconds(10)}));
+    importProcessorLambda.addEventSource(new lambdaEvents.SqsEventSource(importQueue,{batchSize:1}));
   }
 }
