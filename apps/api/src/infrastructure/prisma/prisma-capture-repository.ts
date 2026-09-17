@@ -4,6 +4,12 @@ import { CaptureInput, CaptureRepository } from "../../features/counts/applicati
 export class PrismaCaptureRepository implements CaptureRepository{
   constructor(private readonly db=new PrismaClient()){}
 
+  async getDetails(tenantId:string,captureId:string){
+    const capture=await this.db.capture.findFirst({where:{id:captureId,product:{tenantId}},include:{comments:{orderBy:{createdAt:"asc"}},evidence:{orderBy:{createdAt:"asc"}},product:{select:{id:true,code:true,barcode:true,name:true}},round:{select:{id:true,name:true,status:true}}}});
+    if(!capture)throw new Error("Captura no encontrada para esta empresa");
+    return capture;
+  }
+
   async createIdempotent(input:CaptureInput){
     return this.db.$transaction(async(tx)=>{
       const existing=await tx.capture.findUnique({where:{operationId:input.operationId}});

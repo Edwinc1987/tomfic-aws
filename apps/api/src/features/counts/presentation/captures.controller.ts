@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Inject, Param, Post, Req, UseGuards } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Get, Inject, Param, Post, Req, UseGuards } from "@nestjs/common";
 import { ApiAuthGuard } from "../../../core/auth/cognito-auth.guard";
 import { requirePermission } from "../../../core/auth/authorization";
 import { CaptureRepository } from "../application/capture-repository";
@@ -7,6 +7,11 @@ import { CaptureRepository } from "../application/capture-repository";
 @UseGuards(ApiAuthGuard)
 export class CapturesController{
   constructor(@Inject("CaptureRepository") private readonly repository:CaptureRepository){}
+
+  @Get(":captureId")
+  details(@Req() request:{auth:{tenantId:string}},@Param("captureId") captureId:string){
+    return this.repository.getDetails(request.auth.tenantId,captureId);
+  }
 
   @Post()
   create(@Req() request:{auth:{userId:string;tenantId:string;role:string}},@Body() body:{operationId?:string;productId?:string;roundId?:string;countId?:string;round?:string;quantity?:number;condition?:string}){
