@@ -16,6 +16,7 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm install --force --package-lock=false
+      - run: npm --workspace @tomfic/web install --force --package-lock=false
       - run: npm run build:web
       - run: npm run test:offline
 
