@@ -23,21 +23,20 @@ const pkg=JSON.parse(readFileSync(join(root,"package.json"),"utf8"));
 const prodPkg={name:"tomfic-api",private:true,version:"1.0.0",dependencies:pkg.dependencies||{}};
 writeFileSync(join(dist,"package.json"),JSON.stringify(prodPkg,null,2));
 execSync("npm install --omit=dev --ignore-scripts",{cwd:dist,stdio:"inherit"});
-// El cliente Prisma se genera en el node_modules más cercano con @prisma/client:
-// local (Windows) queda en apps/api/node_modules, en CI (npm workspaces con hoisting) queda en el raíz.
-mkdirSync(join(dist,"node_modules",".prisma"),{recursive:true});
-const prismaCandidates=[join(root,"node_modules",".prisma"),join(root,"..","node_modules",".prisma")];
-const prismaDir=prismaCandidates.find(c=>existsSync(c));
-if(!prismaDir){
-  throw new Error("No se encontró node_modules/.prisma (ni en apps/api ni en el raíz). ¿Corrió 'prisma generate'?");
+// El cliente Prisma se genera en el node_modules más cercano. En Prisma 6
+// el cliente generado vive dentro de node_modules/@prisma/client (no en
+// node_modules/.prisma). La ubicación puede estar en apps/api o hoisted al raíz.
+const prismaRootCandidates=[join(root,"node_modules"),join(root,"..","node_modules"),join(root,"..","..","node_modules")];
+const prismaRoot=prismaRootCandidates.find(c=>existsSync(join(c,"@prisma","client")));
+if(!prismaRoot){
+  throw new Error("No se encontró el cliente Prisma generado (@prisma/client). ¿Corrió 'prisma generate'?");
 }
-cpSync(prismaDir,join(dist,"node_modules",".prisma"),{recursive:true});
-// Copiar también @prisma/client si está hoisted (necesario para el runtime de Lambda).
-const prismaClientCandidates=[join(root,"node_modules","@prisma","client"),join(root,"..","node_modules","@prisma","client")];
-const prismaClientDir=prismaClientCandidates.find(c=>existsSync(c));
-if(prismaClientDir){
-  mkdirSync(join(dist,"node_modules","@prisma"),{recursive:true});
-  cpSync(prismaClientDir,join(dist,"node_modules","@prisma","client"),{recursive:true});
+mkdirSync(join(dist,"node_modules","@prisma"),{recursive:true});
+cpSync(join(prismaRoot,"@prisma","client"),join(dist,"node_modules","@prisma","client"),{recursive:true});
+// Compatibilidad: algunos entornos también exponen .prisma
+if(existsSync(join(prismaRoot,".prisma"))){
+  mkdirSync(join(dist,"node_modules",".prisma"),{recursive:true});
+  cpSync(join(prismaRoot,".prisma"),join(dist,"node_modules",".prisma"),{recursive:true});
 }
 
 console.log("Empaquetado completado en",dist);
