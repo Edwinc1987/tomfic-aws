@@ -1,6 +1,7 @@
 import { Controller, Post, Body, BadRequestException, UnauthorizedException } from "@nestjs/common";
 import { PrismaClient } from "@prisma/client";
 import { randomBytes, scryptSync, timingSafeEqual } from "crypto";
+import { signTeamJwt } from "../../../core/auth/team-jwt";
 
 const db=new PrismaClient();
 
@@ -42,10 +43,13 @@ export class AuthController{
     }
 
     const tenant=await db.tenant.findUnique({where:{id:user.tenantId}});
+    // JWT firmado (HS256, 12h de validez) verificable por ApiAuthGuard.
+    // El guard re-resuelve tenant y rol desde la BD en cada request.
+    const token=signTeamJwt({sub:user.id,tenantId:user.tenantId,role:String(user.role)});
     return {
       user:{id:user.id,name:user.name,email:user.email,role:user.role,tenantId:user.tenantId,inventoryId:user.inventoryId},
-      tenant:tenant?{id:tenant.id,name:tenant.name,nit:tenant.nit}:null,
-      token:`team-${user.id}-${Date.now()}`,
+      tenant:tenant?{id:tenant.id,name:tenant.name,nit:tenant.taxId}:null,
+      token,
     };
   }
 }

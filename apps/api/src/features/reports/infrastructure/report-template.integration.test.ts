@@ -1,6 +1,9 @@
 import { describe,it,expect,beforeAll } from "vitest";
 import { PrismaClient } from "@prisma/client";
 
+// Test de integración: requiere Postgres real (RUN_DB_TESTS=1),
+// igual que los demás tests de aislamiento/concurrencia.
+const integration=process.env.RUN_DB_TESTS==="1"?describe:describe.skip;
 const db=new PrismaClient();
 
 const TENANT_ID="test-report-templates";
@@ -11,7 +14,7 @@ beforeAll(async()=>{
   await db.inventory.upsert({where:{id:INVENTORY_ID},update:{},create:{id:INVENTORY_ID,tenantId:TENANT_ID,name:"INV-TEST-TPL"}});
 });
 
-describe("ReportTemplate CRUD",()=>{
+integration("ReportTemplate CRUD",()=>{
   it("crea y lista plantillas por tenant",async()=>{
     const layout={width:760,headerSection:{height:100,items:[]},contentSection:{height:120,items:[]},footerSection:{height:40,items:[]}};
 

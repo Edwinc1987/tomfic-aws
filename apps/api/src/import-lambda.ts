@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import { ensureDatabaseUrl } from "./core/db-url";
 
 const db=new PrismaClient();
 
@@ -31,6 +32,7 @@ const mapRow=(headers:string[],row:string[]):CsvRow=>{
 };
 
 export const handler=async(event:any)=>{
+  await ensureDatabaseUrl();
   const body=typeof event.body==="string"?JSON.parse(event.body):event.body||{};
   const {tenantId,inventoryId,fileName}=body;
 
