@@ -18,4 +18,9 @@ export class MemoryProductRepository implements ProductRepository{
     if(index<0)this.products.push(product);else this.products[index]=product;
     return product;
   }
+
+  async saveBulk(products:Product[]):Promise<number>{products.forEach(p=>{const i=this.products.findIndex(c=>c.id===p.id);if(i<0)this.products.push(p);else this.products[i]=p;});return products.length;}
+  async deleteAll(tenantId:string,inventoryId:string):Promise<number>{const before=this.products.length;this.products.splice(0,this.products.length,...this.products.filter(p=>!(p.tenantId===tenantId&&p.inventoryId===inventoryId)));return before-this.products.length;}
+  async deleteAllByTenant(tenantId:string):Promise<number>{const before=this.products.length;this.products.splice(0,this.products.length,...this.products.filter(p=>p.tenantId!==tenantId));return before-this.products.length;}
+  async deleteByIds(tenantId:string,ids:string[]):Promise<number>{const before=this.products.length;this.products.splice(0,this.products.length,...this.products.filter(p=>!(p.tenantId===tenantId&&ids.includes(p.id))));return before-this.products.length;}
 }

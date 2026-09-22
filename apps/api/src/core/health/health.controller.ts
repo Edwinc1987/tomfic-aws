@@ -3,7 +3,7 @@ import { PrismaClient } from "@prisma/client";
 
 @Controller("health")
 export class HealthController{
-  constructor(private readonly db=new PrismaClient()){}
+  private readonly db=new PrismaClient();
   @Get()
   status(){
     return{

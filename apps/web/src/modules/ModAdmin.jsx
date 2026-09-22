@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Package, ClipboardList, Database, MapPin, FolderOpen, Radio, BarChart2, Users, Landmark, Bell, RefreshCw, Cloud, Menu, ChevronRight, LogOut } from "lucide-react";
+import { Package, ClipboardList, Database, MapPin, FolderOpen, Radio, BarChart2, Users, Landmark, Bell, RefreshCw, Cloud, Menu, ChevronRight, LogOut, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { VInventario } from "@/views/VInventario";
@@ -32,92 +32,119 @@ export function ModAdmin({usuario,setUsuario,logout,G,rerender,recargar,showToas
   ];
   const props={usuario,setUsuario,G,rerender,recargar,showToast};
 
-  const navActual=nav.find(n=>n.id===view);
-
   return(
-      <div style={{minHeight:"100vh",background:"#f8fafc",fontFamily:"system-ui,sans-serif"}}>
+    <div className="min-h-screen bg-slate-50 font-sans">
 
-      {/* TOPBAR */}
-      <div style={{background:"#ffffff",color:"#1e293b",padding:"0 20px",display:"flex",alignItems:"center",justifyContent:"space-between",height:58,position:"sticky",top:0,zIndex:100,boxShadow:"0 1px 4px rgba(15,23,42,0.08)",borderBottom:"1px solid #e2e8f0"}}>
-        <div style={{display:"flex",alignItems:"center",gap:12}}>
-           <button onClick={()=>setSideCollapsed(v=>!v)} style={{background:"#f1f5f9",border:"1px solid #e2e8f0",color:"#64748b",width:34,height:34,borderRadius:6,cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>
+      {/* ── TOPBAR ── */}
+      <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-slate-200 bg-white px-4 shadow-sm sm:px-5">
+        {/* Left */}
+        <div className="flex items-center gap-3">
+          <button onClick={()=>setSideCollapsed(v=>!v)}
+            className="flex h-[34px] w-[34px] items-center justify-center rounded-md border border-slate-200 bg-slate-100 text-slate-500 transition-colors hover:bg-slate-200 hover:text-slate-700"
+            aria-label={sideCollapsed?"Abrir menú":"Cerrar menú"}>
             {sideCollapsed?<ChevronRight size={16}/>:<Menu size={16}/>}
           </button>
-          <div style={{display:"flex",alignItems:"center",gap:8}}>
-             <div style={{width:32,height:32,background:"#2563eb",borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center"}}><Package size={18} color="white"/></div>
-            <div>
-              <div style={{fontWeight:800,fontSize:15,letterSpacing:-0.5}}>tomfic</div>
-               <div style={{fontSize:9,color:"#94a3b8",marginTop:-2,letterSpacing:1,textTransform:"uppercase"}}>Inventarios</div>
+
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-blue-600">
+              <Package size={18} className="text-white"/>
+            </div>
+            <div className="leading-none">
+              <div className="text-[15px] font-extrabold tracking-tight text-slate-900">tomfic</div>
+              <div className="mt-0.5 text-[9px] font-bold uppercase tracking-widest text-slate-400">Inventarios</div>
             </div>
           </div>
+
           {G.inventario&&(
-            <select value={G.inventario.id} onChange={e=>{selectInventory(e.target.value);rerender();}} aria-label="Inventario activo seleccionado"
-               style={{background:"#f8fafc",border:"1px solid #cbd5e1",fontSize:11,padding:"4px 10px",borderRadius:5,fontWeight:600,color:"#475569",maxWidth:220}}>
-              {G.inventarios.map(inv=><option key={inv.id} value={inv.id} style={{color:"#0f172a"}}>{inv.nombre}</option>)}
+            <select value={G.inventario.id} onChange={e=>{selectInventory(e.target.value);rerender();}}
+              aria-label="Inventario activo"
+              className="ml-1 rounded-md border border-slate-300 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600 outline-none transition-colors hover:border-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 max-w-[200px]">
+              {G.inventarios.map(inv=><option key={inv.id} value={inv.id}>{inv.nombre}</option>)}
             </select>
           )}
-
         </div>
-        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+
+        {/* Right */}
+        <div className="flex items-center gap-2">
           <WhatsAppButton message="Hola, soy administrador y necesito soporte con TOMFIC." label="Soporte" />
+
           <button onClick={async()=>{await recargar();showToast("Datos actualizados ✓");}}
-             style={{background:"#ffffff",border:"1px solid #e2e8f0",color:"#64748b",padding:"5px 12px",borderRadius:6,fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}>
-            <RefreshCw size={13}/> <span>Sync</span>
+            className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-medium text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-700">
+            <RefreshCw size={13}/> Sync
           </button>
+
           {alertas>0&&(
             <button onClick={()=>{G.alertas=G.alertas.map(a=>({...a,leida:true}));rerender();setView("procesos");}}
-              style={{background:"#dc2626",color:"white",border:"none",padding:"5px 14px",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:700,display:"flex",alignItems:"center",gap:5,animation:"pulse 2s infinite"}}>
+              className="flex items-center gap-1.5 rounded-lg border-none bg-red-600 px-3 py-1.5 text-[12px] font-bold text-white shadow-sm transition-all hover:bg-red-700 animate-pulse">
               <Bell size={13}/> {alertas}
             </button>
           )}
-           {lastSaved&&<span style={{fontSize:10,color:"#64748b",display:"flex",alignItems:"center",gap:4}}><Cloud size={12}/> {lastSaved}</span>}
-           <div style={{display:"flex",alignItems:"center",gap:7,background:"#f8fafc",borderRadius:6,padding:"5px 10px",border:"1px solid #e2e8f0"}}>
-             <div style={{width:24,height:24,background:"#2563eb",color:"white",borderRadius:99,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700}}>{usuario.nombre.charAt(0)}</div>
-             <span style={{fontSize:12,color:"#475569",fontWeight:600}}>{usuario.nombre}</span>
+
+          {lastSaved&&(
+            <span className="hidden items-center gap-1 text-[10px] text-slate-400 sm:flex">
+              <Cloud size={12}/> {lastSaved}
+            </span>
+          )}
+
+          <div className="flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5">
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-[11px] font-bold text-white">
+              {usuario.nombre.charAt(0)}
+            </div>
+            <span className="hidden text-[12px] font-semibold text-slate-600 sm:inline">{usuario.nombre}</span>
           </div>
+
           <button onClick={()=>setModalSalir(true)}
-             style={{background:"#fff1f2",border:"1px solid #fecdd3",color:"#be123c",padding:"6px 14px",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>
+            className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-semibold text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-700">
+            <LogOut size={14} className="inline mr-1 -mt-0.5"/>
             Salir
           </button>
         </div>
-      </div>
+      </header>
 
-      <div style={{display:"flex",height:"calc(100vh - 58px)",overflow:"hidden"}}>
+      <div className="flex" style={{height:"calc(100vh - 56px)"}}>
 
-        {/* SIDEBAR */}
-         <div style={{width:sideCollapsed?60:216,background:"#ffffff",borderRight:"1px solid #e2e8f0",flexShrink:0,height:"100%",overflowY:"auto",overflowX:"hidden",transition:"width 0.25s ease"}}>
-          <div style={{padding:sideCollapsed?"10px 8px":"12px 9px",display:"flex",flexDirection:"column",gap:2}}>
-             {nav.map((n,i)=>{
-               const active=view===n.id;
-               return(
-  <div key={n.id}>
-                 {!sideCollapsed&&(i===0||nav[i-1].group!==n.group)&&<div style={{padding:"14px 11px 6px",fontSize:9,color:"#94a3b8",fontWeight:800,letterSpacing:1,textTransform:"uppercase"}}>{n.group}</div>}
-                 <button onClick={()=>setView(n.id)}
-                   title={sideCollapsed?n.label:""}
-                   style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:sideCollapsed?"10px":"8px 11px",background:active?"#eff6ff":"transparent",color:active?"#1d4ed8":"#64748b",border:"none",cursor:"pointer",fontSize:12.5,textAlign:"left",borderRadius:5,transition:"all 0.15s",position:"relative",overflow:"hidden"}}>
-                   {active&&<div style={{position:"absolute",left:0,top:0,bottom:0,width:3,background:"#2563eb",borderRadius:"0 3px 3px 0"}}/>}
-                   <n.icon size={16} style={{flexShrink:0,opacity:active?1:0.8}}/>
-                  {!sideCollapsed&&(
-                    <div style={{overflow:"hidden"}}>
-                       <div style={{fontWeight:active?700:500,fontSize:12.5,whiteSpace:"nowrap",color:active?"#1d4ed8":"#334155"}}>{n.label}</div>
+        {/* ── SIDEBAR ── */}
+        <aside className={`flex-shrink-0 overflow-y-auto overflow-x-hidden border-r border-slate-200 bg-white transition-all duration-200 ${sideCollapsed?"w-[60px]":"w-56"}`}>
+          <nav className="flex flex-col gap-0.5 p-2">
+            {nav.map((n,i)=>{
+              const active=view===n.id;
+              const showGroup=!sideCollapsed&&(i===0||nav[i-1].group!==n.group);
+              return(
+                <div key={n.id}>
+                  {showGroup&&(
+                    <div className="px-3 pt-4 pb-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                      {n.group}
                     </div>
                   )}
-                 </button>
-               </div>
+                  <button onClick={()=>setView(n.id)}
+                    title={sideCollapsed?n.label:""}
+                    className={`group relative flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] transition-all duration-150 ${
+                      active
+                        ?"bg-blue-50 text-blue-700 font-bold"
+                        :"text-slate-500 hover:bg-slate-50 hover:text-slate-700 font-medium"
+                    }`}>
+                    {active&&<div className="absolute left-0 top-1 bottom-1 w-[3px] rounded-r-full bg-blue-600"/>}
+                    <n.icon size={16} className={`flex-shrink-0 ${active?"text-blue-600":"text-slate-400 group-hover:text-slate-600"}`}/>
+                    {!sideCollapsed&&(
+                      <span className="truncate">{n.label}</span>
+                    )}
+                  </button>
+                </div>
               );
             })}
-          </div>
+          </nav>
+
           {!sideCollapsed&&(
-             <div style={{margin:"12px 10px 0",padding:"10px 12px",background:"#f8fafc",borderRadius:5,border:"1px solid #f1f5f9"}}>
-               <div style={{fontSize:9,color:"#94a3b8",textTransform:"uppercase",letterSpacing:1,fontWeight:700,marginBottom:4}}>Sistema</div>
-               <div style={{fontSize:11,color:"#64748b"}}>v2.1</div>
+            <div className="mx-2.5 mt-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+              <div className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Sistema</div>
+              <div className="mt-0.5 text-[11px] text-slate-500">v2.1</div>
             </div>
           )}
-        </div>
+        </aside>
 
-        {/* CONTENIDO */}
-         <div className="view-scroll-container" style={{flex:1,padding:20,overflowY:"auto",minWidth:0,background:"#f8fafc",position:"relative",overscrollBehavior:"contain"}}>
-
+        {/* ── CONTENIDO ── */}
+        <main className="view-scroll-container relative min-w-0 flex-1 overflow-y-auto bg-slate-50 p-5"
+          style={{overscrollBehavior:"contain"}}>
           <BannerVencimiento G={G}/>
           {view==="inventario"&&<VInventario {...props}/>}
           {view==="ubicaciones"&&<VUbicaciones {...props}/>}
@@ -127,7 +154,7 @@ export function ModAdmin({usuario,setUsuario,logout,G,rerender,recargar,showToas
           {view==="reportes"&&<VReportes {...props}/>}
           {view==="usuarios"&&<VUsuarios {...props}/>}
           {view==="historial"&&<VHistorial {...props}/>}
-        </div>
+        </main>
       </div>
 
       <ConfirmDialog

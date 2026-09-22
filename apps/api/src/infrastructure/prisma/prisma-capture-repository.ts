@@ -10,6 +10,38 @@ export class PrismaCaptureRepository implements CaptureRepository{
     return capture;
   }
 
+  async listByCount(tenantId:string,countId:string){
+    const captures=await this.db.capture.findMany({
+      where:{round:{count:{id:countId,tenantId}}},
+      include:{
+        product:{select:{id:true,code:true,barcode:true,name:true,supplier:true,balance:true,cost:true}},
+        round:{select:{id:true,name:true,countId:true}},
+      },
+      orderBy:{capturedAt:"asc"},
+    });
+    return captures.map(c=>{
+      const key=`${c.round.countId}_${c.productId}_${c.round.name}_${c.id}`;
+      return {
+        id:c.id,
+        operationId:c.operationId,
+        conteoId:c.round.countId,
+        productoId:c.productId,
+        ronda:c.round.name,
+        ean:c.product.barcode||"",
+        codigo:c.product.code||"",
+        nombre:c.product.name||"",
+        proveedor:c.product.supplier||"",
+        saldo:Number(c.product.balance),
+        costo:Number(c.product.cost),
+        cantidad:Number(c.quantity),
+        estado:c.condition,
+        fecha:c.capturedAt?.toISOString?.()?.slice(0,10)||"",
+        hora:c.capturedAt?.toISOString()?.slice(11,19)||"",
+        key,
+      };
+    });
+  }
+
   async createIdempotent(input:CaptureInput){
     return this.db.$transaction(async(tx)=>{
       const existing=await tx.capture.findUnique({where:{operationId:input.operationId}});

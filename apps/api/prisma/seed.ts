@@ -38,6 +38,11 @@ async function main(){
     seedTenant({id:"tenant-demo-a",name:"Empresa Demo A",taxId:"900000001",inventoryId:"inventory-demo-a"}),
     seedTenant({id:"tenant-demo-b",name:"Empresa Demo B",taxId:"900000002",inventoryId:"inventory-demo-b"}),
   ]);
+  await prisma.user.upsert({
+    where:{email:"edwin@tomfic.com"},
+    update:{tenantId:"tenant-demo-a",active:true,role:UserRole.ADMIN,name:"Edwin Carbonel"},
+    create:{id:"edwin-cognito-sub",tenantId:"tenant-demo-a",name:"Edwin Carbonel",email:"edwin@tomfic.com",role:UserRole.ADMIN},
+  });
   console.log(JSON.stringify({ok:true,productsPerTenant,results},null,2));
 }
 

@@ -3,10 +3,10 @@ import { Package, Camera, Search, AlertTriangle, ChevronLeft, LogOut, RefreshCw,
 import { Badge as UIBadge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PageHeader } from "@/components/ui/page-header";
-import CamScanner from "@/components/CamScanner";
+import CameraScanner from "@/components/CameraScanner";
 import BtnNotas from "@/components/BtnNotas";
 import SyncStatus from "@/components/SyncStatus";
-import { G, SB, supabase, ID, TODAY, HOUR, conteoCompleto, nU, getStInv, card, inp, selectInventory } from "@/lib/data";
+import { G, SB, ID, TODAY, HOUR, conteoCompleto, nU, getStInv, card, inp, selectInventory } from "@/lib/data";
 import { useCaptureOutbox } from "@/features/counts/hooks/useCaptureOutbox";
 
 function EstBadge({e}){
@@ -42,11 +42,11 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
   const [c3Vals,setC3Vals]=useState({}); // {productoId: cantidad}
   const [notFound,setNotFound]=useState(false);
   const [modalCerrar,setModalCerrar]=useState(false);
-  const [busqueda,setBusqueda]=useState("");
   const [showCam,setShowCam]=useState(false);
   const [modalSalir,setModalSalir]=useState(false);
   const [busqCap,setBusqCap]=useState("");
   const [editCap,setEditCap]=useState(null); // {p, cap} cuando se edita una captura
+  const [busquedaUnif,setBusquedaUnif]=useState("");
   // Modo Día/Noche del capturador (recordado). De noche el fondo blanco cansa la vista;
   // se oscurece SOLO el contenido (no la barra ni la cámara) con un filtro suave.
   const [dark,setDark]=useState(()=>{try{return localStorage.getItem("tomfic_capdark")==="1";}catch(e){return false;}});
@@ -160,7 +160,7 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
 
   const buscarProd=(q)=>{
     const s=q.trim().toLowerCase();
-    return prods.find(p=>p.ean===s||p.ean===q.trim()||p.codigo.toLowerCase()===s||p.nombre.toLowerCase().includes(s))||null;
+    return prods.find(p=>p.ean===s||p.ean===q.trim()||p.codigo.toLowerCase()===s||p.nombre.toLowerCase().includes(s)||(p.referencia||"").toLowerCase()===s)||null;
   };
 
   const handleScan=(e)=>{
@@ -171,12 +171,21 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
     setScanInput("");
   };
 
+  const handleUnifiedSearch=(e)=>{
+    if(e.key!=="Enter"&&e.key!=="NumpadEnter")return;
+    const q=busquedaUnif.trim();
+    if(!q)return;
+    const p=buscarProd(q);
+    setNotFound(!p);
+    if(p){setProductoActivo(p);resetForm();setBusquedaUnif("");setTimeout(()=>unidadesRef.current?.focus(),80);}
+  };
+
   const onCamDetect=(code)=>{
     setShowCam(false);
     const p=buscarProd(code);
     setNotFound(!p);
      if(p){setProductoActivo(p);resetForm();setTimeout(()=>unidadesRef.current?.focus(),200);showToast(`📷 ${p.nombre}`);}
-    else{showToast(`Código ${code} no está en la base`,"err");setTimeout(()=>scanRef.current?.focus(),120);}
+    else{showToast(`Código ${code} no está en la base`,"err");setBusquedaUnif(code);setTimeout(()=>scanRef.current?.focus(),120);}
   };
 
   const calcTotal=(f)=>(parseFloat(f.unidades)||0)+(parseFloat(f.cajas)||0)*(parseFloat(f.embalaje)||1);
@@ -548,7 +557,7 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
     <div className={dark?"cap-shell cap-dark-shell":"cap-shell"} style={{minHeight:"100vh",background:pageBg,fontFamily:"system-ui,sans-serif"}}>
        <div style={{background:"#ffffff",color:"#1e293b",padding:"0 16px",display:"flex",alignItems:"center",justifyContent:"space-between",height:52,position:"sticky",top:0,zIndex:100,borderBottom:"1px solid #e2e8f0",boxShadow:"0 1px 4px rgba(15,23,42,0.08)"}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
-           <button onClick={()=>{setConteoActivo(null);setRondaActiva(null);setProductoActivo(null);setScanInput("");setBusqueda("");}}
+           <button onClick={()=>{setConteoActivo(null);setRondaActiva(null);setProductoActivo(null);setScanInput("");setBusquedaUnif("");}}
              style={{background:"#ffffff",border:"1px solid #cbd5e1",color:"#64748b",padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:3}}><ChevronLeft size={13}/> Mis conteos</button>
            <span style={{fontWeight:800,fontSize:15,color:"#0f172a"}}>TOMFIC</span>
           <span style={{background:rcol[miRonda],fontSize:10,padding:"2px 10px",borderRadius:20,fontWeight:700}}>{rlbl[miRonda]}</span>
@@ -645,60 +654,67 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
           </div>
         )}
 
-        {/* Scanner + búsqueda — también disponible en C3 */}
-         <div style={{background:"white",borderRadius:9,padding:"9px 12px",marginBottom:8,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
-           <div className="cap-scan-grid" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-            <div>
-               <div style={{fontSize:10,fontWeight:800,color:"#374151",marginBottom:4}}>CÓDIGO (EAN / INTERNO)</div>
-              <div style={{display:"flex",gap:8}}>
-                   <input ref={scanRef} value={scanInput} onChange={e=>setScanInput(e.target.value)} onKeyDown={handleScan} enterKeyHint="go"
-                  placeholder="Escanee o escriba y presione Enter…"
-                   style={{...inp,flex:1,padding:"7px 10px",border:`2px solid ${rcol[miRonda]}`}} autoFocus/>
-                <button onClick={()=>handleScan({key:"Enter"})} style={{padding:"9px 14px",background:rcol[miRonda],color:"white",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:15,display:"inline-flex",alignItems:"center"}}><CornerDownLeft size={16}/></button>
-                <button onClick={()=>setShowCam(true)} title="Escanear con cámara" style={{padding:"9px 14px",background:"white",color:rcol[miRonda],border:`2px solid ${rcol[miRonda]}`,borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:15,display:"inline-flex",alignItems:"center"}}><Camera size={16}/></button>
+        {/* Scanner + búsqueda unificada */}
+         <div style={{background:"white",borderRadius:12,padding:"10px 12px",marginBottom:8,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+           <div style={{position:"relative"}}>
+              <div style={{display:"flex",alignItems:"center",gap:6}}>
+                <div style={{flex:1,position:"relative"}}>
+                  <div style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",color:scanInput||busquedaUnif?"#2563eb":"#94a3b8",pointerEvents:"none"}}>
+                    <Search 
+size={18}/>
+                  </div>
+                  <input ref={scanRef} value={busquedaUnif} onChange={e=>{setBusquedaUnif(e.target.value);setProductoActivo(null);setNotFound(false);}}
+                    onKeyDown={handleUnifiedSearch} enterKeyHint="go"
+                    placeholder={busquedaUnif.length>=3?"Buscando…":"Escanee código de barras, QR o escriba nombre, código, referencia…"}
+                    style={{...inp,width:"100%",padding:"10px 12px 10px 36px",border:`2px solid ${busquedaUnif?"#2563eb":"#e2e8f0"}`,borderRadius:10,fontSize:14,transition:"border-color 0.15s"}}
+                    autoComplete="off" autoFocus/>
+                </div>
+                <button onClick={()=>handleUnifiedSearch({key:"Enter"})} title="Buscar"
+                  style={{padding:"10px 14px",background:rcol[miRonda],color:"white",border:"none",borderRadius:10,cursor:"pointer",fontWeight:700,display:"inline-flex",alignItems:"center",flexShrink:0}}>
+                  <CornerDownLeft size={17}/>
+                </button>
+                <button onClick={()=>setShowCam(true)} title="Escanear con cámara (barras / QR)"
+                  style={{padding:"10px 14px",background:"white",color:rcol[miRonda],border:`2px solid ${rcol[miRonda]}`,borderRadius:10,cursor:"pointer",fontWeight:700,display:"inline-flex",alignItems:"center",flexShrink:0}}>
+                  <Camera size={17}/>
+                </button>
               </div>
-              {notFound&&<div style={{marginTop:6,color:"#dc2626",fontSize:12,fontWeight:600,display:"flex",alignItems:"center",gap:4}}><AlertTriangle size={12}/> Código no encontrado</div>}
-            </div>
-            <div style={{position:"relative"}}>
-               <div style={{fontSize:10,fontWeight:800,color:"#374151",marginBottom:4}}>BUSCAR EN LA LISTA</div>
-              <input value={busqueda} onChange={e=>{setBusqueda(e.target.value);setProductoActivo(null);}}
-                placeholder="Escriba nombre, código o referencia…"
-                 style={{...inp,padding:"7px 10px",border:`1.5px solid ${busqueda?"#2563eb":"#e2e8f0"}`}}
-                onKeyDown={e=>{if(e.key==="Escape"){setBusqueda("");setProductoActivo(null);}}}
-                autoComplete="off"/>
-              {busqueda.length>=1&&!productoActivo&&(()=>{
-                const q=busqueda.toLowerCase();
-                const sugs=prods.filter(p=>p.nombre.toLowerCase().includes(q)||p.codigo.toLowerCase().includes(q)||p.ean.includes(q)||(p.referencia||"").toLowerCase().includes(q)).slice(0,8);
+              {notFound&&<div style={{marginTop:6,color:"#dc2626",fontSize:12,fontWeight:600,display:"flex",alignItems:"center",gap:4}}><AlertTriangle size={12}/> Código "{busquedaUnif}" no encontrado en la base</div>}
+              {/* Dropdown de resultados */}
+              {busquedaUnif.length>=2&&!productoActivo&&(()=>{
+                const q=busquedaUnif.toLowerCase();
+                const sugs=prods.filter(p=>(p.nombre||"").toLowerCase().includes(q)||(p.codigo||"").toLowerCase().includes(q)||(p.ean||"").includes(busquedaUnif)||(p.referencia||"").toLowerCase().includes(q)).slice(0,8);
                 if(!sugs.length)return(
-                  <div style={{position:"absolute",top:"100%",left:0,right:0,background:"white",border:"1.5px solid #e2e8f0",borderRadius:8,boxShadow:"0 4px 16px rgba(0,0,0,0.12)",zIndex:200,padding:"10px 14px",fontSize:12,color:"#64748b"}}>
-                    No se encontró "{busqueda}"
+                  <div style={{position:"absolute",top:"100%",left:0,right:0,background:"white",border:"1.5px solid #e2e8f0",borderRadius:10,boxShadow:"0 4px 16px rgba(0,0,0,0.12)",zIndex:200,padding:"10px 14px",fontSize:12,color:"#64748b",marginTop:4}}>
+                    No se encontró "{busquedaUnif}"
                   </div>
                 );
                 return(
-                  <div style={{position:"absolute",top:"100%",left:0,right:0,background:"white",border:`1.5px solid ${rcol[miRonda]}`,borderRadius:8,boxShadow:"0 4px 16px rgba(0,0,0,0.15)",zIndex:200,maxHeight:280,overflowY:"auto"}}>
+                  <div style={{position:"absolute",top:"100%",left:0,right:60,background:"white",border:`1.5px solid ${rcol[miRonda]}`,borderRadius:10,boxShadow:"0 4px 16px rgba(0,0,0,0.15)",zIndex:200,maxHeight:280,overflowY:"auto",marginTop:4}}>
                     {sugs.map((p,i)=>{
                       const tot=getTotal(miConteo.id,miRonda,p.id);
+                      const isEan=(p.ean||"").includes(busquedaUnif);
                       return(
-                        <div key={p.id} onClick={()=>{setProductoActivo(p);resetForm();setBusqueda("");setTimeout(()=>unidadesRef.current?.focus(),80);}}
+                        <div key={p.id} onClick={()=>{setProductoActivo(p);resetForm();setBusquedaUnif("");setTimeout(()=>unidadesRef.current?.focus(),80);}}
                           style={{padding:"10px 14px",cursor:"pointer",borderBottom:i<sugs.length-1?"1px solid #f1f5f9":"none",display:"flex",justifyContent:"space-between",alignItems:"center"}}
                           onMouseEnter={e=>e.currentTarget.style.background="#eff6ff"}
                           onMouseLeave={e=>e.currentTarget.style.background="white"}>
-                          <div>
-                            <div style={{fontWeight:700,fontSize:13,color:"#0f172a"}}>{p.nombre}</div>
-                            <div style={{fontSize:11,color:"#64748b",marginTop:1}}>
-                              <span style={{fontFamily:"monospace",color:"#2563eb",marginRight:8}}>{p.codigo}</span>{p.referencia}
+                          <div style={{minWidth:0}}>
+                            <div style={{fontWeight:700,fontSize:13,color:"#0f172a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.nombre}</div>
+                            <div style={{fontSize:11,color:"#64748b",marginTop:1,display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+                              <span style={{fontFamily:"monospace",color:"#2563eb",fontWeight:600}}>{p.codigo}</span>
+                              {p.referencia&&<span>Ref: {p.referencia}</span>}
+                              {isEan&&<span style={{background:"#dbeafe",color:"#1d4ed8",padding:"0 5px",borderRadius:4,fontSize:10,fontWeight:700}}>EAN</span>}
                             </div>
                           </div>
-                          {tot>0?<div style={{background:rcol[miRonda]+"22",color:rcol[miRonda],padding:"2px 8px",borderRadius:12,fontSize:11,fontWeight:700}}>✓ {tot}</div>:<div style={{color:"#d1d5db",fontSize:11}}>Sin captura</div>}
+                          {tot>0?<div style={{background:rcol[miRonda]+"22",color:rcol[miRonda],padding:"2px 8px",borderRadius:12,fontSize:11,fontWeight:700,flexShrink:0}}>✓ {tot}</div>:<div style={{color:"#d1d5db",fontSize:11,flexShrink:0}}>Sin captura</div>}
                         </div>
                       );
                     })}
                   </div>
                 );
               })()}
-            </div>
-          </div>
-        </div>
+           </div>
+         </div>
 
         {/* Ficha del producto */}
         {productoActivo&&(()=>{
@@ -900,7 +916,8 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
         onConfirm={cerrarConteo}
       />
       <BtnNotas G={G} usuario={usuario} rerender={rerender} showToast={showToast}/>
-      {showCam&&<CamScanner color={rcol[miRonda]} onClose={()=>setShowCam(false)} onDetect={onCamDetect}/>}
+      {showCam&&<CameraScanner 
+color={rcol[miRonda]} onClose={()=>setShowCam(false)} onDetect={onCamDetect}/>}
       {modalSalirJSX}
     </div>
   );

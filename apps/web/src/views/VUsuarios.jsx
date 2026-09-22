@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import * as XLSX from "xlsx-js-style";
 import {
   Users, UserPlus, Upload, Download, Search, Mail, Smartphone, Send,
@@ -28,6 +28,7 @@ export function VUsuarios({usuario,G,rerender,showToast}){
   const [busy,setBusy]=useState(false);
   const [busqUser,setBusqUser]=useState(""); // filtro de la tabla de usuarios
   const [usuarioExistente,setUsuarioExistente]=useState("");
+  useEffect(()=>{refresh();},[]);
   // El admin es transversal; los demás usuarios pertenecen al inventario activo.
   const usuariosInventario=G.usuarios.filter(u=>u.rol==="admin"||u.inventario_id===G.inventario?.id);
   const usuariosFiltrados=usuariosInventario.filter(u=>{
@@ -72,18 +73,14 @@ export function VUsuarios({usuario,G,rerender,showToast}){
         await refresh();showToast("Actualizado ✓");
       }else{
         const nombreCreado=form.nombre.toUpperCase().trim();
-        const {data,error}=await SB.createMember(nombreCreado,form.pass,form.rol,form.correo,form.telefono);
+        const invId=G.inventario&&form.rol!=="admin"?G.inventario.id:undefined;
+        const {data,error}=await SB.createMember(nombreCreado,form.pass,form.rol,form.correo,form.telefono,invId);
         if(error)throw error;
         // El RPC puede devolver solo la credencial. Recargamos el perfil para
         // obtener su id real antes de vincularlo al inventario seleccionado.
         await refresh();
         const creado=G.usuarios.find(u=>(u.nombre||"").toUpperCase()===nombreCreado)||data;
         if(!creado?.id)throw new Error("El usuario fue creado, pero no se pudo vincular al inventario.");
-        if(G.inventario&&form.rol!=="admin"){
-          const {error:eInv}=await SB.updateUsuario(creado.id,{inventario_id:G.inventario.id});
-          if(eInv)throw eInv;
-          await refresh();
-        }
         setCredCreada({nombre:creado.nombre||nombreCreado,pass:data?.pass||form.pass,email:data?.email||creado.email});
         showToast("Usuario creado ✓");
       }
@@ -321,7 +318,7 @@ export function VUsuarios({usuario,G,rerender,showToast}){
             <div className="space-y-1.5">
               <Label>Rol</Label>
               <div className="grid grid-cols-2 gap-2.5">
-                 {[["capturador","Capturador","Solo captura"],["admin","Administrador","Acceso total"],["gerente","Gerente","Solo lectura"],["comercial","Comercial","Gestiona clientes y renovaciones"]].map(([v,t,s])=>(
+                 {[["capturador","Capturador","Solo captura"],["admin","Administrador","Acceso total"],["gerente","Gerente","Solo lectura"]].map(([v,t,s])=>(
                   <div key={v} onClick={()=>setForm(p=>({...p,rol:v}))} className={`rounded-lg border-2 p-3 cursor-pointer transition-colors ${form.rol===v?"border-primary bg-blue-50":"border-slate-200 hover:border-slate-300"}`}>
                     <div className={`font-bold text-sm ${form.rol===v?"text-primary":"text-slate-900"}`}>{t}</div>
                     <div className="text-[11px] text-muted-foreground mt-0.5">{s}</div>

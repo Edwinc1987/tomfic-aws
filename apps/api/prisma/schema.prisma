@@ -96,6 +96,8 @@ model User {
   email        String      @unique
   role         UserRole
   active       Boolean     @default(true)
+  inventoryId  String?
+  passwordHash String?
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
   rounds       CountRound[]
@@ -115,10 +117,14 @@ model Inventory {
   tenant       Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   name         String
   status       String      @default("OPEN")
+  tipo         String      @default("2conteos")
+  closedAt     DateTime?
+  closedBy     String?
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
   products     Product[]
   counts       Count[]
+  snapshotsJson Json?
 
   @@unique([tenantId, name])
   @@index([tenantId, status])
@@ -133,6 +139,7 @@ model Product {
   code         String    @default("")
   barcode      String    @default("")
   name         String
+  supplier     String    @default("")
   balance      Decimal   @default(0) @db.Decimal(14, 3)
   cost         Decimal   @default(0) @db.Decimal(14, 2)
   createdAt    DateTime  @default(now())
@@ -152,6 +159,8 @@ model Count {
   inventory    Inventory   @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
   name         String
   location     String
+  locLabel     String      @default("")
+  tipo         String      @default("2conteos")
   status       String      @default("PENDING")
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
@@ -336,4 +345,22 @@ model ReportTemplate {
 
   @@unique([tenantId, name])
   @@index([tenantId, updatedAt])
+}
+
+model AppConfig {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+model Lead {
+  id         String   @id @default(uuid())
+  name       String
+  email      String?
+  phone      String?
+  message    String?
+  status     String   @default("nuevo")
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
 }

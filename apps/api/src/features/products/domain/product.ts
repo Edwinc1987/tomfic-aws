@@ -5,11 +5,12 @@ export type Product = {
   code: string;
   barcode: string;
   name: string;
+  supplier: string;
   balance: number;
   cost: number;
 };
 
-export type ProductInput = Omit<Product, "id"> & { id?: string };
+export type ProductInput = Omit<Product, "id" | "supplier"> & { id?: string; supplier?: string };
 
 export const normalizeProduct=(input:ProductInput):Product=>{
   const product={
@@ -19,6 +20,7 @@ export const normalizeProduct=(input:ProductInput):Product=>{
     code:input.code.trim(),
     barcode:input.barcode.trim(),
     name:input.name.trim(),
+    supplier:(input.supplier||"").trim(),
     balance:Number(input.balance),
     cost:Number(input.cost),
   };

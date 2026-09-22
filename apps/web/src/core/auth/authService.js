@@ -1,12 +1,15 @@
-import { supabase } from "@/lib/data";
+import { cognitoAuth } from "./cognitoAuth";
 
-// Adaptador de autenticación para mantener el proveedor fuera de la UI.
 export const authService={
-  getUser:()=>supabase.auth.getUser(),
-  getSession:()=>supabase.auth.getSession(),
-  onAuthStateChange:(handler)=>supabase.auth.onAuthStateChange(handler),
-  signIn:(email,password)=>supabase.auth.signInWithPassword({email,password}),
-  signOut:()=>supabase.auth.signOut(),
-  updatePassword:(password)=>supabase.auth.updateUser({password}),
-  resetPassword:(email,redirectTo)=>supabase.auth.resetPasswordForEmail(email,{redirectTo}),
+  getUser:()=>cognitoAuth.getUser(),
+  getSession:()=>cognitoAuth.getSession(),
+  getToken:()=>cognitoAuth.getToken(),
+  onAuthStateChange:(handler)=>{
+    setTimeout(()=>handler("INITIAL_SESSION"),0);
+    return {subscription:{unsubscribe:()=>{}}};
+  },
+  signIn:(email,password)=>cognitoAuth.signIn(email,password),
+  signOut:()=>cognitoAuth.signOut(),
+  updatePassword:()=>Promise.resolve({data:{},error:new Error("Usa Cognito para cambiar contraseña")}),
+  resetPassword:()=>Promise.resolve({data:{},error:new Error("Recuperación no disponible aún")}),
 };

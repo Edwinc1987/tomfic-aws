@@ -8,6 +8,11 @@ import { CaptureRepository } from "../application/capture-repository";
 export class CapturesController{
   constructor(@Inject("CaptureRepository") private readonly repository:CaptureRepository){}
 
+  @Get("by-count/:countId")
+  listByCount(@Req() request:{auth:{tenantId:string}},@Param("countId") countId:string){
+    return this.repository.listByCount(request.auth.tenantId,countId);
+  }
+
   @Get(":captureId")
   details(@Req() request:{auth:{tenantId:string}},@Param("captureId") captureId:string){
     return this.repository.getDetails(request.auth.tenantId,captureId);

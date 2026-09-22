@@ -7,10 +7,11 @@ import { Search, Download, SlidersHorizontal, Columns, X, ChevronDown } from "lu
 // Usa las MISMAS columnas que el Excel (reporteXLSX) → pantalla y archivo idénticos.
 const NUM = new Set(["num", "money"]);
 
-export function ReporteGrid({ title, meta, columns, rows, groupBy, nameKey = "nombre", onExport }) {
+export function ReporteGrid({ title, meta, columns, rows, groupBy, nameKey = "nombre", onExport, showSupplierFilter = true }) {
   const [q, setQ] = useState("");
   const [fCat, setFCat] = useState("");
   const [fEstado, setFEstado] = useState("");
+  const [fSupplier, setFSupplier] = useState("");
   const [soloDif, setSoloDif] = useState(false);
   const [ocultas, setOcultas] = useState(() => new Set());
   const [showMas, setShowMas] = useState(false);
@@ -21,19 +22,21 @@ export function ReporteGrid({ title, meta, columns, rows, groupBy, nameKey = "no
   const estadoKey = (columns.find(c => c.type === "estado") || {}).key;
 
   const cats = groupBy ? [...new Set(rows.map(r => r[groupBy] || "Sin categoría"))].sort((a, b) => a.localeCompare(b)) : [];
+  const suppliers = showSupplierFilter ? [...new Set(rows.map(r => r.supplier || r.proveedor).filter(Boolean))].sort((a, b) => a.localeCompare(b)) : [];
   const estados = hasEstado ? [...new Set(rows.map(r => r[estadoKey]).filter(Boolean))].sort() : [];
 
   const nq = q.trim().toLowerCase();
   const rowsF = rows.filter(r => {
-    if (nq && ![r.codigo, r.nombre, r.ean].some(v => String(v || "").toLowerCase().includes(nq))) return false;
+    if (nq && ![r.codigo, r.nombre, r.ean, r.supplier, r.proveedor].some(v => String(v || "").toLowerCase().includes(nq))) return false;
     if (fCat && (r[groupBy] || "Sin categoría") !== fCat) return false;
+    if (fSupplier && (r.supplier || r.proveedor || "") !== fSupplier) return false;
     if (fEstado && r[estadoKey] !== fEstado) return false;
     if (soloDif && Number(r.diferencia || 0) === 0) return false;
     return true;
   });
 
-  const nFiltros = [fCat, fEstado, soloDif].filter(Boolean).length;
-  const limpiar = () => { setQ(""); setFCat(""); setFEstado(""); setSoloDif(false); };
+  const nFiltros = [fCat, fEstado, fSupplier, soloDif].filter(Boolean).length;
+  const limpiar = () => { setQ(""); setFCat(""); setFEstado(""); setFSupplier(""); setSoloDif(false); };
   const visibles = columns.filter(c => !ocultas.has(c.key));
   const toggleCol = k => setOcultas(s => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n; });
 
@@ -90,6 +93,15 @@ export function ReporteGrid({ title, meta, columns, rows, groupBy, nameKey = "no
               <select value={fCat} onChange={e => setFCat(e.target.value)} className="bg-transparent outline-none text-[13px] font-semibold text-slate-700 max-w-[160px]">
                 <option value="">Todas</option>
                 {cats.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </label>
+          )}
+          {suppliers.length > 0 && (
+            <label className={sel}>
+              <span className="text-slate-400 text-[11px] font-normal">Proveedor</span>
+              <select value={fSupplier} onChange={e => setFSupplier(e.target.value)} className="bg-transparent outline-none text-[13px] font-semibold text-slate-700 max-w-[160px]">
+                <option value="">Todos</option>
+                {suppliers.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </label>
           )}

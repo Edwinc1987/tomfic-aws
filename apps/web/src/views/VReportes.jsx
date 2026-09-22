@@ -150,7 +150,8 @@ export function VReportes({G,showToast,usuario}){
       columns:[
         {key:"__nivel",label:"Nivel",type:"text",width:11},
         {key:"codigo",label:"Código",type:"text",width:12},
-        {key:"nombre",label:"Nombre del producto",type:"text",width:34},
+        {key:"nombre",label:"Nombre del producto",type:"text",width:30},
+        {key:"proveedor",label:"Proveedor",type:"text",width:16},
         {key:"saldo",label:"Saldo sistema",type:"num",width:13},
         {key:"cantFinal",label:"Físico",type:"num",width:10},
         {key:"diferencia",label:"Diferencia",type:"num",width:12,colorSign:true},

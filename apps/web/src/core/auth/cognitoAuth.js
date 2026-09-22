@@ -50,7 +50,7 @@ export const cognitoAuth={
     if(!currentUser)return resolve(null);
     currentUser.getSession((err,session)=>{
       if(err||!session||!session.isValid())return resolve(null);
-      resolve(session.getIdToken().getJwtToken());
+       resolve(session.getAccessToken().getJwtToken());
     });
   }),
 

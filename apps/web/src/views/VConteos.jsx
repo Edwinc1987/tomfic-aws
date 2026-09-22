@@ -13,7 +13,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import Section from "@/components/Section";
 import EstBadge from "@/components/EstBadge";
-import { G, TODAY, ID, conteosReales, rondaCerrada, conteoCompleto } from "@/lib/data";
+import { G, TODAY, ID, conteosReales, rondaCerrada, conteoCompleto, SB } from "@/lib/data";
 
 // ── CONTEOS ──
 export function VConteos({G,rerender,showToast,usuario,recargar}){
@@ -35,21 +35,33 @@ export function VConteos({G,rerender,showToast,usuario,recargar}){
   const locUsada=l=>G.conteos.some(c=>c.tipo!=="ajuste"&&(c.locId===l.id||locKey(c)===locKey(l)));
   const locDisponibles=G.localizaciones.filter(l=>!locUsada(l));
 
-  const crear=()=>{
+  const crear=async()=>{
     if(!G.inventario)return showToast("Primero crea un inventario","err");
     if(!form.nombre.trim()||!form.locId||!form.usuarioC1)return showToast("Completa nombre, localización y usuario C1","err");
     const loc=G.localizaciones.find(l=>l.id===form.locId);
     if(!loc)return showToast("La ubicación ya no está disponible. Actualiza la lista e inténtalo de nuevo.","err");
     if(loc&&locUsada(loc))return showToast("Esta ubicación ya fue utilizada en un conteo","err");
+    const rounds=G.inventario.tipo==="2conteos"?["C1","C2"]:["C1"];
+    let apiId=null;
+    try{
+      const result=await SB.upsertConteo({inventoryId:G.inventario.id,nombre:form.nombre,location:`${loc.ubicacion} › ${loc.localizacion} › ${loc.nro}`,locLabel:`${loc.ubicacion} › ${loc.localizacion} › ${loc.nro}`,tipo:G.inventario.tipo,rounds});
+      apiId=result?.id||null;
+    }catch(e){console.warn("Error API crear conteo:",e);}
+    const countId=apiId||ID();
+    const c1User=G.usuarios.find(x=>x.nombre===form.usuarioC1);
+    if(apiId&&c1User?.id){try{await SB.assignConteoRound(apiId,"C1",c1User.id);}catch(e){}}
+    if(apiId&&form.usuarioC2){
+      const c2User=G.usuarios.find(x=>x.nombre===form.usuarioC2);
+      try{await SB.assignConteoRound(apiId,"C2",c2User?.id||"");}catch(e){}
+    }
     G.conteos.push({
-      id:ID(),nombre:form.nombre,locId:form.locId,
+      id:countId,nombre:form.nombre,locId:form.locId,
       locLabel:`${loc.ubicacion} › ${loc.localizacion} › ${loc.nro}`,
       ubicacion:loc.ubicacion,localizacion:loc.localizacion,nro:loc.nro,
       obs:"",
       tipo:G.inventario.tipo,
       usuarioC1:form.usuarioC1,usuarioC2:form.usuarioC2||"",usuarioC3:"",
       estado:"pendiente",
-      // Rondas cerradas independientemente
       rondasCerradas:[],
       fechaCreacion:TODAY(),
     });
@@ -63,8 +75,10 @@ export function VConteos({G,rerender,showToast,usuario,recargar}){
     setModalMod(null);rerender();showToast("Conteo actualizado ✓");
   };
 
-  const guardarC2=(id)=>{
+  const guardarC2=async(id)=>{
     if(!c2Val)return showToast("Selecciona un usuario","err");
+    const user=G.usuarios.find(x=>x.nombre===c2Val);
+    if(user?.id){try{await SB.assignConteoRound(id,"C2",user.id);}catch(e){console.warn("Error API asignar C2:",e);}}
     G.conteos=G.conteos.map(c=>c.id===id?{...c,usuarioC2:c2Val}:c);
     setEditC2(null);setC2Val("");rerender();showToast("Usuario C2 asignado ✓");
   };

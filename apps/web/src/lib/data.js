@@ -3,90 +3,82 @@
 // Extraído de App.jsx (Fase 2.2a de la modularización). Riesgo cero: solo relocaliza.
 // ─────────────────────────────────────────
 import * as XLSX from "xlsx-js-style";
-import { createClient } from "@supabase/supabase-js";
 
-// Cliente Supabase (nube). Requiere VITE_SUPABASE_URL / VITE_SUPABASE_KEY en .env
-export const supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_KEY);
-
-// --- Operaciones Supabase --- (movido de App.jsx en Fase 2.2b; SB no depende de G)
-export const SB={
-  // Perfil propio del usuario autenticado (id = auth.uid()).
-  loadMyProfile:(uid)=>supabase.from("usuarios").select("*").eq("id",uid).maybeSingle(),
-  loadTenant:(tid)=>supabase.from("tenants").select("*").eq("id",tid).maybeSingle(),
-  // RPCs (SECURITY DEFINER en la base): creación/gestión privilegiada de usuarios y empresas.
-  registerTenant:(empresa,slug,email,pass,nombre,nit)=>supabase.rpc("register_tenant",{p_empresa:empresa,p_slug:slug,p_email:email,p_pass:pass,p_admin_nombre:nombre||"",p_nit:nit||""}),
-  createMember:(nombre,pass,rol,correo,telefono)=>supabase.rpc("create_member",{p_nombre:nombre,p_pass:pass,p_rol:rol,p_correo:correo||"",p_telefono:telefono||""}),
-  resetMemberPassword:(id,pass)=>supabase.rpc("reset_member_password",{p_user_id:id,p_pass:pass}),
-  deleteMember:(id)=>supabase.rpc("delete_member",{p_user_id:id}),
-  setTenantActive:(tid,activo)=>supabase.rpc("set_tenant_active",{p_tid:tid,p_activo:activo}),
-  deleteTenant:(tid)=>supabase.rpc("delete_tenant",{p_tid:tid}),
-  setMemberActive:(id,activo)=>supabase.rpc("set_member_active",{p_user_id:id,p_activo:activo}),
-  loadUsuarios:(tid)=>supabase.from("usuarios").select("*").eq("tenant_id",tid),
-  // Gestión de clientes/pagos (Panel del Dueño).
-  updateTenant:(tid,patch)=>supabase.from("tenants").update(patch).eq("id",tid),
-  listPagos:(tid)=>supabase.from("pagos").select("*").eq("tenant_id",tid).order("fecha",{ascending:false}),
-  // Todos los pagos de todas las empresas (dashboard del dueño). Requiere que RLS permita al dueño leerlos.
-  listAllPagos:()=>supabase.from("pagos").select("*").order("fecha",{ascending:false}),
-  // Leads (prospectos capturados desde la web pública).
-  capturarLead:(nombre,email,telefono,mensaje)=>supabase.rpc("capturar_lead",{p_nombre:nombre||"",p_email:email||"",p_telefono:telefono||"",p_mensaje:mensaje||""}),
-  listLeads:()=>supabase.from("leads").select("*").order("created_at",{ascending:false}),
-  updateLead:(id,patch)=>supabase.from("leads").update(patch).eq("id",id),
-  deleteLead:(id)=>supabase.from("leads").delete().eq("id",id),
-  insertPago:(p)=>supabase.from("pagos").insert(p),
-  deletePago:(id)=>supabase.from("pagos").delete().eq("id",id),
-  // Datos de UNA empresa (tenant). Si tid es null, trae todo (compatibilidad).
-  async loadAll(tid){
-    const f=(t)=>tid?supabase.from(t).select("*").eq("tenant_id",tid):supabase.from(t).select("*");
-    const [u,inv,c]=await Promise.all([f("usuarios"),f("inventarios"),f("conteos")]);
-     // Productos puede superar el límite de 1000 filas. Se cargan en páginas
-     // concurrentes limitadas para no hacer 50.000 solicitudes secuenciales.
-     let base=supabase.from("productos").select("*",{count:"exact",head:true});if(tid)base=base.eq("tenant_id",tid);
-     const {count,error:countError}=await base;
-     if(countError)throw countError;
-     const TAM=1000,productos=[];
-     for(let inicio=0;inicio<(count||0);inicio+=TAM*5){
-       const paginas=await Promise.all(Array.from({length:5},(_,i)=>{
-         const desde=inicio+i*TAM;if(desde>=(count||0))return null;
-         let q=supabase.from("productos").select("*");if(tid)q=q.eq("tenant_id",tid);
-         return q.range(desde,Math.min(desde+TAM-1,count-1));
-       }).filter(Boolean));
-       paginas.forEach(({data,error})=>{if(error)throw error;productos.push(...(data||[]));});
-     }
-    return {usuarios:u.data||[],productos,inventarios:inv.data||[],conteos:c.data||[]};
+// --- Adaptador API AWS (reemplaza Supabase) ---
+import { apiRequest } from "@/core/network/apiClient";
+const _h=(tid,role)=>({"x-tenant-id":tid||G.tenantId||"tenant-demo-a","x-user-role":role||"ADMIN"});
+const _api={
+  me:()=>apiRequest("/v1/users/me"),
+  loadUsuarios:async(tid)=>{const r=await apiRequest("/v1/users",{headers:_h(tid)});const arr=Array.isArray(r)?r:r?.data||[];return{data:arr.map(u=>({id:u.id,nombre:u.name,correo:u.email,telefono:u.phone||"",rol:(u.role||"").toLowerCase(),activo:u.active!==false,inventario_id:u.inventoryId||null}))};},
+  createMember:(nombre,pass,rol,correo,telefono,inventoryId)=>{const roleMap={capturador:"CAPTURER",admin:"ADMIN",gerente:"MANAGER",comercial:"COMMERCIAL"};const body={name:nombre,email:correo,role:roleMap[rol]||rol?.toUpperCase()||"CAPTURER",password:pass};if(inventoryId)body.inventoryId=inventoryId;return apiRequest("/v1/users",{method:"POST",headers:_h(),body});},
+  resetMemberPassword:()=>Promise.resolve({error:null}),
+  deleteMember:(id)=>apiRequest(`/v1/users/${id}`,{method:"DELETE",headers:_h()}),
+  setMemberActive:(id,activo)=>apiRequest(`/v1/users/${id}`,{method:"PATCH",headers:_h(),body:{active:activo}}),
+  setTenantActive:(tid,activo)=>apiRequest(`/v1/tenants/${tid}/active`,{method:"PATCH",headers:_h(tid,"OWNER"),body:{active:activo}}),
+  deleteTenant:(tid)=>apiRequest(`/v1/tenants/${tid}`,{method:"DELETE",headers:_h(tid,"OWNER")}),
+  updateTenant:(tid,patch)=>apiRequest(`/v1/tenants/${tid}`,{method:"PATCH",headers:_h(tid,"OWNER"),body:patch}),
+  listTenants:()=>apiRequest("/v1/tenants"),
+  listPagos:async(tid)=>{try{const r=await apiRequest(`/v1/tenants/${tid}/payments`);return{data:r||[],error:null};}catch(e){return{data:[],error:e};}},
+  listAllPagos:async()=>{try{const ts=await apiRequest("/v1/tenants");const all=[];for(const t of ts){const p=await apiRequest(`/v1/tenants/${t.id}/payments`);(p||[]).forEach(x=>all.push({...x,tenant_id:t.id}));}return{data:all,error:null};}catch(e){return{data:[],error:e};}},
+  insertPago:(row)=>apiRequest(`/v1/tenants/${row.tenant_id}/payments`,{method:"POST",headers:_h(row.tenant_id),body:row}),
+  deletePago:async(id)=>{const ts=await apiRequest("/v1/tenants").catch(()=>[]);for(const t of ts){try{await apiRequest(`/v1/tenants/${t.id}/payments/${id}`,{method:"DELETE",headers:_h(t.id)});return{};}catch(e){}}return{};},
+  listLeads:()=>apiRequest("/v1/leads"),
+  updateLead:(id,body)=>apiRequest(`/v1/leads/${id}`,{method:"PATCH",headers:_h(),body}),
+  deleteLead:(id)=>apiRequest(`/v1/leads/${id}`,{method:"DELETE",headers:_h()}),
+  capturarLead:(nombre,email,telefono,mensaje)=>apiRequest("/v1/leads",{method:"POST",body:{name:nombre,email,phone:telefono,message:mensaje}}),
+  registerTenant:()=>Promise.resolve({data:null,error:new Error("Usa Cognito para registrar empresas")}),
+  getConfig:async(key)=>{try{return await apiRequest(`/v1/config/${encodeURIComponent(key)}`);}catch(e){return null;}},
+  setConfig:(key,value)=>apiRequest(`/v1/config/${encodeURIComponent(key)}`,{method:"PUT",headers:_h(),body:{value}}),
+  loadMyProfile:async(uid)=>{
+    try{const r=await apiRequest("/v1/users/me");return{data:r};}catch(e){return{data:null,error:e};}
   },
-  // Página de productos para tablas administrativas. No modifica G.productos.
-  async listProductosPage({tenantId,inventarioId,page=1,pageSize=50,search="",categoria=""}){
-    let q=supabase.from("productos").select("*",{count:"exact"});
-    q=q.eq("tenant_id",tenantId).eq("inventario_id",inventarioId);
-    if(categoria)q=q.eq("categoria",categoria);
-    const term=String(search||"").trim().replace(/[%,()\\]/g," ");
-    if(term)q=q.or(["nombre","codigo","ean"].map(col=>`${col}.ilike.%${term}%`).join(","));
-    const from=Math.max(0,page-1)*pageSize;
-    const {data,error,count}=await q.order("nombre",{ascending:true}).order("id",{ascending:true}).range(from,from+pageSize-1);
-    return {data:data||[],count:count||0,error};
+  loadTenant:async(tid)=>{
+    try{const r=await apiRequest(`/v1/tenants/${tid}`);return{data:r};}catch(e){return{data:null,error:e};}
   },
-  // Empresas (tenants)
-  listTenants:()=>supabase.from("tenants").select("*").order("created_at",{ascending:false}),
-  upsertTenant:(t)=>supabase.from("tenants").upsert(t,{onConflict:"id"}),
-  upsertUsuario:(u)=>supabase.from("usuarios").upsert(u,{onConflict:"id"}),
-  updateUsuario:(id,patch)=>supabase.from("usuarios").update(patch).eq("id",id),
-  deleteUsuario:(id)=>supabase.from("usuarios").delete().eq("id",id),
-   async upsertProductosBulk(prods,onProgress){for(let i=0;i<prods.length;i+=500){const lote=prods.slice(i,i+500);const{error}=await supabase.from("productos").upsert(lote,{onConflict:"id"});if(error)throw error;onProgress?.(Math.min(i+lote.length,prods.length),prods.length);await new Promise(resolve=>setTimeout(resolve,0));}},
-  // SIEMPRE scopeado por empresa. Si no hay tenant, es un NO-OP: nunca un borrado global
-  // (con RLS el dueño podría borrar productos de TODAS las empresas → se prohíbe de raíz).
-  deleteAllProductos:(tid,invId)=>tid?supabase.from("productos").delete().eq("tenant_id",tid).eq("inventario_id",invId):Promise.resolve({data:null,error:null}),
-  deleteAllProductosTenant:(tid)=>tid?supabase.from("productos").delete().eq("tenant_id",tid):Promise.resolve({data:null,error:null}),
-  deleteProductosByIds:async(ids)=>{for(let i=0;i<ids.length;i+=200){const{error}=await supabase.from("productos").delete().in("id",ids.slice(i,i+200));if(error)throw error;}},
-  upsertInventario:(inv)=>supabase.from("inventarios").upsert(inv,{onConflict:"id"}),
-  upsertConteo:(c)=>supabase.from("conteos").upsert(c,{onConflict:"id"}),
-  closeConteoRound:(id,ronda)=>supabase.rpc("close_count_round",{p_count_id:id,p_round:ronda}),
-  reopenConteoRound:(id,ronda)=>supabase.rpc("reopen_count_round",{p_count_id:id,p_round:ronda}),
-  deleteConteo:(id)=>supabase.from("conteos").delete().eq("id",id),
-  deleteInventario:(id)=>supabase.from("inventarios").delete().eq("id",id),
-  // Configuración global key/value (ej: contenido de la landing). Tabla: app_config(key text pk, value jsonb)
-  getConfig:async(key)=>{try{const{data}=await supabase.from("app_config").select("value").eq("key",key).maybeSingle();return data?data.value:null;}catch(e){return null;}},
-  setConfig:(key,value)=>supabase.from("app_config").upsert({key,value},{onConflict:"key"}),
+  loadAll:async(tid)=>{
+    const invs=await apiRequest("/v1/inventories",{headers:_h(tid)}).catch(()=>[]);
+    const firstInvId=(invs&&invs[0]?.id)||"";
+    const counts=await apiRequest(`/v1/counts?inventoryId=${firstInvId}`,{headers:_h(tid)}).catch(()=>[]);
+    const prods=await apiRequest(`/v1/products?inventoryId=${firstInvId}&page=1&pageSize=10000`,{headers:_h(tid)}).catch(()=>[]);
+    const capturas={};
+    if(Array.isArray(counts)){
+      for(const c of counts){
+        try{
+          const caps=await apiRequest(`/v1/captures/by-count/${c.id}`,{headers:_h(tid)});
+          if(Array.isArray(caps))caps.forEach(cap=>{if(cap.key)capturas[cap.key]=cap;});
+        }catch(e){}
+      }
+    }
+    return{usuarios:[],productos:Array.isArray(prods)?prods:prods?.items||[],inventarios:Array.isArray(invs)?invs:[],conteos:Array.isArray(counts)?counts:[],capturas};
+  },
+  listProductosPage:async({tenantId,inventarioId,page=1,pageSize=50,search=""})=>{
+    const r=await apiRequest(`/v1/products?inventoryId=${inventarioId}&page=${page}&pageSize=${pageSize}&search=${encodeURIComponent(search)}`,{headers:_h(tenantId)});
+    return{data:Array.isArray(r)?r:r?.items||[],count:r?.total||0,error:null};
+  },
+  upsertTenant:()=>Promise.resolve({error:null}),
+  upsertUsuario:()=>Promise.resolve({error:null}),
+  updateUsuario:(id,body)=>{const mapped={};if(body.rol!==undefined){const rm={capturador:"CAPTURER",admin:"ADMIN",gerente:"MANAGER",comercial:"COMMERCIAL"};mapped.role=rm[body.rol]||body.rol?.toUpperCase()||body.rol;}if(body.correo!==undefined)mapped.email=body.correo;if(body.telefono!==undefined)mapped.phone=body.telefono;if(body.active!==undefined)mapped.active=body.active;if(body.inventario_id!==undefined)mapped.inventoryId=body.inventario_id;return apiRequest(`/v1/users/${id}`,{method:"PATCH",headers:_h(),body:mapped});},
+  deleteUsuario:(id)=>apiRequest(`/v1/users/${id}`,{method:"DELETE",headers:_h()}),
+  upsertProductosBulk:async(prods,progressCb)=>{const backendProds=prods.map(p=>({id:p.id,tenantId:p.tenantId||p.tenant_id||G.tenantId||"",inventoryId:p.inventoryId||p.inventario_id||G.inventario?.id||"",code:p.code||p.codigo||"",barcode:p.barcode||p.ean||"",name:p.name||p.nombre||"",supplier:p.supplier||p.proveedor||"",balance:Number(p.balance||p.saldo||0),cost:Number(p.cost||p.costo||0)}));const BATCH=200;let total=0;for(let i=0;i<backendProds.length;i+=BATCH){const chunk=backendProds.slice(i,i+BATCH);const r=await apiRequest("/v1/products/bulk",{method:"POST",headers:_h(),body:{products:chunk}});total+=(r?.count||0);if(progressCb)progressCb(total,backendProds.length);}return{count:total};},
+  deleteAllProductos:async(tid,invId)=>{const r=await apiRequest(`/v1/products/all?inventoryId=${invId}`,{method:"DELETE",headers:_h(tid)});return{data:null,error:null,count:r?.count||0};},
+  deleteAllProductosTenant:async(tid)=>{const r=await apiRequest("/v1/products/all",{method:"DELETE",headers:_h(tid)});return{data:null,error:null,count:r?.count||0};},
+  deleteProductosByIds:async(ids)=>{const r=await apiRequest("/v1/products/by-ids",{method:"DELETE",headers:_h(),body:{ids}});return{count:r?.count||0};},
+  upsertInventario:async(inv)=>{if(inv?.id){await apiRequest(`/v1/inventories/${inv.id}`,{method:"PATCH",headers:_h(),body:inv});}return{error:null};},
+  closeInventario:async(id,snapshots)=>{await apiRequest(`/v1/inventories/${id}/close`,{method:"POST",headers:_h(),body:{snapshots}});return{error:null};},
+  listClosedInventories:async()=>{return apiRequest("/v1/inventories/closed",{headers:_h()});},
+  upsertConteo:async(c)=>{
+    const body={inventoryId:c.inventoryId||G.inventario?.id||"",name:c.nombre||c.name||"",location:c.location||c.ubicacion||"",locLabel:c.locLabel||"",tipo:c.tipo||"2conteos",rounds:c.rounds||["C1","C2"]};
+    return apiRequest("/v1/counts",{method:"POST",headers:_h(),body});
+  },
+  closeConteoRound:(id,ronda)=>apiRequest(`/v1/counts/${id}/rounds/${ronda}/close`,{method:"POST",headers:_h()}),
+  reopenConteoRound:(id,ronda)=>apiRequest(`/v1/counts/${id}/rounds/${ronda}/reopen`,{method:"POST",headers:_h()}),
+  assignConteoRound:(id,ronda,userId)=>apiRequest(`/v1/counts/${id}/rounds/${ronda}/assign`,{method:"POST",headers:_h(),body:{userId}}),
+  deleteConteo:async(id)=>{await apiRequest(`/v1/counts/${id}`,{method:"DELETE",headers:_h()});return{error:null};},
+  deleteInventario:async(id)=>{await apiRequest(`/v1/inventories/${id}`,{method:"DELETE",headers:_h()});return{error:null};},
 };
+
+// --- Operaciones API --- (reemplazado de Supabase a NestJS)
+export const SB=_api;
 
 export const TODAY = () => new Date().toLocaleDateString("es-CO");
 export const HOUR  = () => new Date().toLocaleTimeString("es-CO");
@@ -204,7 +196,12 @@ export const serInv=(inv,estado)=>({
   localizacion_tipos_snapshot:inv.localizacionTipos?JSON.stringify(inv.localizacionTipos):null,
   notas_snapshot:inv.notas?JSON.stringify(inv.notas):null,
 });
-export const prodCols=(p,invId)=>({id:p.id,tenant_id:G.tenantId||null,inventario_id:invId||p.inventario_id||G.inventario?.id||null,ean:p.ean||"",codigo:p.codigo||"",nombre:p.nombre||"",referencia:p.referencia||"",categoria:p.categoria||"",subcategoria:p.subcategoria||"",subgrupo:p.subgrupo||"",determinada:p.determinada||"",localizacion:p.localizacion||"",ubicacion:p.ubicacion||"",observacion:p.observacion||"",saldo:p.saldo||0,costo:p.costo||0,nit:p.nit||"",proveedor:p.proveedor||""});
+export const prodCols=(p,invId)=>{
+  const base={id:p.id,ean:p.ean||"",codigo:p.codigo||"",nombre:p.nombre||"",referencia:p.referencia||"",categoria:p.categoria||"",subcategoria:p.subcategoria||"",subgrupo:p.subgrupo||"",determinada:p.determinada||"",localizacion:p.localizacion||"",ubicacion:p.ubicacion||"",observacion:p.observacion||"",saldo:p.saldo||0,costo:p.costo||0,nit:p.nit||"",proveedor:p.proveedor||""};
+  base.tenant_id=G.tenantId||null;base.inventario_id=invId||p.inventario_id||G.inventario?.id||null;
+  return base;
+};
+export const toBackendProduct=(p,invId)=>({id:p.id,tenantId:G.tenantId||p.tenant_id||"",inventoryId:invId||p.inventario_id||G.inventario?.id||"",code:p.codigo||p.code||"",barcode:p.ean||p.barcode||"",name:p.nombre||p.name||"",supplier:p.proveedor||p.supplier||"",balance:Number(p.saldo||p.balance||0),cost:Number(p.costo||p.cost||0)});
 export const userCols=(u)=>({id:u.id,tenant_id:u.tenant_id||G.tenantId||null,inventario_id:u.inventario_id||null,nombre:u.nombre,pass:u.pass,rol:u.rol,activo:u.activo,creado:u.creado||TODAY(),correo:u.correo||"",telefono:u.telefono||"",cargo:u.cargo||"",turno:u.turno||"",zona:u.zona||"",obs:u.obs||""});
 
 // --- Config local / dominio ---

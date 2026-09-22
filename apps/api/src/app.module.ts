@@ -19,10 +19,15 @@ import { PrismaReportRepository } from "./infrastructure/prisma/prisma-report-re
 import { StorageController } from "./core/storage/storage.controller";
 import { S3StorageService } from "./core/storage/s3-storage.service";
 import { ImportController } from "./features/import/presentation/import.controller";
+import { UsersController } from "./features/users/presentation/users.controller";
+import { TenantsController } from "./features/tenants/presentation/tenants.controller";
+import { ConfigController } from "./features/config/presentation/config.controller";
+import { LeadsController } from "./features/leads/presentation/leads.controller";
+import { AuthController } from "./features/auth/presentation/auth.controller";
 
 @Module({
   imports:[ThrottlerModule.forRoot([{ttl:60000,limit:100}])],
-  controllers:[HealthController,StorageController,ProductsController,InventoriesController,CountsController,CapturesController,CrmController,ReportsController,ImportController],
+  controllers:[HealthController,StorageController,ProductsController,InventoriesController,CountsController,CapturesController,CrmController,ReportsController,ImportController,UsersController,TenantsController,ConfigController,LeadsController,AuthController],
   providers:[
     {provide:"ProductRepository",useClass:PrismaProductRepository},
     {provide:"InventoryRepository",useClass:PrismaInventoryRepository},

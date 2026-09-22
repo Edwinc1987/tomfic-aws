@@ -27,7 +27,7 @@ const IMPORT_FIELDS=[["codigo","Código"],["ean","EAN / cód. barras"],["nombre"
 const detectCol=(cols,aliases)=>{const set=aliases.map(_normKey);for(const c of cols){if(set.includes(_normKey(c)))return c;}return null;};
 
 // ── BASE DE DATOS ──
-export function VBaseDatos({G,rerender,showToast}){
+export function VBaseDatos({G,rerender,showToast,recargar}){
   const [search,setSearch]=useState("");
   const [catF,setCatF]=useState("");
   const [preview,setPreview]=useState(null);
@@ -111,20 +111,19 @@ export function VBaseDatos({G,rerender,showToast}){
       G.productos=mapped;
      rememberSelectedInventory(); // CLAVE: deja _inventarioDatos consistente con G.productos para que el sync NO borre lo recién importado.
     // Subir directamente a la nube y ESPERAR a que termine, antes de permitir refrescos.
+    // Usa upsert (NO delete+insert) para no borrar datos de otros inventarios.
     try{
-       await SB.deleteAllProductos(G.tenantId,G.inventario?.id);
-       // No usar mapped.map(prodCols): Array.map pasa el índice como segundo argumento
-       // y prodCols lo interpreta como inventario_id.
         if(mapped.length)await SB.upsertProductosBulk(mapped.map(p=>prodCols(p,G.inventario?.id)),(done,total)=>setImportProgress({done:rawData.length+done,total:rawData.length+total}));
        console.log("[TOMFIC import] subidos a la nube:",mapped.length,"con inventario_id:",(G.inventario?.id||"null"));
         _snap.prods={};mapped.forEach(p=>{_snap.prods[p.id]=JSON.stringify(prodCols(p,G.inventario?.id));}); // marca como ya sincronizado (mismo shape que sube y que lee el sync)
         setPreview(null);setRawData(null);
         nubeGuardada=true;
-      }catch(e){console.warn("Error subiendo productos:",e);showToast("Error subiendo a la nube, revisa tu conexión","err");}
+      }catch(e){console.error("Error subiendo productos:",e);showToast("Error subiendo a la nube: "+(e.message||"revisa tu conexión"),"err");}
       if(!nubeGuardada)scheduleSync();
       saveLocalCache();
       setProductosRefresh(v=>v+1);
       setBusy(false);setImportando(false);
+    if(nubeGuardada&&recargar)await recargar();
     rerender();
     const conCosto=mapped.filter(p=>p.costo>0).length,conSaldo=mapped.filter(p=>p.saldo>0).length;
      if(!nubeGuardada)showToast(`Importados ${mapped.length} localmente; la nube sigue pendiente de sincronización`,"warn");

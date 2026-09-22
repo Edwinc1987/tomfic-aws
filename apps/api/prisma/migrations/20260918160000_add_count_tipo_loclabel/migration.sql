@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Count" ADD COLUMN "locLabel" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "Count" ADD COLUMN "tipo" TEXT NOT NULL DEFAULT '2conteos';

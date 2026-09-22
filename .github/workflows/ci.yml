@@ -67,10 +67,6 @@ jobs:
           cd ..
           npm install --force --package-lock=false
           cd apps/api
-          npx prisma generate
-          npx tsc
-          mkdir -p dist/prisma
-          cp prisma/schema.prisma dist/prisma/
-          cp -r prisma/migrations dist/prisma/
+          node scripts/package-lambda.mjs
           cd ../../infra
       - run: npx cdk synth

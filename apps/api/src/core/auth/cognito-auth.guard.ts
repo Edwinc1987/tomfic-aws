@@ -10,9 +10,11 @@ export class ApiAuthGuard implements CanActivate{
     :null;
 
   async canActivate(context:ExecutionContext){
+    const request=context.switchToHttp().getRequest();
+    const url=String(request.url||"");
+    if(url.startsWith("/v1/auth/"))return true;
     if(process.env.AUTH_MODE!=="cognito")return this.dev.canActivate(context);
     if(!this.verifier)throw new UnauthorizedException("Cognito no está configurado");
-    const request=context.switchToHttp().getRequest();
     const header=String(request.headers.authorization||"");
     if(!header.startsWith("Bearer "))throw new UnauthorizedException("Token requerido");
     try{

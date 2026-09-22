@@ -75,7 +75,7 @@ export function VInventario({G,rerender,showToast,usuario}){
     }
     setModalCerrar(true);
   };
-  const cerrar=()=>{
+  const cerrar=async()=>{
     if(!G.inventario)return;
     setModalCerrar(false);
     setBusy(true);
@@ -83,12 +83,21 @@ export function VInventario({G,rerender,showToast,usuario}){
     const prodsSnapshot=JSON.parse(JSON.stringify(G.productos));
     const conteosSnapshot=JSON.parse(JSON.stringify(G.conteos));
     const cerradoId=G.inventario.id;
+    const snapshots={
+      conteos:conteosSnapshot,
+      capturas:capsSnapshot,
+      productos:prodsSnapshot,
+      localizaciones:JSON.parse(JSON.stringify(G.localizaciones)),
+      ubicacionesTipos:[...G.ubicacionesTipos],
+      localizacionTipos:[...G.localizacionTipos],
+      notas:JSON.parse(JSON.stringify(G.notas.filter(n=>n.inventarioId===cerradoId))),
+    };
+    try{
+      await SB.closeInventario(cerradoId,snapshots);
+    }catch(e){console.warn("Error guardando cierre en la nube:",e);}
     G.historial.unshift({
       ...G.inventario,cierre:TODAY(),horaCierre:HOUR(),usuarioCierre:usuario.nombre,
-      conteos:conteosSnapshot,capturas:capsSnapshot,productos:prodsSnapshot,
-      localizaciones:JSON.parse(JSON.stringify(G.localizaciones)),
-      ubicacionesTipos:[...G.ubicacionesTipos],localizacionTipos:[...G.localizacionTipos],
-      notas:JSON.parse(JSON.stringify(G.notas.filter(n=>n.inventarioId===cerradoId))),
+      ...snapshots,
       totalProductos:G.productos.length,totalCapturas:Object.keys(G.capturas).length,
     });
     G.productos=G.productos.map(p=>{
@@ -98,7 +107,7 @@ export function VInventario({G,rerender,showToast,usuario}){
       const sumC1=caps.filter(c=>c.ronda==="C1").reduce((s,c)=>s+c.cantidad,0);
       const final=finalAjustado(caps,sumC3||sumC2||sumC1);
       const tieneAjuste=caps.some(c=>c.ronda==="AJU");
-      return (final>0||tieneAjuste)?{...p,saldo:final}:p; // un ajuste (aunque sea 0) siempre manda
+      return (final>0||tieneAjuste)?{...p,saldo:final}:p;
     });
     G.inventarios=G.inventarios.filter(i=>i.id!==cerradoId);
     delete G._inventarioDatos[cerradoId];
