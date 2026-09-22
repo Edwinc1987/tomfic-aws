@@ -5,6 +5,7 @@ import { authService } from "@/core/auth/authService";
 import { api } from "@/core/network/api";
 import { setAuthTokenGetter, setExtraHeaders, clearExtraHeaders, teamLogin, apiRequest } from "@/core/network/apiClient";
 import OfflineBanner from "@/components/OfflineBanner";
+import { CommandPalette } from "@/components/CommandPalette";
 import { Login } from "@/modules/Login";
 import { ModAdmin } from "@/modules/ModAdmin";
 import { ModCapturador } from "@/modules/ModCapturador";
@@ -207,6 +208,7 @@ export default function TomficApp(){
     <>
       {toast&&(()=>{const err=toast.type==="err",warn=toast.type==="warn";const Icon=err?XCircle:warn?AlertTriangle:CheckCircle2;return <div role="status" aria-live="polite" style={{position:"fixed",right:18,bottom:18,display:"flex",alignItems:"flex-start",gap:10,background:"white",color:"#0f172a",padding:"12px 12px 12px 14px",borderLeft:`4px solid ${err?"#dc2626":warn?"#d97706":"#16a34a"}`,borderRadius:10,zIndex:9999,fontSize:13,fontWeight:600,boxShadow:"0 8px 25px rgba(15,23,42,0.18)",maxWidth:360,lineHeight:1.35}}><Icon size={18} color={err?"#dc2626":warn?"#d97706":"#16a34a"} style={{flexShrink:0,marginTop:1}}/><span>{toast.msg}</span><button aria-label="Cerrar mensaje" onClick={()=>setToast(null)} style={{border:0,background:"transparent",color:"#94a3b8",padding:0,cursor:"pointer",lineHeight:1}}><X size={16}/></button></div>})()}
       <OfflineBanner/>
+      <CommandPalette/>
       {usuario.rol==="dueno"?<PanelDueno {...p}/>:usuario.rol==="comercial"?<VComercial {...p}/>:usuario.rol==="capturador"?<ModCapturador {...p}/>:usuario.rol==="gerente"?<ModGerente {...p}/>:<ModAdmin {...p}/>}
     </>
   );
