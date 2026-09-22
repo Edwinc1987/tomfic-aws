@@ -1,51 +1,54 @@
+@import "./design-tokens.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
+  /* ── shadcn/ui token bridge ── Mapea tokens TOMFIC a los que shadcn espera ── */
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
+    --background: var(--surface-canvas);
+    --foreground: var(--text-primary);
+    --card: var(--surface-raised);
+    --card-foreground: var(--text-primary);
+    --popover: var(--surface-raised);
+    --popover-foreground: var(--text-primary);
+    --primary: var(--accent);
+    --primary-foreground: var(--accent-foreground);
+    --secondary: var(--surface-overlay);
+    --secondary-foreground: var(--text-primary);
+    --muted: var(--surface-overlay);
+    --muted-foreground: var(--text-secondary);
+    --accent: var(--accent-soft);
+    --accent-foreground: var(--text-primary);
+    --destructive: var(--status-danger);
+    --destructive-foreground: white;
+    --border: var(--border-subtle);
+    --input: var(--border-subtle);
+    --ring: var(--ring);
     --radius: 0.5rem;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
+    --background: var(--surface-canvas);
+    --foreground: var(--text-primary);
+    --card: var(--surface-raised);
+    --card-foreground: var(--text-primary);
+    --popover: var(--surface-raised);
+    --popover-foreground: var(--text-primary);
+    --primary: var(--accent);
+    --primary-foreground: var(--accent-foreground);
+    --secondary: var(--surface-overlay);
+    --secondary-foreground: var(--text-primary);
+    --muted: var(--surface-overlay);
+    --muted-foreground: var(--text-secondary);
+    --accent: var(--accent-soft);
+    --accent-foreground: var(--text-primary);
+    --destructive: var(--status-danger);
+    --destructive-foreground: white;
+    --border: var(--border-subtle);
+    --input: var(--border-subtle);
+    --ring: var(--ring);
   }
 }
 
@@ -54,11 +57,7 @@
     border-color: hsl(var(--border));
   }
 
-  /* Foco de teclado visible en toda la app (botones/enlaces con estilo inline
-     que no tienen ring propio). Los componentes shadcn ya definen su ring con
-     `focus-visible:outline-none` por clase, que gana en especificidad y por eso
-     no se ven afectados. `:focus-visible` NO se dispara al hacer clic con mouse,
-     solo al navegar con teclado, así que no molesta al capturador. */
+  /* Foco de teclado visible en toda la app */
   button:focus-visible,
   a:focus-visible,
   [role="button"]:focus-visible,
@@ -68,19 +67,17 @@
     border-radius: 4px;
   }
 
-  /* Pulido global de tablas: zebra muy sutil + hover de fila. Va en @layer base
-     (baja prioridad) para que cualquier fila con su propio fondo/hover por clase
-     lo sobrescriba sin problema. No cambia ningún color de marca. */
+  /* Tablas: zebra sutil + hover */
   tbody tr { transition: background-color .12s ease; }
-  tbody tr:nth-child(even) { background-color: #fafbfc; }
-  tbody tr:hover { background-color: #f1f5f9; }
+  tbody tr:nth-child(even) { background-color: hsl(var(--surface-raised)); }
+  tbody tr:hover { background-color: hsl(var(--surface-overlay)); }
 
-  /* Barra de acciones y filtros fija debajo del encabezado de cada vista. */
+  /* Barra sticky de acciones/filtros */
   .view-sticky-controls {
     position: sticky;
     top: 6.5rem;
     z-index: 20;
-    background: #f8fafc;
+    background: hsl(var(--surface-canvas));
     padding-top: .35rem;
     padding-bottom: .35rem;
   }
@@ -93,10 +90,10 @@
     position: sticky;
     top: 0;
     z-index: 10;
-    background: #f8fafc;
+    background: hsl(var(--surface-canvas));
   }
 
-  /* Compacta el capturador en escritorio y evita desbordes en móvil. */
+  /* Responsive: compactar capturador */
   @media (max-width: 640px) {
     .view-sticky-controls { top: 5.25rem; }
     .cap-count-header,
@@ -107,24 +104,41 @@
   }
 }
 
-/* Tema noche del capturador. Se aplican colores reales, no inversión de
-   píxeles, para conservar legibles fotos, iconos y colores de estado. */
-.cap-dark-shell { color: #e2e8f0; }
+/* ── Dark mode del capturador — ahora usa tokens semánticos ── */
+.cap-dark-shell {
+  color: hsl(var(--text-primary));
+  background: hsl(var(--surface-canvas)) !important;
+}
 .cap-dark-shell [style*="background: white"],
 .cap-dark-shell [style*="background:#ffffff"],
 .cap-dark-shell [style*="background: #ffffff"],
 .cap-dark-shell [style*="background: #f8fafc"],
 .cap-dark-shell [style*="background: #f1f5f9"],
-.cap-dark-shell [style*="background: #eef2ff"] { background: #1e293b !important; }
+.cap-dark-shell [style*="background: #eef2ff"] {
+  background: hsl(var(--surface-raised)) !important;
+}
 .cap-dark-shell [style*="color: #0f172a"],
 .cap-dark-shell [style*="color: #1e293b"],
-.cap-dark-shell [style*="color: #374151"] { color: #e2e8f0 !important; }
-.cap-dark-shell [style*="color: #64748b"] { color: #94a3b8 !important; }
+.cap-dark-shell [style*="color: #374151"] {
+  color: hsl(var(--text-primary)) !important;
+}
+.cap-dark-shell [style*="color: #64748b"] {
+  color: hsl(var(--text-secondary)) !important;
+}
 .cap-dark-shell [style*="border: 1px solid #e2e8f0"],
 .cap-dark-shell [style*="borderBottom: 1px solid #e2e8f0"],
-.cap-dark-shell [style*="border: 1px solid #cbd5e1"] { border-color: #334155 !important; }
+.cap-dark-shell [style*="border: 1px solid #cbd5e1"] {
+  border-color: hsl(var(--border-subtle)) !important;
+}
 .cap-dark-shell input,
 .cap-dark-shell select,
-.cap-dark-shell textarea { background: #0f172a !important; color: #e2e8f0 !important; border-color: #475569 !important; }
-.cap-dark-shell option { background: #0f172a; color: #e2e8f0; }
+.cap-dark-shell textarea {
+  background: hsl(var(--surface-sunken)) !important;
+  color: hsl(var(--text-primary)) !important;
+  border-color: hsl(var(--border-strong)) !important;
+}
+.cap-dark-shell option {
+  background: hsl(var(--surface-sunken));
+  color: hsl(var(--text-primary));
+}
 .cap-dark-shell img { filter: none !important; }

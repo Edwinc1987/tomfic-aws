@@ -1,0 +1,154 @@
+/*
+ * TOMFIC design tokens — Linear-inspired.
+ *
+ * Dos capas de variables CSS:
+ *   1. Tokens semánticos (--surface, --text, --border, --accent) usados por
+ *      todos los componentes. Swap entre :root y .dark para el tema.
+ *   2. Escala de espaciado/tipografía — compacta por defecto.
+ *
+ * Los componentes DEBEN usar tokens semánticos (ej: text-text-primary, border-border)
+ * en vez de colores raw para que el swap dark/light sea una sola fuente de verdad.
+ */
+
+@layer base {
+  :root {
+    /* ── Fondos — neutros, casi monocromáticos ── */
+    --surface-canvas: 0 0% 100%;            /* fondo de página */
+    --surface-base: 210 20% 98%;            /* sidebar, header */
+    --surface-raised: 210 20% 97%;          /* cards, popovers */
+    --surface-overlay: 210 16% 95%;         /* hover, fila activa */
+    --surface-sunken: 214 16% 91%;          /* pozos inset */
+
+    /* ── Bordes — 1px sutiles ── */
+    --border-subtle: 214 16% 91%;           /* línea 1px default */
+    --border-strong: 214 12% 80%;           /* inputs enfocados, separadores */
+
+    /* ── Texto — escala de alto contraste ── */
+    --text-primary: 222 47% 11%;            /* headings, body */
+    --text-secondary: 215 16% 47%;          /* texto secundario */
+    --text-tertiary: 220 9% 64%;            /* texto de hint */
+    --text-disabled: 220 9% 75%;
+
+    /* ── Acento — azul TOMFIC (brand) ── */
+    --accent: 221 83% 53%;                  /* blue-600 #2563eb */
+    --accent-hover: 226 71% 48%;            /* blue-700 #1d4ed8 */
+    --accent-foreground: 0 0% 100%;
+    --accent-soft: 214 95% 96%;             /* fila seleccionada, badge bg */
+
+    /* ── Estado — semántico ── */
+    --status-success: 142 71% 36%;          /* verde #16a34a */
+    --status-success-soft: 142 76% 96%;
+    --status-warning: 38 92% 42%;           /* ámbar #d97706 */
+    --status-warning-soft: 48 100% 96%;
+    --status-danger: 0 72% 45%;             /* rojo #dc2626 */
+    --status-danger-soft: 0 86% 97%;
+    --status-info: 217 91% 50%;             /* info */
+    --status-info-soft: 214 95% 97%;
+
+    /* ── Ajuste / C3 — morado TOMFIC ── */
+    --accent-alt: 263 70% 50%;              /* morado #7c3aed */
+    --accent-alt-soft: 270 96% 97%;
+
+    /* ── Focus ring ── */
+    --ring: 217 91% 60%;
+
+    /* ── Radios ── */
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 8px;
+    --radius-xl: 12px;
+
+    /* ── Sombras — sutiles, nunca borrosas ── */
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.04);
+    --shadow-md: 0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.04);
+    --shadow-lg: 0 4px 12px -2px rgb(0 0 0 / 0.08), 0 2px 6px -2px rgb(0 0 0 / 0.04);
+
+    /* ── Rondas de conteo ── */
+    --round-c1: 221 83% 53%;                /* azul #2563eb */
+    --round-c2: 142 71% 36%;                /* verde #16a34a */
+    --round-c3: 263 70% 50%;                /* morado #7c3aed */
+  }
+
+  .dark {
+    --surface-canvas: 222 24% 7%;
+    --surface-base: 222 22% 9%;
+    --surface-raised: 222 20% 12%;
+    --surface-overlay: 222 18% 16%;
+    --surface-sunken: 222 22% 6%;
+
+    --border-subtle: 222 16% 18%;
+    --border-strong: 222 12% 28%;
+
+    --text-primary: 220 14% 96%;
+    --text-secondary: 220 10% 70%;
+    --text-tertiary: 220 9% 55%;
+    --text-disabled: 220 9% 40%;
+
+    --accent: 213 94% 68%;
+    --accent-hover: 213 94% 74%;
+    --accent-foreground: 222 47% 11%;
+    --accent-soft: 217 45% 18%;
+
+    --status-success: 142 64% 52%;
+    --status-success-soft: 142 30% 16%;
+    --status-warning: 38 92% 60%;
+    --status-warning-soft: 38 30% 16%;
+    --status-danger: 0 84% 65%;
+    --status-danger-soft: 0 30% 18%;
+    --status-info: 217 91% 65%;
+    --status-info-soft: 217 30% 18%;
+
+    --accent-alt: 263 70% 65%;
+    --accent-alt-soft: 263 30% 18%;
+
+    --ring: 213 94% 68%;
+
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.4);
+    --shadow-md: 0 1px 3px 0 rgb(0 0 0 / 0.5), 0 1px 2px -1px rgb(0 0 0 / 0.3);
+    --shadow-lg: 0 4px 12px -2px rgb(0 0 0 / 0.6), 0 2px 6px -2px rgb(0 0 0 / 0.4);
+  }
+
+  /* ── Body baseline ── */
+  html {
+    font-feature-settings: 'cv11', 'ss01', 'ss03', 'cv02';
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    background-color: hsl(var(--surface-canvas));
+    color: hsl(var(--text-primary));
+    font-family: 'Inter', ui-sans-serif, system-ui, -apple-system,
+      BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    letter-spacing: -0.01em;
+  }
+
+  /* ── Scrollbar — thin, Linear-style ── */
+  .ds-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border-strong)) transparent;
+  }
+  .ds-scroll::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .ds-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .ds-scroll::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 3px;
+    transition: background 0.2s;
+  }
+  .ds-scroll:hover::-webkit-scrollbar-thumb {
+    background: hsl(var(--border-strong));
+  }
+
+  /* ── Focus ring ── */
+  .ds-focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2;
+    --tw-ring-color: hsl(var(--ring));
+    --tw-ring-offset-color: hsl(var(--surface-canvas));
+  }
+}
