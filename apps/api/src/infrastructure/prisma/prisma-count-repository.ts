@@ -26,6 +26,7 @@ export class PrismaCountRepository implements CountRepository{
       const estado=allClosed?"completado":hasC3&&c3Closed?"enC2":hasC3?"enC3":"enC1";
       return {
         id:c.id,tenantId:c.tenantId,inventoryId:c.inventoryId,
+        name:c.name,status:c.status,
         nombre:c.name,ubicacion:c.location,
         locLabel:c.locLabel||c.location,
         tipo:c.tipo||"2conteos",

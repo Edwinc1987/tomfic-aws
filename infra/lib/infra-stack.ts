@@ -7,6 +7,7 @@ import * as rds from 'aws-cdk-lib/aws-rds';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as lambdaEvents from 'aws-cdk-lib/aws-lambda-event-sources';
 import * as apigw from 'aws-cdk-lib/aws-apigateway';
+import * as secrets from 'aws-cdk-lib/aws-secretsmanager';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import { Construct } from 'constructs';
 import * as path from 'path';
@@ -51,8 +52,21 @@ export class InfraStack extends cdk.Stack {
     new cdk.CfnOutput(this,"StorageBucketName",{value:storageBucket.bucketName});
 
     let database: rds.DatabaseInstance | undefined;
+    let vpc: ec2.Vpc | undefined;
     if(process.env.ENABLE_RDS==="true"){
-      const vpc=new ec2.Vpc(this,"TomficVpc",{maxAzs:2,natGateways:0,subnetConfiguration:[{name:"database",subnetType:ec2.SubnetType.PRIVATE_ISOLATED,cidrMask:24}]});
+      // VPC con subredes aisladas para la BD y subredes privadas CON salida a
+      // internet (NAT) para las Lambdas: necesitan llegar a Secrets Manager,
+      // S3 y Cognito, ademas de a la propia BD.
+      // natGateways=1: costo minimo aceptable; para produccion multi-AZ usar 2.
+      vpc=new ec2.Vpc(this,"TomficVpc",{
+        maxAzs:2,
+        natGateways:1,
+        subnetConfiguration:[
+          {name:"database",subnetType:ec2.SubnetType.PRIVATE_ISOLATED,cidrMask:24},
+          {name:"app",subnetType:ec2.SubnetType.PRIVATE_WITH_EGRESS,cidrMask:24},
+          {name:"public",subnetType:ec2.SubnetType.PUBLIC,cidrMask:24},
+        ],
+      });
       database=new rds.DatabaseInstance(this,"TomficDatabase",{
         engine:rds.DatabaseInstanceEngine.postgres({version:rds.PostgresEngineVersion.VER_16_3}),
         vpc,
@@ -71,21 +85,38 @@ export class InfraStack extends cdk.Stack {
       new cdk.CfnOutput(this,"DatabaseEndpoint",{value:database.dbInstanceEndpointAddress});
     }
 
+    // AUTH_SECRET: firma los JWT de team-login. Generado en el deploy y
+    // guardado en Secrets Manager (nunca en texto plano en la consola).
+    const authSecret=new secrets.Secret(this,"TomficAuthSecret",{
+      description:"Clave HMAC para firmar los JWT de team-login de TOMFIC",
+      generateSecretString:{secretStringTemplate:"{}",generateStringKey:"value",passwordLength:64},
+    });
+
     const apiLambda=new lambda.Function(this,"TomficApiLambda",{
       runtime:lambda.Runtime.NODEJS_24_X,
       handler:"lambda.handler",
       code:lambda.Code.fromAsset(path.join(__dirname,"../../apps/api/dist")),
       memorySize:1024,
       timeout:cdk.Duration.seconds(30),
+      ...(vpc?{vpc,vpcSubnets:{subnetType:ec2.SubnetType.PRIVATE_WITH_EGRESS}}:{}),
       environment:{
-        DATABASE_URL:database?`postgresql://tomfic_admin:${database.secret?.secretValue?.unsafeUnwrap()||"changeme"}@${database.dbInstanceEndpointAddress}:${database.dbInstanceEndpointPort}/tomfic`:"postgresql://postgres:postgres@localhost:5432/tomfic_dev",
+        // La URL real se compone en runtime desde Secrets Manager (core/db-url.ts).
+        // Nunca se pasa la contrasena en texto plano por variables de entorno.
+        DATABASE_URL:database?"__FROM_SECRETS_MANAGER__":"postgresql://postgres:***@localhost:5432/tomfic_dev",
+        DB_SECRET_ARN:database?(database.secret?.secretArn||""):"",
         AUTH_MODE:"cognito",
         COGNITO_USER_POOL_ID:userPool.userPoolId,
         COGNITO_CLIENT_ID:userPoolClient.userPoolClientId,
         STORAGE_BUCKET:storageBucket.bucketName,
+        AUTH_SECRET_ARN:authSecret.secretArn,
         NODE_ENV:"production",
       },
     });
+    if(database){
+      // La API puede abrir conexiones Postgres hacia el RDS (puerto 5432).
+      database.connections.allowDefaultPortFrom(apiLambda);
+    }
+    authSecret.grantRead(apiLambda);
     storageBucket.grantReadWrite(apiLambda);
     importQueue.grantSendMessages(apiLambda);
     if(database){database.secret?.grantRead(apiLambda);}
@@ -94,7 +125,18 @@ export class InfraStack extends cdk.Stack {
       handler:apiLambda,
       proxy:true,
       deployOptions:{stageName:"v1",tracingEnabled:true,metricsEnabled:true},
-      defaultCorsPreflightOptions:{allowOrigins:apigw.Cors.ALL_ORIGINS,allowMethods:apigw.Cors.ALL_METHODS,allowHeaders:["Content-Type","Authorization","x-tenant-id","x-user-role","x-user-id"]},
+      defaultCorsPreflightOptions:{
+        // Solo los dominios de TOMFIC pueden llamar la API desde un navegador.
+        allowOrigins:[
+          "https://www.tomfic.com",
+          "https://tomfic.com",
+          "https://tomfic.vercel.app",
+          ...((process.env.CORS_EXTRA_ORIGINS||"").split(",").filter(Boolean)),
+        ],
+        allowMethods:apigw.Cors.ALL_METHODS,
+        allowHeaders:["Content-Type","Authorization"],
+        allowCredentials:true,
+      },
     });
     new cdk.CfnOutput(this,"ApiUrl",{value:api.url});
 
@@ -104,14 +146,18 @@ export class InfraStack extends cdk.Stack {
       code:lambda.Code.fromAsset(path.join(__dirname,"../../apps/api/dist")),
       memorySize:1536,
       timeout:cdk.Duration.minutes(5),
+      ...(vpc?{vpc,vpcSubnets:{subnetType:ec2.SubnetType.PRIVATE_WITH_EGRESS}}:{}),
       environment:{
-        DATABASE_URL:database?`postgresql://tomfic_admin:${database.secret?.secretValue?.unsafeUnwrap()||"changeme"}@${database.dbInstanceEndpointAddress}:${database.dbInstanceEndpointPort}/tomfic`:"postgresql://postgres:postgres@localhost:5432/tomfic_dev",
+        DATABASE_URL:database?"__FROM_SECRETS_MANAGER__":"postgresql://postgres:***@localhost:5432/tomfic_dev",
+        DB_SECRET_ARN:database?(database.secret?.secretArn||""):"",
         STORAGE_BUCKET:storageBucket.bucketName,
         NODE_ENV:"production",
       },
     });
-    storageBucket.grantReadWrite(importProcessorLambda);
-    if(database){database.secret?.grantRead(importProcessorLambda);}
+    if(database){
+      database.connections.allowDefaultPortFrom(importProcessorLambda);
+      database.secret?.grantRead(importProcessorLambda);
+    }
     importProcessorLambda.addEventSource(new lambdaEvents.SqsEventSource(importQueue,{batchSize:1}));
   }
 }

@@ -3,12 +3,16 @@ import { NestFactory } from "@nestjs/core";
 import { ExpressAdapter } from "@nestjs/platform-express";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { AppModule } from "./app.module";
+import { ensureDatabaseUrl, ensureAuthSecret } from "./core/db-url";
 import express from "express";
 import cors from "cors";
 
 export const apiVersion = "0.1.0";
 
 async function bootstrap(){
+  // En local no hace nada si las env vars ya están completas.
+  await ensureDatabaseUrl();
+  await ensureAuthSecret();
   const server=express();
   server.use(cors());
   server.use(express.json({limit:"10mb"}));

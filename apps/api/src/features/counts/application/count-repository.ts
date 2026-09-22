@@ -1,6 +1,14 @@
 import { CountRoundName } from "@prisma/client";
 
-export type CountSummary={id:string;tenantId:string;inventoryId:string;name:string;status:string};
+export type CountSummary={
+  id:string;tenantId:string;inventoryId:string;
+  name:string;status:string;
+  // Campos extendidos que devuelve el repositorio Prisma (legacy SPA):
+  nombre?:string;ubicacion?:string;locLabel?:string;tipo?:string;estado?:string;
+  usuarioC1?:string|null;usuarioC2?:string|null;usuarioC3?:string|null;
+  rondasCerradas?:string[];fechaCreacion?:string;
+  c1Cerrado?:boolean;c2Cerrado?:boolean;c3Cerrado?:boolean;
+};
 export type RoundSummary={id:string;countId:string;name:CountRoundName;status:string;assignedToId:string|null;closedAt:Date|null};
 
 export interface CountRepository{
