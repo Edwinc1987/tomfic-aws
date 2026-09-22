@@ -11,7 +11,7 @@ const [modalSalir,setModalSalir]=useState(false);
 const [hSel,setHSel]=useState(null); // inventario del historial seleccionado (detalle)
 
 useEffect(()=>{
-const t=setInterval(()=>recargar(),15000);
+const t=setInterval(()=>{if(!document.hidden)recargar();},30000);
 return()=>clearInterval(t);
 },[]);
 

@@ -10,6 +10,7 @@ import { Badge as UIBadge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { PageHeader } from "@/components/ui/page-header";
+import { DataTable } from "@/components/ui/data-table";
 import Section from "@/components/Section";
 import { setBusy, setClearBase, _snap, scheduleSync } from "@/lib/sync";
 import { G, SB, prodCols, exportSheet, saveLocalCache, todosConteosCerrados, conteosReales, conteoCompleto, ID, rememberSelectedInventory } from "@/lib/data";
@@ -105,8 +106,12 @@ export function VBaseDatos({G,rerender,showToast,recargar}){
      const rawReales=rawData.filter(r=>Object.values(r).some(v=>String(v??"").trim()!=="")).length;
      if(mapped.length===0){setBusy(false);setImportando(false);return showToast("No se detectó la columna NOMBRE en ninguna fila. Corrige el mapeo de columnas. Tu base actual NO se tocó.","err");}
      if(rawReales>1&&mapped.length<rawReales*0.5&&G.productos.length>0){setBusy(false);setImportando(false);return showToast(`Solo ${mapped.length} de ${rawReales} filas tienen NOMBRE — parece un mapeo mal asignado. Corrige "Nombre" en el mapeo. Tu base NO se reemplazó.`,"err");}
-     console.log("[TOMFIC import] archivo:",rawData.length,"filas | con NOMBRE:",mapped.length,"| inventario activo:",(G.inventario?.id||"NINGUNO"),(G.inventario?.nombre||""));
-     setImportProgress({done:rawData.length,total:rawData.length+mapped.length});
+       console.log("[TOMFIC import] archivo:",rawData.length,"filas | con NOMBRE:",mapped.length,"| inventario activo:",(G.inventario?.id||"NINGUNO"),(G.inventario?.nombre||""));
+       if(!G.inventario){
+         setBusy(false);setImportando(false);
+         return showToast("No hay inventario activo. Crea o selecciona un inventario antes de importar la base.","err");
+       }
+       setImportProgress({done:rawData.length,total:rawData.length+mapped.length});
        setPage(1);
       G.productos=mapped;
      rememberSelectedInventory(); // CLAVE: deja _inventarioDatos consistente con G.productos para que el sync NO borre lo recién importado.
@@ -184,11 +189,15 @@ export function VBaseDatos({G,rerender,showToast,recargar}){
        setLoadingProductos(true);setProductosError("");
        const result=await SB.listProductosPage({tenantId:G.tenantId,inventarioId:G.inventario.id,page,pageSize,search,categoria:catF});
        if(!activo)return;
-       if(result.error){setPagina([]);setTotalCount(0);setProductosError("No se pudieron cargar los productos. Revisa tu conexión e inténtalo de nuevo.");}
-       else{setPagina(result.data);setTotalCount(result.count);}
+        if(result.error){
+          setPagina([]);setTotalCount(0);
+          const status=result.error.status?` (${result.error.status})`:"";
+          setProductosError(`No se pudieron cargar los productos${status}: ${result.error.message||"revisa la conexión con el API."}`);
+        }
+        else{setPagina(result.data);setTotalCount(result.count);}
        setLoadingProductos(false);
      };
-     cargarProductos().catch(()=>{if(activo){setPagina([]);setTotalCount(0);setProductosError("No se pudieron cargar los productos. Revisa tu conexión e inténtalo de nuevo.");setLoadingProductos(false);}});
+      cargarProductos().catch(error=>{if(activo){setPagina([]);setTotalCount(0);setProductosError(`No se pudieron cargar los productos: ${error?.message||"revisa la conexión con el API."}`);setLoadingProductos(false);}});
      return()=>{activo=false;};
    },[G.tenantId,G.inventario?.id,page,search,catF,productosRefresh]);
 
@@ -410,43 +419,25 @@ export function VBaseDatos({G,rerender,showToast,recargar}){
              <UIBadge variant="secondary" className="bg-sky-100 text-sky-700 h-9 px-3 text-sm rounded-md">{totalCount}</UIBadge>
            </div>
            {productosError&&<div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{productosError}</div>}
-           <Card className="overflow-hidden">
-             <div className="database-scroll-body max-h-[calc(100vh-20rem)] overflow-auto">
-               <table className="view-sticky-table w-full text-xs">
-                <thead className="sticky top-0 z-10">
-                  <tr className="bg-slate-50 text-slate-600 border-b border-slate-200">
-                    {["Código","EAN","Nombre","Referencia","Categoría","Proveedor","Saldo","Costo"].map(h=>(
-                      <th key={h} className="px-3 py-1.5 text-left font-semibold whitespace-nowrap">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                 <tbody>
-                   {loadingProductos&&<tr><td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">Cargando productos…</td></tr>}
-                   {!loadingProductos&&!productosError&&!pagina.length&&<tr><td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">No hay productos que coincidan con los filtros.</td></tr>}
-                   {!loadingProductos&&pagina.map((p)=>(
-                    <tr key={p.id} className="border-b last:border-0 hover:bg-slate-50 transition-colors">
-                      <td className="px-3 py-1.5 font-mono text-primary font-bold whitespace-nowrap">{p.codigo}</td>
-                      <td className="px-3 py-1.5 text-muted-foreground text-[10px]">{p.ean}</td>
-                      <td className="px-3 py-1.5 font-medium">{p.nombre}</td>
-                      <td className="px-3 py-1.5 text-muted-foreground">{p.referencia}</td>
-                      <td className="px-3 py-1.5"><UIBadge variant="secondary">{p.categoria||"—"}</UIBadge></td>
-                      <td className="px-3 py-1.5 text-muted-foreground">{p.proveedor||"—"}</td>
-                      <td className={`px-3 py-1.5 text-center font-bold ${p.saldo>0?"text-green-600":"text-muted-foreground"}`}>{p.saldo}</td>
-                      <td className="px-3 py-1.5 text-right text-muted-foreground">{p.costo>0?"$"+p.costo.toLocaleString("es-CO"):"—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-               </table>
-             </div>
-             <div className="flex items-center justify-between gap-3 border-t bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                <span>{totalCount?`${(page-1)*pageSize+1}-${Math.min(page*pageSize,totalCount)} de ${totalCount}`:"0 productos"}</span>
-               <div className="flex gap-2">
-                 <Button variant="outline" size="sm" disabled={page===1} onClick={()=>setPage(p=>p-1)}>Anterior</Button>
-                 <span className="flex items-center px-1">Página {page} de {pageCount}</span>
-                 <Button variant="outline" size="sm" disabled={page===pageCount} onClick={()=>setPage(p=>p+1)}>Siguiente</Button>
-               </div>
-             </div>
-           </Card>
+           <DataTable
+             columns={[
+               {key:"codigo",label:"Código",render:v=><span className="font-mono font-bold text-blue-700 whitespace-nowrap">{v}</span>},
+               {key:"ean",label:"EAN",render:v=><span className="text-text-secondary text-[10px]">{v||"—"}</span>},
+               {key:"nombre",label:"Nombre",render:v=><span className="font-medium">{v}</span>},
+               {key:"referencia",label:"Referencia",render:v=><span className="text-text-secondary">{v||"—"}</span>},
+               {key:"categoria",label:"Categoría",render:v=><UIBadge variant="secondary">{v||"—"}</UIBadge>},
+               {key:"proveedor",label:"Proveedor",render:v=><span className="text-text-secondary">{v||"—"}</span>},
+               {key:"saldo",label:"Saldo",align:"center",render:v=><span className={`font-bold ${v>0?"text-emerald-600":"text-text-secondary"}`}>{v}</span>},
+               {key:"costo",label:"Costo",align:"right",render:v=><span className="text-text-secondary">{v>0?"$"+v.toLocaleString("es-CO"):"—"}</span>},
+             ]}
+             rows={pagina}
+             loading={loadingProductos}
+             emptyText={loadingProductos?"Cargando productos…":`No hay productos que coincidan con los filtros.`}
+             page={page}
+             pageCount={pageCount}
+             onPageChange={setPage}
+             totalText={totalCount?`${(page-1)*pageSize+1}-${Math.min(page*pageSize,totalCount)} de ${totalCount}`:"0 productos"}
+           />
         </>
       )}
     </Section>

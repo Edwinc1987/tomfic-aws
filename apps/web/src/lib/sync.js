@@ -46,23 +46,46 @@ const doSync=async()=>{
     // la nube directo). Ante un desajuste se OMITE la eliminación, pero el sync
     // SIGUE — así inventarios y conteos sí se guardan (abortarlo los dejaba sin
     // subir, y por eso los productos importados quedaban huérfanos al recargar).
+    let omitidos=false;
     if(eliminados.length && !_clearBase && (Object.keys(curP).length===0 || eliminados.length>curP.length)){
       console.warn("[TOMFIC sync] borrado masivo de",eliminados.length,"productos EVITADO (se omite; el resto del sync continúa)");
       eliminados.length=0;
+      omitidos=true;
     }
     if(cambiados.length)await SB.upsertProductosBulk(cambiados);
     if(eliminados.length)await SB.deleteProductosByIds(eliminados);
     for(const id in curP)_snap.prods[id]=JSON.stringify(curP[id]);
-    for(const id in _snap.prods){if(!curP[id])delete _snap.prods[id];}
+    if(!omitidos){for(const id in _snap.prods){if(!curP[id])delete _snap.prods[id];}}
     _clearBase=false;
     const curInv={};
     G.inventarios.forEach(inv=>{curInv[inv.id]=serInv(inv,"abierto");});
-    for(const id in curInv){const s=JSON.stringify(curInv[id]);if(_snap.invs[id]!==s){await SB.upsertInventario(curInv[id]);_snap.invs[id]=s;}}
-    for(const id in _snap.invs){if(!curInv[id]){await SB.deleteInventario(id);delete _snap.invs[id];}}
+    for(const id in curInv){
+      const s=JSON.stringify(curInv[id]);
+      if(_snap.invs[id]!==s){
+        await SB.upsertInventario({...curInv[id],id});
+        _snap.invs[id]=s;
+      }
+    }
+    // Solo borrar inventarios de la nube si el usuario lo eliminó a propósito
+    // (ya no está en G.inventarios ni en historial) Y no es un fallo transitorio
+    // de carga. Nunca borrar si la lista local está vacía (evita wipe por refresh).
+    if(G.inventarios.length>0||G.historial.length>0){
+      for(const id in _snap.invs){
+        if(!curInv[id]&&!G.historial.some(h=>h.id===id)){
+          try{await SB.deleteInventario(id);delete _snap.invs[id];}catch(e){console.warn("No se pudo borrar inventario de la nube:",e);}
+        }
+      }
+    }
     const curH={};G.historial.forEach(h=>{curH[h.id]=serInv(h,"cerrado");});
-    for(const id in curH){const s=JSON.stringify(curH[id]);if(_snap.hist[id]!==s){await SB.upsertInventario(curH[id]);_snap.hist[id]=s;}}
+    for(const id in curH){const s=JSON.stringify(curH[id]);if(_snap.hist[id]!==s){await SB.upsertInventario({...curH[id],id});_snap.hist[id]=s;}}
     // Un inventario puede pasar de cerrado a abierto sin cambiar de id.
-    for(const id in _snap.hist){if(!curH[id]&&!curInv[id]){await SB.deleteInventario(id);delete _snap.hist[id];}}
+    if(G.inventarios.length>0||G.historial.length>0){
+      for(const id in _snap.hist){
+        if(!curH[id]&&!curInv[id]){
+          try{await SB.deleteInventario(id);delete _snap.hist[id];}catch(e){}
+        }
+      }
+    }
     const curC={};
     G.inventarios.forEach(inv=>{const d=G._inventarioDatos[inv.id]||{conteos:[],capturas:{}};d.conteos.forEach(c=>{curC[c.id]=serConteo(c,inv.id,d.capturas);});});
     for(const id in curC){const s=JSON.stringify(curC[id]);if(_snap.c[id]!==s){await SB.upsertConteo(curC[id]);_snap.c[id]=s;}}
@@ -103,7 +126,17 @@ export const loadTenantData=async(tid,preferredInvId=null)=>{
    const legacyCfg=await SB.getConfig(`tenant:${tid}:config`);
    const {usuarios,productos,inventarios,conteos}=await SB.loadAll(tid);
   if(usuarios.length)G.usuarios=usuarios;
-   const activos=inventarios.filter(i=>i.estado==="abierto").map(i=>({id:i.id,nombre:i.nombre,tipo:i.tipo,obs:i.obs,fecha:i.fecha,apertura:i.apertura,horaApertura:i.hora_apertura,usuarioApertura:i.usuario_apertura}));
+   const activos=inventarios.filter(i=>(i.estado||i.status||"abierto")==="abierto"||(i.status||"")==="OPEN"||i.estado==="abierto").map(i=>({
+     id:i.id,
+     nombre:i.nombre||i.name||"",
+     tipo:i.tipo||"2conteos",
+     obs:i.obs||"",
+     fecha:i.fecha||"",
+     apertura:i.apertura||"",
+     horaApertura:i.horaApertura||i.hora_apertura||"",
+     usuarioApertura:i.usuarioApertura||i.usuario_apertura||"",
+     status:i.status||"OPEN",
+   }));
    const previo=preferredInvId||G.inventario?.id;
    G.inventarios=activos;
    G._inventarioDatos={};
@@ -129,11 +162,11 @@ export const loadTenantData=async(tid,preferredInvId=null)=>{
    // no inflen la base ni tapen (por el límite de filas) a los productos vigentes.
    // Guardado: solo si conocemos al menos un inventario, para no borrar por un
    // estado transitorio vacío.
-   if(inventarios.length){
-     const idsValidos=new Set(inventarios.map(i=>i.id));
-     const huerfanos=(productos||[]).filter(p=>p.inventario_id&&!idsValidos.has(p.inventario_id)).map(p=>p.id);
-     if(huerfanos.length){console.log("[TOMFIC load] eliminando",huerfanos.length,"productos huérfanos (de inventarios borrados)");try{await SB.deleteProductosByIds(huerfanos);}catch(e){console.warn("no se pudieron limpiar huérfanos:",e);}}
-   }
+    if(inventarios.length){
+      const idsValidos=new Set(inventarios.map(i=>i.id));
+      const huerfanos=(productos||[]).filter(p=>{const inv=p.inventario_id||p.inventoryId;return inv&&!idsValidos.has(inv);}).map(p=>p.id);
+      if(huerfanos.length){console.log("[TOMFIC load] eliminando",huerfanos.length,"productos huérfanos (de inventarios borrados)");try{await SB.deleteProductosByIds(huerfanos);}catch(e){console.warn("no se pudieron limpiar huérfanos:",e);}}
+    }
    const seleccionado=activos.find(i=>i.id===previo)||activos[0]||null;
    G.inventario=null;G.conteos=[];G.capturas={};G.productos=[];G.localizaciones=[];G.ubicacionesTipos=[];G.localizacionTipos=[];G.alertas=[];
    if(seleccionado)selectInventory(seleccionado.id);

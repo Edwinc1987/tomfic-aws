@@ -1,7 +1,7 @@
 import { BadRequestException, Body, Controller, Delete, Get, Inject, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
 import { ApiAuthGuard } from "../../../core/auth/cognito-auth.guard";
 import { requirePermission } from "../../../core/auth/authorization";
-import { InventoryRepository } from "../application/inventory-repository";
+import { InventoryMeta, InventoryRepository } from "../application/inventory-repository";
 
 @Controller("v1/inventories")
 @UseGuards(ApiAuthGuard)
@@ -19,20 +19,31 @@ export class InventoriesController{
   }
 
   @Post()
-  create(@Req() request:{auth:{userId:string;tenantId:string;role:string}},@Body() body:{name?:string;tipo?:string}){
+  create(
+    @Req() request:{auth:{userId:string;tenantId:string;role:string}},
+    @Body() body:{name?:string;tipo?:string;meta?:InventoryMeta;id?:string},
+  ){
     requirePermission(request.auth,"inventories:manage");
     if(!body.name?.trim())throw new BadRequestException("name es obligatorio");
-    return this.repository.create(request.auth.tenantId,body.name,body.tipo);
+    return this.repository.create(request.auth.tenantId,body.name,body.tipo,body.meta,body.id);
   }
 
   @Patch(":id")
-  update(@Req() request:{auth:{userId:string;tenantId:string;role:string}},@Param("id") id:string,@Body() body:{name?:string;status?:string}){
+  update(
+    @Req() request:{auth:{userId:string;tenantId:string;role:string}},
+    @Param("id") id:string,
+    @Body() body:{name?:string;status?:string;tipo?:string;meta?:InventoryMeta},
+  ){
     requirePermission(request.auth,"inventories:manage");
     return this.repository.update(request.auth.tenantId,id,body);
   }
 
   @Post(":id/close")
-  close(@Req() request:{auth:{userId:string;tenantId:string;role:string}},@Param("id") id:string,@Body() body:{snapshots?:unknown}){
+  close(
+    @Req() request:{auth:{userId:string;tenantId:string;role:string}},
+    @Param("id") id:string,
+    @Body() body:{snapshots?:unknown},
+  ){
     requirePermission(request.auth,"inventories:manage");
     return this.repository.close(request.auth.tenantId,id,request.auth.userId,body.snapshots||{});
   }

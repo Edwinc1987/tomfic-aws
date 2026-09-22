@@ -8,9 +8,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { StatTile } from "@/components/ui/stat-tile";
 import Section from "@/components/Section";
-import { setBusy, initSnap } from "@/lib/sync";
-import { G, TODAY, HOUR, ID, finalAjustado, SB, rememberSelectedInventory, selectInventory, rondaCerrada, conteoCompleto } from "@/lib/data";
+import { setBusy, initSnap, scheduleSync } from "@/lib/sync";
+import { G, TODAY, HOUR, ID, finalAjustado, SB, saveLocalCache, rememberSelectedInventory, selectInventory, rondaCerrada, conteoCompleto } from "@/lib/data";
+import { api } from "@/core/network/api";
 
 // ── INVENTARIO ──
 export function VInventario({G,rerender,showToast,usuario}){
@@ -21,6 +23,7 @@ export function VInventario({G,rerender,showToast,usuario}){
   const [eliminando,setEliminando]=useState(false);
   const [form,setForm]=useState({nombre:"",tipo:"2conteos",obs:"",fecha:TODAY()});
   const [editForm,setEditForm]=useState({nombre:"",obs:""});
+  const [saving,setSaving]=useState(false);
 
   // Determina qué conteos NO están completados (para bloquear el cierre)
   const estadoConteo=(c)=>{
@@ -37,11 +40,22 @@ export function VInventario({G,rerender,showToast,usuario}){
     return "C1 en curso";
   };
   const conteosIncompletos=()=>G.conteos.filter(c=>c.tipo!=="ajuste").map(c=>({c,razon:estadoConteo(c)})).filter(x=>x.razon!==null);
-  const crear=()=>{
+  const crear=async()=>{
     if(!form.nombre.trim())return showToast("Ingresa un nombre","err");
     const limite=Math.max(1,Number(G.tenant?.limite_inventarios||1));
     if(G.inventarios.length>=limite)return showToast(`Tu plan permite ${limite} inventario${limite===1?"":"s"} activo${limite===1?"":"s"}.` ,"err");
-    const inv={id:ID(),nombre:form.nombre,tipo:form.tipo,obs:form.obs,fecha:form.fecha,apertura:TODAY(),horaApertura:HOUR(),usuarioApertura:usuario.nombre};
+    if(saving)return;
+    setSaving(true);
+    const meta={fecha:form.fecha,obs:form.obs,apertura:TODAY(),horaApertura:HOUR(),usuarioApertura:usuario.nombre};
+    let inv;
+    try{
+      const created=await api.createInventory(G.tenantId,{name:form.nombre.trim(),tipo:form.tipo,meta});
+      inv={id:created.id,nombre:created.nombre||form.nombre.trim(),tipo:created.tipo||form.tipo,obs:created.obs??form.obs,fecha:created.fecha||form.fecha,apertura:created.apertura||meta.apertura,horaApertura:created.horaApertura||meta.horaApertura,usuarioApertura:created.usuarioApertura||meta.usuarioApertura};
+    }catch(e){
+      setSaving(false);
+      console.error("No se pudo crear el inventario en la nube:",e);
+      return showToast("No se pudo guardar el inventario en la nube: "+(e.message||"error de conexión"),"err");
+    }
     rememberSelectedInventory();
     G.inventarios=[...G.inventarios,inv];
     G.inventario=inv;
@@ -54,12 +68,25 @@ export function VInventario({G,rerender,showToast,usuario}){
     G.localizacionTipos=["MUEBLE","LINEAL","NEVERA","PUNTA","JAULA","CAVA"];
     G.conteos=[];G.capturas={};G.alertas=[];
     setModal(false);setForm({nombre:"",tipo:"2conteos",obs:"",fecha:TODAY()});
-    rerender();showToast("Inventario creado. Ahora carga la base de productos ✓");
+    setSaving(false);
+    saveLocalCache();
+    scheduleSync();
+    rerender();showToast("Inventario creado y guardado en la nube ✓");
   };
-  const guardarEdit=()=>{
+  const guardarEdit=async()=>{
     if(!editForm.nombre.trim())return showToast("El nombre no puede estar vacío","err");
-    G.inventario={...G.inventario,nombre:editForm.nombre,obs:editForm.obs};
+    const prev={...G.inventario};
+    const next={...G.inventario,nombre:editForm.nombre,obs:editForm.obs};
+    try{
+      await SB.upsertInventario(next);
+    }catch(e){
+      console.warn("No se pudo actualizar el inventario en la nube:",e);
+      showToast("No se pudo guardar el cambio en la nube","err");
+      return;
+    }
+    G.inventario=next;
     G.inventarios=G.inventarios.map(i=>i.id===G.inventario.id?G.inventario:i);
+    saveLocalCache();
     setModalEdit(false);rerender();showToast("Inventario actualizado ✓");
   };
   const intentarCerrar=()=>{
@@ -151,37 +178,36 @@ export function VInventario({G,rerender,showToast,usuario}){
       ):(
         <>
           {/* Banner principal del inventario */}
-          <div style={{background:"linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%)",borderRadius:18,padding:"24px 28px",marginBottom:16,color:"white",position:"relative",overflow:"hidden"}}>
-            <div style={{position:"absolute",right:-20,top:-20,width:120,height:120,background:"rgba(255,255,255,0.04)",borderRadius:99}}/>
-            <div style={{position:"absolute",right:40,bottom:-30,width:80,height:80,background:"rgba(255,255,255,0.03)",borderRadius:99}}/>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12}}>
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 p-6 text-white mb-4">
+            <div className="absolute -right-5 -top-5 h-28 w-28 rounded-full bg-white/5"/>
+            <div className="absolute right-10 -bottom-7 h-20 w-20 rounded-full bg-white/5"/>
+            <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <div style={{fontSize:11,color:"#64748b",fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>Inventario Activo</div>
-                <div style={{fontSize:26,fontWeight:900,letterSpacing:-0.5,marginBottom:6}}>{G.inventario.nombre}</div>
-                <div style={{fontSize:12,color:"#64748b"}}>Abierto el {G.inventario.apertura} {G.inventario.horaApertura&&`a las ${G.inventario.horaApertura}`} · por <span style={{color:"#60a5fa",fontWeight:700}}>{G.inventario.usuarioApertura}</span></div>
+                <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Inventario Activo</div>
+                <div className="text-2xl font-black tracking-tight">{G.inventario.nombre}</div>
+                <div className="mt-1 text-xs text-slate-400">
+                  Abierto el {G.inventario.apertura} {G.inventario.horaApertura&&`a las ${G.inventario.horaApertura}`} · por <span className="font-bold text-blue-300">{G.inventario.usuarioApertura}</span>
+                </div>
               </div>
-              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                <div style={{background:"rgba(22,163,74,0.2)",border:"1px solid rgba(22,163,74,0.4)",borderRadius:20,padding:"4px 14px",fontSize:12,fontWeight:700,color:"#4ade80",display:"flex",alignItems:"center",gap:5}}>
-                  <span style={{width:7,height:7,background:"#4ade80",borderRadius:99,display:"inline-block"}}/>
+              <div className="flex gap-2 flex-wrap">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/20 px-3 py-1 text-xs font-bold text-emerald-300">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400"/>
                   ACTIVO
-                </div>
-                <div style={{background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.15)",borderRadius:20,padding:"4px 14px",fontSize:12,fontWeight:700,color:"white"}}>
+                </span>
+                <span className="inline-flex items-center rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-bold">
                   {G.inventario.tipo==="2conteos"?"2 Conteos":"1 Conteo"}
-                </div>
+                </span>
               </div>
             </div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(110px,1fr))",gap:10,marginTop:20}}>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5">
               {[
-                {l:"Productos",v:G.productos.length,icon:Package},
-                {l:"Conteos",v:G.conteos.length,icon:ClipboardList},
-                {l:"Completados",v:st.comp,icon:CheckCircle},
-                {l:"Diferencias",v:st.dif,icon:AlertTriangle},
+                {l:"Productos",v:G.productos.length,icon:Package,tone:"brand"},
+                {l:"Conteos",v:G.conteos.length,icon:ClipboardList,tone:"info"},
+                {l:"Completados",v:st.comp,icon:CheckCircle,tone:"success"},
+                {l:"Diferencias",v:st.dif,icon:AlertTriangle,tone:st.dif>0?"warning":"success"},
               ].map(s=>(
-                <div key={s.l} style={{background:"rgba(255,255,255,0.07)",borderRadius:12,padding:"12px 14px",border:"1px solid rgba(255,255,255,0.08)"}}>
-                  <div style={{marginBottom:4}}><s.icon size={16} color="white"/></div>
-                  <div style={{fontSize:22,fontWeight:900,color:"white"}}>{s.v}</div>
-                  <div style={{fontSize:10,color:"#64748b",marginTop:2,textTransform:"uppercase",letterSpacing:0.5}}>{s.l}</div>
-                </div>
+                <StatTile key={s.l} label={s.l} value={s.v} icon={<s.icon size={16}/>} iconTone={s.tone}
+                  className="bg-white/5 border-white/10 hover:border-white/20 text-white [&_[class*=text-text]]:text-white/60 [&_[class*=text-tertiary]]:text-white/40"/>
               ))}
             </div>
           </div>
@@ -237,7 +263,7 @@ export function VInventario({G,rerender,showToast,usuario}){
               <Label>Observaciones</Label>
               <Input value={form.obs} onChange={e=>setForm(p=>({...p,obs:e.target.value}))} placeholder="Opcional..."/>
             </div>
-            <Button className="w-full" onClick={crear}><Plus size={16}/> Crear Inventario</Button>
+            <Button className="w-full" onClick={crear} disabled={saving}>{saving?"Creando…":<><Plus size={16}/> Crear Inventario</>}</Button>
           </div>
         </DialogContent>
       </Dialog>

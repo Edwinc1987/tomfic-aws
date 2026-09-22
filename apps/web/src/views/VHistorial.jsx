@@ -10,6 +10,8 @@ import { Badge as UIBadge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { DataTable } from "@/components/ui/data-table";
+import { StatTile } from "@/components/ui/stat-tile";
 import { G, TODAY, getStInv, getKPIsInv, nU, SB, selectInventory } from "@/lib/data";
 import { _snap } from "@/lib/sync";
 export function VHistorial({G,showToast,usuario,rerender}){
@@ -50,24 +52,11 @@ export function VHistorial({G,showToast,usuario,rerender}){
           <Button variant="outline" size="sm" onClick={()=>setCardDetalle(null)}><ChevronLeft size={15}/> Volver</Button>
           <h2 className="text-lg font-bold">{cardDetalle.titulo}</h2>
         </div>
-        <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead><tr className="bg-slate-50 text-slate-600 border-b border-slate-200">
-                {cardDetalle.cols.map(h=><th key={h} className="px-3 py-2 text-left font-semibold">{h}</th>)}
-              </tr></thead>
-              <tbody>
-                {cardDetalle.lista.length===0?(
-                  <tr><td colSpan={cardDetalle.cols.length} className="p-5 text-center text-muted-foreground">Sin registros</td></tr>
-                ):cardDetalle.lista.map((row,i)=>(
-                  <tr key={i} className="border-b last:border-0 hover:bg-slate-50">
-                    {row.map((cell,j)=><td key={j} className="px-3 py-1.5 text-slate-700">{cell}</td>)}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
+        <DataTable
+          columns={cardDetalle.cols.map((h,i)=>({key:i,label:h}))}
+          rows={(cardDetalle.lista||[]).map(row=>{const obj={};cardDetalle.cols.forEach((c,j)=>{obj[j]=row[j];});return obj;})}
+          emptyText="Sin registros"
+        />
       </div>
     );
   }
@@ -354,15 +343,13 @@ export function VHistorial({G,showToast,usuario,rerender}){
                <div><div className="text-[11px] font-extrabold tracking-wider uppercase text-slate-400">Resumen gerencial</div><div className="text-sm text-slate-500 mt-1">Resultado del último inventario cerrado</div></div>
                <Button variant="outline" size="sm" onClick={()=>setInvSel(inv)}>Ver análisis completo <ChevronRight size={14}/></Button>
              </div>
-             <div className="grid gap-3 mb-4" style={{gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))"}}>
-               {kpis.map((k,i)=>(
-                 <Card key={i} className="px-4 py-3.5 border-l-4" style={{borderLeftColor:k.c}}>
-                   <div className="flex items-center gap-2 mb-2"><k.icon size={16} style={{color:k.c}}/><span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{k.l}</span></div>
-                   <div className="font-black leading-tight truncate" style={{color:k.c,fontSize:typeof k.v==="string"&&k.v.length>9?15:22}}>{k.v}</div>
-                   <div className="text-[11px] text-slate-500 mt-1">{k.detail}</div>
-                 </Card>
-               ))}
-             </div>
+              <div className="grid gap-3 mb-4" style={{gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))"}}>
+                {kpis.map((k,i)=>(
+                  <StatTile key={i} label={k.l} value={k.v} detail={k.detail} icon={<k.icon size={16}/>}
+                    iconTone={k.c==="#dc2626"?"danger":k.c==="#16a34a"?"success":k.c==="#d97706"?"warning":"info"}
+                    className="border-l-4" style={{borderLeftColor:k.c}}/>
+                ))}
+              </div>
              <Card className="p-4 mb-4 border-l-4 border-l-primary">
                <div className="flex items-center justify-between gap-3 flex-wrap"><div><div className="font-bold text-base">{inv.nombre}</div><div className="text-xs text-muted-foreground mt-0.5">{inv.apertura} → {inv.cierre} · Responsable: {inv.usuarioApertura||"—"}</div></div><Button variant="outline" size="sm" onClick={()=>reabrir(inv)}><RotateCcw size={14}/> Reabrir</Button></div>
              </Card>

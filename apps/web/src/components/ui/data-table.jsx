@@ -1,19 +1,19 @@
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 /**
- * DataTable — tabla de datos estilo Linear.
+ * DataTable — tabla de datos estilo Linear, con paginación opcional.
  *
  * <DataTable
  *   columns={[{ key: "name", label: "Nombre" }, { key: "stock", label: "Stock", align: "right" }]}
  *   rows={productos}
  *   rowKey="id"
- *   onRowClick={(row) => navigate(`/products/${row.id}`)}
  * />
  *
- * Cell custom: renderiza una función en la columna.
- * <DataTable columns={[{ key: "status", label: "Estado", render: (v) => <Badge>{v}</Badge> }]} />
+ * Con paginación:
+ * <DataTable rows={page} page={1} pageCount={5} onPageChange={fn} totalText="1-50 de 200" />
  */
-export function DataTable({ columns = [], rows = [], rowKey = "id", onRowClick, loading, dense, emptyText = "Sin datos.", className, headerClassName, rowClassName }) {
+export function DataTable({ columns = [], rows = [], rowKey = "id", onRowClick, loading, dense, emptyText = "Sin datos.", className, headerClassName, rowClassName, page, pageCount, onPageChange, totalText }) {
   const keyOf = (row, idx) => {
     if (typeof rowKey === "function") return rowKey(row);
     return row[rowKey] ?? idx;
@@ -74,7 +74,7 @@ export function DataTable({ columns = [], rows = [], rowKey = "id", onRowClick, 
                 {columns.map((col) => (
                   <td key={col.key}
                     className={cn(pad, alignClass(col.align), "text-text-primary", col.className)}>
-                    {col.render ? col.render(row[col.key], row) : row[col.key]}
+                    {col.render ? col.render(row[col.key], row) : (row[col.key] ?? "—")}
                   </td>
                 ))}
               </tr>
@@ -82,6 +82,16 @@ export function DataTable({ columns = [], rows = [], rowKey = "id", onRowClick, 
           )}
         </tbody>
       </table>
+      {page != null && pageCount != null && (
+        <div className="flex items-center justify-between gap-3 border-t border-border-subtle bg-surface-base px-4 py-2 text-xs text-text-secondary">
+          <span>{totalText || ""}</span>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => onPageChange?.(page - 1)}>Anterior</Button>
+            <span className="flex items-center px-1">Página {page} de {pageCount}</span>
+            <Button variant="outline" size="sm" disabled={page >= pageCount} onClick={() => onPageChange?.(page + 1)}>Siguiente</Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

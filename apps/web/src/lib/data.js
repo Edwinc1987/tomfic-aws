@@ -36,10 +36,33 @@ const _api={
     try{const r=await apiRequest(`/v1/tenants/${tid}`);return{data:r};}catch(e){return{data:null,error:e};}
   },
   loadAll:async(tid)=>{
-    const invs=await apiRequest("/v1/inventories",{headers:_h(tid)}).catch(()=>[]);
+    const invsRaw=await apiRequest("/v1/inventories",{headers:_h(tid)}).catch(()=>[]);
+    const invs=(Array.isArray(invsRaw)?invsRaw:[]).map(i=>{
+      const meta=i.meta||i.snapshotsJson?.meta||{};
+      return{
+        id:i.id,
+        nombre:i.name||i.nombre||"",
+        tipo:i.tipo||"2conteos",
+        obs:meta.obs??i.obs??"",
+        fecha:meta.fecha??i.fecha??"",
+        apertura:meta.apertura??i.apertura??"",
+        horaApertura:meta.horaApertura??meta.hora_apertura??i.horaApertura??i.hora_apertura??"",
+        usuarioApertura:meta.usuarioApertura??meta.usuario_apertura??i.usuarioApertura??i.usuario_apertura??"",
+        estado:i.status==="OPEN"?"abierto":"cerrado",
+        status:i.status||"OPEN",
+      };
+    });
     const firstInvId=(invs&&invs[0]?.id)||"";
     const counts=await apiRequest(`/v1/counts?inventoryId=${firstInvId}`,{headers:_h(tid)}).catch(()=>[]);
-    const prods=await apiRequest(`/v1/products?inventoryId=${firstInvId}&page=1&pageSize=10000`,{headers:_h(tid)}).catch(()=>[]);
+    const allProds=[];
+    for(let pg=1;pg<=50;pg++){
+      const r=await apiRequest(`/v1/products?inventoryId=${firstInvId}&page=${pg}&pageSize=500`,{headers:_h(tid)}).catch(()=>null);
+      const items=Array.isArray(r)?r:r?.items||[];
+      allProds.push(...items);
+      const total=Number(r?.total||0);
+      if(!items.length||(total>0&&allProds.length>=total))break;
+    }
+    const prods=allProds;
     const capturas={};
     if(Array.isArray(counts)){
       for(const c of counts){
@@ -49,11 +72,15 @@ const _api={
         }catch(e){}
       }
     }
-    return{usuarios:[],productos:Array.isArray(prods)?prods:prods?.items||[],inventarios:Array.isArray(invs)?invs:[],conteos:Array.isArray(counts)?counts:[],capturas};
+    return{usuarios:[],productos:Array.isArray(prods)?prods:prods?.items||[],inventarios:invs,conteos:Array.isArray(counts)?counts:[],capturas};
   },
   listProductosPage:async({tenantId,inventarioId,page=1,pageSize=50,search=""})=>{
-    const r=await apiRequest(`/v1/products?inventoryId=${inventarioId}&page=${page}&pageSize=${pageSize}&search=${encodeURIComponent(search)}`,{headers:_h(tenantId)});
-    return{data:Array.isArray(r)?r:r?.items||[],count:r?.total||0,error:null};
+    try{
+      const r=await apiRequest(`/v1/products?inventoryId=${encodeURIComponent(inventarioId)}&page=${page}&pageSize=${pageSize}&search=${encodeURIComponent(search)}`,{headers:_h(tenantId)});
+      return{data:Array.isArray(r)?r:r?.items||[],count:Number(r?.total||0),error:null};
+    }catch(error){
+      return{data:[],count:0,error};
+    }
   },
   upsertTenant:()=>Promise.resolve({error:null}),
   upsertUsuario:()=>Promise.resolve({error:null}),
@@ -63,7 +90,32 @@ const _api={
   deleteAllProductos:async(tid,invId)=>{const r=await apiRequest(`/v1/products/all?inventoryId=${invId}`,{method:"DELETE",headers:_h(tid)});return{data:null,error:null,count:r?.count||0};},
   deleteAllProductosTenant:async(tid)=>{const r=await apiRequest("/v1/products/all",{method:"DELETE",headers:_h(tid)});return{data:null,error:null,count:r?.count||0};},
   deleteProductosByIds:async(ids)=>{const r=await apiRequest("/v1/products/by-ids",{method:"DELETE",headers:_h(),body:{ids}});return{count:r?.count||0};},
-  upsertInventario:async(inv)=>{if(inv?.id){await apiRequest(`/v1/inventories/${inv.id}`,{method:"PATCH",headers:_h(),body:inv});}return{error:null};},
+  upsertInventario:async(inv)=>{
+    if(!inv?.id)return{error:null};
+    const body={
+      name:inv.nombre||inv.name||"",
+      tipo:inv.tipo||"2conteos",
+      meta:{
+        fecha:inv.fecha||"",
+        obs:inv.obs||"",
+        apertura:inv.apertura||"",
+        horaApertura:inv.horaApertura||inv.hora_apertura||"",
+        usuarioApertura:inv.usuarioApertura||inv.usuario_apertura||"",
+        cierre:inv.cierre||"",
+        horaCierre:inv.horaCierre||inv.hora_cierre||"",
+        usuarioCierre:inv.usuarioCierre||inv.usuario_cierre||"",
+      },
+    };
+    try{
+      await apiRequest(`/v1/inventories/${inv.id}`,{method:"PATCH",headers:_h(),body});
+    }catch(e){
+      if(e.status===404||e.status===400||e.status===500){
+        try{await apiRequest("/v1/inventories",{method:"POST",headers:_h(),body:{...body,id:inv.id}});}
+        catch(e2){console.warn("upsertInventario create fallback:",e2.message||e2);}
+      }else throw e;
+    }
+    return{error:null};
+  },
   closeInventario:async(id,snapshots)=>{await apiRequest(`/v1/inventories/${id}/close`,{method:"POST",headers:_h(),body:{snapshots}});return{error:null};},
   listClosedInventories:async()=>{return apiRequest("/v1/inventories/closed",{headers:_h()});},
   upsertConteo:async(c)=>{
@@ -185,9 +237,9 @@ export const deserConteo=(r)=>{
   return {c,caps};
 };
 export const serInv=(inv,estado)=>({
-  id:inv.id,tenant_id:G.tenantId||null,nombre:inv.nombre||"",fecha:inv.fecha||"",estado,tipo:inv.tipo||"",obs:inv.obs||"",
-  apertura:inv.apertura||"",hora_apertura:inv.horaApertura||"",usuario_apertura:inv.usuarioApertura||"",
-  cierre:inv.cierre||"",hora_cierre:inv.horaCierre||"",usuario_cierre:inv.usuarioCierre||"",
+  id:inv.id,tenant_id:G.tenantId||null,nombre:inv.nombre||inv.name||"",fecha:inv.fecha||"",estado,tipo:inv.tipo||"",obs:inv.obs||"",
+  apertura:inv.apertura||"",hora_apertura:inv.horaApertura||inv.hora_apertura||"",usuario_apertura:inv.usuarioApertura||inv.usuario_apertura||"",
+  cierre:inv.cierre||"",hora_cierre:inv.horaCierre||inv.hora_cierre||"",usuario_cierre:inv.usuarioCierre||inv.usuario_cierre||"",
   conteos_snapshot:inv.conteos?JSON.stringify(inv.conteos):null,
   capturas_snapshot:inv.capturas?JSON.stringify(inv.capturas):null,
   productos_snapshot:inv.productos?JSON.stringify(inv.productos):null,

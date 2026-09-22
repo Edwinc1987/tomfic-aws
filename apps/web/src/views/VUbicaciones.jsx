@@ -326,7 +326,7 @@ export function VUbicaciones({G,rerender,showToast}){
                 <tbody>
                   {G.localizaciones.map((l)=>(
                     <tr key={l.id} className="border-b last:border-0 hover:bg-slate-50 transition-colors">
-                      <td className="px-4 py-1.5 font-bold text-primary whitespace-nowrap">{l.ubicacion}</td>
+                      <td className="px-4 py-1.5 font-bold text-slate-900 whitespace-nowrap">{l.ubicacion}</td>
                       <td className="px-4 py-1.5 text-muted-foreground">{l.localizacion}</td>
                       <td className="px-4 py-1.5 font-semibold">{l.nro}</td>
                       <td className="px-4 py-1.5 text-muted-foreground">{l.observacion||"—"}</td>

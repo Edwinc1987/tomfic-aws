@@ -2,10 +2,8 @@ import { cn } from "@/lib/utils";
 
 /**
  * StatTile — tarjeta de estadística estilo Linear.
- *
- * <StatTile label="Productos" value={142} delta="+12" deltaTone="up" hint="vs mes anterior" />
  */
-export function StatTile({ label, value, delta, deltaTone = "neutral", hint, icon, iconTone, className }) {
+export function StatTile({ label, value, delta, deltaTone = "neutral", hint, icon, iconTone, className, detail, style }) {
   const deltaColor = {
     up: "text-emerald-600",
     down: "text-red-500",
@@ -16,12 +14,22 @@ export function StatTile({ label, value, delta, deltaTone = "neutral", hint, ico
     brand: "text-blue-600",
     success: "text-emerald-600",
     warning: "text-amber-500",
+    danger: "text-red-500",
     violet: "text-violet-500",
     info: "text-blue-500",
   }[iconTone] || "text-slate-400";
 
+  const iconBg = {
+    brand: "bg-blue-50",
+    success: "bg-emerald-50",
+    warning: "bg-amber-50",
+    danger: "bg-red-50",
+    violet: "bg-violet-50",
+    info: "bg-blue-50",
+  }[iconTone] || "bg-slate-50";
+
   return (
-    <div className={cn(
+    <div style={style} className={cn(
       "rounded-lg border border-border-subtle bg-surface-raised p-4 transition-colors hover:border-border-strong",
       className
     )}>
@@ -30,7 +38,7 @@ export function StatTile({ label, value, delta, deltaTone = "neutral", hint, ico
           {label}
         </p>
         {icon && (
-          <span className={cn("shrink-0", iconColor)}>
+          <span className={cn("grid place-items-center rounded-lg shrink-0 w-8 h-8", iconBg, iconColor)}>
             {icon}
           </span>
         )}
@@ -38,6 +46,9 @@ export function StatTile({ label, value, delta, deltaTone = "neutral", hint, ico
       <p className="mt-2 text-2xl font-semibold text-text-primary tracking-tight tabular-nums">
         {value}
       </p>
+      {detail && (
+        <p className="mt-1 text-xs text-text-secondary">{detail}</p>
+      )}
       {(delta != null || hint) && (
         <p className={cn("mt-1 text-xs flex items-center gap-1.5", deltaColor)}>
           {delta != null && <span>{delta}</span>}

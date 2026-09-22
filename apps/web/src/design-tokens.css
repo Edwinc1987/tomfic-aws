@@ -10,8 +10,7 @@
  * en vez de colores raw para que el swap dark/light sea una sola fuente de verdad.
  */
 
-@layer base {
-  :root {
+:root {
     /* ── Fondos — neutros, casi monocromáticos ── */
     --surface-canvas: 0 0% 100%;            /* fondo de página */
     --surface-base: 210 20% 98%;            /* sidebar, header */
@@ -151,4 +150,3 @@
     --tw-ring-color: hsl(var(--ring));
     --tw-ring-offset-color: hsl(var(--surface-canvas));
   }
-}

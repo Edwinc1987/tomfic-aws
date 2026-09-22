@@ -5,50 +5,53 @@
 @tailwind utilities;
 
 @layer base {
-  /* ── shadcn/ui token bridge ── Mapea tokens TOMFIC a los que shadcn espera ── */
+  /* ── shadcn/ui token bridge ── */
+  /* IMPORTANT: values must be raw H S% L% (no hsl() wrapper) */
+  /* because Tailwind generates hsl(var(--primary)) etc. */
+  /* Also: --accent here is shadcn's "subtle highlight", NOT the brand color. */
   :root {
-    --background: var(--surface-canvas);
-    --foreground: var(--text-primary);
-    --card: var(--surface-raised);
-    --card-foreground: var(--text-primary);
-    --popover: var(--surface-raised);
-    --popover-foreground: var(--text-primary);
-    --primary: var(--accent);
-    --primary-foreground: var(--accent-foreground);
-    --secondary: var(--surface-overlay);
-    --secondary-foreground: var(--text-primary);
-    --muted: var(--surface-overlay);
-    --muted-foreground: var(--text-secondary);
-    --accent: var(--accent-soft);
-    --accent-foreground: var(--text-primary);
-    --destructive: var(--status-danger);
-    --destructive-foreground: white;
-    --border: var(--border-subtle);
-    --input: var(--border-subtle);
-    --ring: var(--ring);
+    --background: 0 0% 100%;
+    --foreground: 222 47% 11%;
+    --card: 210 20% 97%;
+    --card-foreground: 222 47% 11%;
+    --popover: 210 20% 97%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 221 83% 53%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 16% 95%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 16% 95%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 214 95% 96%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 72% 45%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 16% 91%;
+    --input: 214 16% 91%;
+    --ring: 221 83% 53%;
     --radius: 0.5rem;
   }
 
   .dark {
-    --background: var(--surface-canvas);
-    --foreground: var(--text-primary);
-    --card: var(--surface-raised);
-    --card-foreground: var(--text-primary);
-    --popover: var(--surface-raised);
-    --popover-foreground: var(--text-primary);
-    --primary: var(--accent);
-    --primary-foreground: var(--accent-foreground);
-    --secondary: var(--surface-overlay);
-    --secondary-foreground: var(--text-primary);
-    --muted: var(--surface-overlay);
-    --muted-foreground: var(--text-secondary);
-    --accent: var(--accent-soft);
-    --accent-foreground: var(--text-primary);
-    --destructive: var(--status-danger);
-    --destructive-foreground: white;
-    --border: var(--border-subtle);
-    --input: var(--border-subtle);
-    --ring: var(--ring);
+    --background: 222 24% 7%;
+    --foreground: 220 14% 96%;
+    --card: 222 20% 12%;
+    --card-foreground: 220 14% 96%;
+    --popover: 222 20% 12%;
+    --popover-foreground: 220 14% 96%;
+    --primary: 213 94% 68%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 222 18% 16%;
+    --secondary-foreground: 220 14% 96%;
+    --muted: 222 18% 16%;
+    --muted-foreground: 220 10% 70%;
+    --accent: 217 45% 18%;
+    --accent-foreground: 220 14% 96%;
+    --destructive: 0 84% 65%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 222 16% 18%;
+    --input: 222 16% 18%;
+    --ring: 213 94% 68%;
   }
 }
 

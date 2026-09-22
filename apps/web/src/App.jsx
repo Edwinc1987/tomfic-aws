@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Package, CheckCircle2, AlertTriangle, XCircle, X } from "lucide-react";
-import { G, saveLocalCache, loadLocalCache, clearLocalCache, saveLocalConfig, APP_VERSION } from "@/lib/data";
+import { G, saveLocalCache, loadLocalCache, clearLocalCache, saveLocalConfig, rememberSelectedInventory, APP_VERSION } from "@/lib/data";
 import { authService } from "@/core/auth/authService";
 import { api } from "@/core/network/api";
 import { setAuthTokenGetter, setExtraHeaders, clearExtraHeaders, teamLogin, apiRequest } from "@/core/network/apiClient";
@@ -52,13 +52,16 @@ export default function TomficApp(){
     G.tenant=perfil.tenant||{id:G.tenantId,nombre:"Empresa",activo:true};
     setLoadingTenant(true);
     try{
-      const invs=await api.listInventories(G.tenantId).catch(()=>[]);
-      G.inventarios=Array.isArray(invs)?invs:[];
-      if(G.inventarios.length>0){G.inventario=G.inventarios[0];}
+      const invs=await api.listInventories(G.tenantId).catch(()=>null);
+      if(Array.isArray(invs))G.inventarios=invs;
+      if(!G.inventario||!G.inventarios.some(i=>i.id===G.inventario?.id)){
+        if(G.inventarios.length>0)G.inventario=G.inventarios[0];
+      }
       const counts=await api.listCounts(G.tenantId,G.inventario?.id||"").catch(()=>[]);
-      G.conteos=Array.isArray(counts)?counts:[];
-      const prods=await api.listProducts(G.tenantId,G.inventario?.id||"").catch(()=>[]);
-      G.productos=Array.isArray(prods?.data)?prods.data:Array.isArray(prods)?prods:[];
+      G.conteos=Array.isArray(counts)?counts:G.conteos;
+      const prods=await api.listAllProducts(G.tenantId,G.inventario?.id||"").catch(()=>null);
+      if(Array.isArray(prods))G.productos=prods;
+      if(G.inventario)rememberSelectedInventory();
       for(const c of G.conteos){
         try{
           const caps=await apiRequest(`/v1/captures/by-count/${c.id}`,{headers:{"x-tenant-id":G.tenantId}});
@@ -70,7 +73,8 @@ export default function TomficApp(){
         if(Array.isArray(closed)){
           G.historial=closed.map(inv=>{
             const snaps=inv.snapshotsJson||{};
-            return{...inv,conteos:snaps.conteos||[],capturas:snaps.capturas||{},productos:snaps.productos||[],localizaciones:snaps.localizaciones||[],ubicacionesTipos:snaps.ubicacionesTipos||[],localizacionTipos:snaps.localizacionTipos||[],notas:snaps.notas||[]};
+            const meta=inv.meta||snaps.meta||{};
+            return{...inv,nombre:inv.name||inv.nombre||"",fecha:inv.fecha||meta.fecha||"",apertura:inv.apertura||meta.apertura||"",horaApertura:meta.horaApertura||"",usuarioApertura:meta.usuarioApertura||"",cierre:inv.closedAt||inv.cierre||meta.cierre||"",horaCierre:meta.horaCierre||"",usuarioCierre:meta.usuarioCierre||inv.closedBy||"",conteos:snaps.conteos||[],capturas:snaps.capturas||{},productos:snaps.productos||[],localizaciones:snaps.localizaciones||[],ubicacionesTipos:snaps.ubicacionesTipos||[],localizacionTipos:snaps.localizacionTipos||[],notas:snaps.notas||[]};
           });
         }
       }catch(e){}
@@ -83,6 +87,7 @@ export default function TomficApp(){
   useEffect(()=>{
     console.log("TOMFIC build:",APP_VERSION);
     (async()=>{
+      try{await loadLocalCache(G.tenantId||null);}catch(e){}
       try{const r=await authService.getSession();if(r?.data?.session)await afterAuth();}catch(e){console.warn(e);}
       setLoading(false);
     })();
@@ -105,13 +110,16 @@ export default function TomficApp(){
   const recargar=async()=>{
     if(typeof navigator!=="undefined"&&!navigator.onLine)return;
     try{
-      const invs=await api.listInventories(G.tenantId).catch(()=>[]);
-      G.inventarios=Array.isArray(invs)?invs:G.inventarios;
-      if(G.inventarios.length>0)G.inventario=G.inventarios[0];
+      const invs=await api.listInventories(G.tenantId).catch(()=>null);
+      if(Array.isArray(invs))G.inventarios=invs;
+      if(!G.inventario||!G.inventarios.some(i=>i.id===G.inventario?.id)){
+        if(G.inventarios.length>0)G.inventario=G.inventarios[0];
+      }
       const counts=await api.listCounts(G.tenantId,G.inventario?.id||"").catch(()=>[]);
-      G.conteos=Array.isArray(counts)?counts:[];
-      const prods=await api.listProducts(G.tenantId,G.inventario?.id||"").catch(()=>[]);
-      G.productos=Array.isArray(prods?.data)?prods.data:Array.isArray(prods)?prods:[];
+      G.conteos=Array.isArray(counts)?counts:G.conteos;
+      const prods=await api.listAllProducts(G.tenantId,G.inventario?.id||"").catch(()=>null);
+      if(Array.isArray(prods))G.productos=prods;
+      if(G.inventario)rememberSelectedInventory();
       for(const c of G.conteos){
         try{
           const caps=await apiRequest(`/v1/captures/by-count/${c.id}`,{headers:{"x-tenant-id":G.tenantId}});
@@ -123,10 +131,12 @@ export default function TomficApp(){
         if(Array.isArray(closed)){
           G.historial=closed.map(inv=>{
             const snaps=inv.snapshotsJson||{};
-            return{...inv,conteos:snaps.conteos||[],capturas:snaps.capturas||{},productos:snaps.productos||[],localizaciones:snaps.localizaciones||[],ubicacionesTipos:snaps.ubicacionesTipos||[],localizacionTipos:snaps.localizacionTipos||[],notas:snaps.notas||[]};
+            const meta=inv.meta||snaps.meta||{};
+            return{...inv,nombre:inv.name||inv.nombre||"",fecha:inv.fecha||meta.fecha||"",apertura:inv.apertura||meta.apertura||"",horaApertura:meta.horaApertura||"",usuarioApertura:meta.usuarioApertura||"",cierre:inv.closedAt||inv.cierre||meta.cierre||"",horaCierre:meta.horaCierre||"",usuarioCierre:meta.usuarioCierre||inv.closedBy||"",conteos:snaps.conteos||[],capturas:snaps.capturas||{},productos:snaps.productos||[],localizaciones:snaps.localizaciones||[],ubicacionesTipos:snaps.ubicacionesTipos||[],localizacionTipos:snaps.localizacionTipos||[],notas:snaps.notas||[]};
           });
         }
       }catch(e){}
+      saveLocalCache();
       const users=await api.loadUsuarios(G.tenantId).catch(()=>null);
       if(users?.data)G.usuarios=users.data;
       const tenants=await api.listTenants().catch(()=>null);
@@ -162,13 +172,16 @@ export default function TomficApp(){
         const rol=mapRole(result.user.role);
         setUsuario({id:result.user.id,nombre:result.user.name,email:result.user.email,rol,activo:true,tenant_id:result.user.tenantId,tenant:G.tenant,inventario_id:result.user.inventoryId});
         try{
-          const invs=await api.listInventories(G.tenantId).catch(()=>[]);
-          G.inventarios=Array.isArray(invs)?invs:[];
-          if(G.inventarios.length>0){G.inventario=G.inventarios[0];}
+          const invs=await api.listInventories(G.tenantId).catch(()=>null);
+          if(Array.isArray(invs))G.inventarios=invs;
+          if(!G.inventario||!G.inventarios.some(i=>i.id===G.inventario?.id)){
+            if(G.inventarios.length>0)G.inventario=G.inventarios[0];
+          }
           const counts=await api.listCounts(G.tenantId,G.inventario?.id||"").catch(()=>[]);
           G.conteos=Array.isArray(counts)?counts:[];
-          const prods=await api.listProducts(G.tenantId,G.inventario?.id||"").catch(()=>[]);
-          G.productos=Array.isArray(prods?.data)?prods.data:Array.isArray(prods)?prods:[];
+            const prods=await api.listAllProducts(G.tenantId,G.inventario?.id||"").catch(()=>null);
+            if(Array.isArray(prods))G.productos=prods;
+            if(G.inventario)rememberSelectedInventory();
         }catch(e){}
         setLoadingTenant(false);
       }catch(e){

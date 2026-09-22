@@ -73,9 +73,9 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
   // escribiendo una captura o tiene la cámara abierta, para no interrumpir.
   useEffect(()=>{
     const t=setInterval(()=>{
-      if(productoActivo||showCam)return;
+      if(productoActivo||showCam||document.hidden)return;
       recargar();
-    },10000);
+    },15000);
     return ()=>clearInterval(t);
   },[productoActivo,showCam]);
 
