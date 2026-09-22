@@ -55,6 +55,13 @@ jobs:
     defaults:
       run:
         working-directory: infra
+    # DATABASE_URL/AUTH_SECRET: el prisma.config.ts de apps/api exige DATABASE_URL
+    # incluso para `prisma generate`. Es un valor dummy local (nunca se conecta a
+    # una BD real en este job; el runtime de Lambda resuelve el valor real por
+    # Secrets Manager).
+    env:
+      DATABASE_URL: postgresql://tomfic:tomfic_dummy@localhost:5433/tomfic_dummy
+      AUTH_SECRET: ci-dummy-secret-not-used-at-runtime
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
