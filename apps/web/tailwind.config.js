@@ -61,6 +61,10 @@ module.exports = {
         "round-c2": "hsl(var(--round-c2))",
         "round-c3": "hsl(var(--round-c3))",
       },
+      fontFamily: {
+        sans: ['Inter', 'Figtree', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'ui-monospace', 'Menlo', 'Consolas', 'monospace'],
+      },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
