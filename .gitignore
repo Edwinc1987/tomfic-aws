@@ -12,3 +12,5 @@ dist/
 # Local / editor
 .claude/
 .DS_Store
+
+apps/api/dist-migrate/

@@ -39,4 +39,16 @@ if(existsSync(join(prismaRoot,".prisma"))){
   cpSync(join(prismaRoot,".prisma"),join(dist,"node_modules",".prisma"),{recursive:true});
 }
 
+// bundle principal NO incluye el CLI de Prisma (lo infla); la migrate lambda tiene su propio bundle.
+
+// Query engine Linux para Lambda (no se instala en Windows; se baja del CDN).
+const qePath=join(dist,"node_modules","@prisma","engines","libquery_engine-rhel-openssl-3.0.x.so.node");
+if(!existsSync(qePath)){
+  const sha="c2990dca591cba766e3b7ef5d9e8a84796e47ab7"; // prisma 6.19.3
+  execSync(`curl -sL "https://binaries.prisma.sh/all_commits/${sha}/rhel-openssl-3.0.x/libquery_engine.so.node.gz" -o "${qePath}.gz" && gzip -dc "${qePath}.gz" > "${qePath}"`,{stdio:"inherit"});
+}
+// Copiar también al client y a la raíz (rutas de búsqueda de Prisma en Lambda)
+for(const dst of [join(dist,"node_modules","@prisma","client","libquery_engine-rhel-openssl-3.0.x.so.node"),join(dist,"libquery_engine-rhel-openssl-3.0.x.so.node")]){
+  cpSync(qePath,dst);
+}
 console.log("Empaquetado completado en",dist);

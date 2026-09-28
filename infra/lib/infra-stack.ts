@@ -159,5 +159,27 @@ export class InfraStack extends cdk.Stack {
       database.secret?.grantRead(importProcessorLambda);
     }
     importProcessorLambda.addEventSource(new lambdaEvents.SqsEventSource(importQueue,{batchSize:1}));
+
+    // Lambda one-off para correr `prisma migrate deploy` contra el RDS nuevo.
+    // Se invoca manualmente (aws lambda invoke) tras el despliegue; nunca por API Gateway.
+    if(database){
+      const migrateLambda=new lambda.Function(this,"MigrateLambda",{
+        runtime:lambda.Runtime.NODEJS_24_X,
+        handler:"migrate-lambda.handler",
+        code:lambda.Code.fromAsset(path.join(__dirname,"../../apps/api/dist-migrate")),
+        memorySize:1024,
+        timeout:cdk.Duration.minutes(5),
+        vpc,
+        vpcSubnets:{subnetType:ec2.SubnetType.PRIVATE_WITH_EGRESS},
+        environment:{
+          DATABASE_URL:"__FROM_SECRETS_MANAGER__",
+          DB_SECRET_ARN:database.secret?.secretArn||"",
+          NODE_ENV:"production",
+        },
+      });
+      database.connections.allowDefaultPortFrom(migrateLambda);
+      database.secret?.grantRead(migrateLambda);
+      new cdk.CfnOutput(this,"MigrateLambdaName",{value:migrateLambda.functionName});
+    }
   }
 }
