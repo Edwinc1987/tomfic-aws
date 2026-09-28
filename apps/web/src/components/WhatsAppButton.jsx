@@ -24,13 +24,16 @@ export function WhatsAppFab({ message }) {
   );
 }
 
-// Botón inline (topbar del admin, footer, etc.).
+// Botón inline (topbar del admin) — variante SUCCESS verde #22C55E según especificación.
+import { Button } from "@/components/ui/button";
+
 export function WhatsAppButton({ message, label = "WhatsApp", style = {} }) {
   return (
-    <a href={waLink(message)} target="_blank" rel="noopener noreferrer"
-       title="Escríbenos por WhatsApp"
-       style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "#25d366", color: "#fff", padding: "5px 12px", borderRadius: 6, fontSize: 12, fontWeight: 700, textDecoration: "none", ...style }}>
-      <WaIcon size={15} /> {label}
-    </a>
+    <Button variant="success" asChild>
+      <a href={waLink(message)} target="_blank" rel="noopener noreferrer"
+         title="Escríbenos por WhatsApp" style={style}>
+        <WaIcon size={16} /> {label}
+      </a>
+    </Button>
   );
 }

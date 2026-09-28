@@ -94,8 +94,8 @@ export function ModAdmin({usuario,setUsuario,logout,G,rerender,recargar,showToas
           </div>
 
           <button onClick={()=>setModalSalir(true)}
-            className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-semibold text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-700">
-            <LogOut size={14} className="inline mr-1 -mt-0.5"/>
+            className="inline-flex items-center gap-2 rounded-lg border border-[hsl(220_14%_91%)] bg-white px-3 h-10 text-sm font-medium text-[hsl(221_39%_11%)] transition-colors hover:bg-[#F9FAFB]">
+            <LogOut size={16}/>
             Salir
           </button>
         </div>
