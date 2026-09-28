@@ -11,7 +11,7 @@ import { ModAdmin } from "@/modules/ModAdmin";
 
 export function PanelDueno({usuario,setUsuario,logout,G,rerender,recargar,showToast}){
   const [view,setView]=useState("resumen");
-  const [modo,setModo]=useState("dueno"); // dueno | inventario — el dueño también opera el módulo del inventario
+  const [modo,setModo]=useState("inventario"); // SE ABRE DIRECTO EN EL MÓDULO DEL INVENTARIO (lo que el dueño opera a diario)
   const [modalSalir,setModalSalir]=useState(false);
   if(modo==="inventario"){
     return <ModAdmin usuario={usuario} setUsuario={setUsuario} logout={()=>setModo("dueno")} G={G} rerender={rerender} recargar={recargar} showToast={showToast}/>;
