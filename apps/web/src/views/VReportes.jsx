@@ -250,6 +250,8 @@ export function VReportes({G,showToast,usuario}){
             </button>
           );
         })}
+      </div>
+
       {/* Diferencias de Conteos — panel expandido por conteo */}
       {verDifs&&(
         <div className="mt-4">
