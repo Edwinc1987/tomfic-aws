@@ -6,11 +6,16 @@ import { VPagos } from "@/views/VPagos";
 import { VPaginaWeb } from "@/views/VPaginaWeb";
 import { VLeads } from "@/views/VLeads";
 import { VCRM } from "@/views/VCRM";
+import { ModAdmin } from "@/modules/ModAdmin";
 
 
 export function PanelDueno({usuario,setUsuario,logout,G,rerender,recargar,showToast}){
   const [view,setView]=useState("resumen");
+  const [modo,setModo]=useState("dueno"); // dueno | inventario — el dueño también opera el módulo del inventario
   const [modalSalir,setModalSalir]=useState(false);
+  if(modo==="inventario"){
+    return <ModAdmin usuario={usuario} setUsuario={setUsuario} logout={()=>setModo("dueno")} G={G} rerender={rerender} recargar={recargar} showToast={showToast}/>;
+  }
   const [focusTenant,setFocusTenant]=useState(null); // empresa a abrir directo desde el Dashboard
   const irA=(v,filtro)=>setView(v==="clientes"?"crm":v);
   const nav=[
@@ -32,6 +37,7 @@ export function PanelDueno({usuario,setUsuario,logout,G,rerender,recargar,showTo
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <button onClick={()=>setModo("inventario")} className="inline-flex items-center gap-1.5 rounded-md bg-white/10 px-3 py-1.5 text-xs hover:bg-white/15"><Package size={13}/> Inventario</button>
           <button onClick={async()=>{await recargar();showToast("Actualizado ✓");}} className="inline-flex items-center gap-1.5 rounded-md bg-white/10 px-3 py-1.5 text-xs hover:bg-white/15"><RefreshCw size={13}/> Sync</button>
           <span className="text-xs text-indigo-200 hidden sm:inline">{usuario.nombre}</span>
           <button onClick={()=>setModalSalir(true)} className="rounded-md bg-red-500/20 border border-red-400/30 px-3 py-1.5 text-xs font-bold text-red-200 hover:bg-red-500/30">Salir</button>
