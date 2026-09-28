@@ -202,107 +202,95 @@ export function VReportes({G,showToast,usuario}){
         </div>
       )}
 
-      <div className="grid gap-4" style={{gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",display:vista?"none":undefined}}>
+      <div className="grid gap-4" style={{gridTemplateColumns:"repeat(auto-fit,minmax(300px,1fr))",display:vista?"none":undefined}}>
 
-        {/* Diferencias de Conteos — expandible */}
-        <Card className="p-4">
-          <div className="flex items-center gap-2.5 mb-3">
-            <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{background:"#fef2f2"}}><RefreshCw size={20} style={{color:"#dc2626"}}/></div>
-            <div>
-              <div className="font-bold text-sm text-slate-900">Diferencias de Conteos</div>
-              <div className="text-[11px] text-muted-foreground">C1 ≠ C2 — por conteo</div>
-            </div>
+        {/* Hub de reportes — estilo Linear: cards fila (icono suave + título + subtítulo + chevron) */}
+        {[
+          {id:"difs",      icon:RefreshCw, tone:"danger",  title:"Diferencias de Conteos", desc:"C1 ≠ C2 — detalladas por conteo, con PDF y Excel"},
+          {id:"diferencias",icon:Scale,    tone:"brand",   title:"Diferencia Inventario",  desc:"Físico vs Sistema · base completa"},
+          {id:"captura",   icon:FileText,  tone:"violet",  title:"Reporte de captura",     desc:"Por producto y estado · C1·C2·C3"},
+          {id:"sinconteo", icon:Circle,    tone:"warning", title:"Sin Conteo",             desc:"Productos no inventariados"},
+          {id:"ajuste",    icon:Wrench,    tone:"success", title:"Ajuste de Inventario",   desc:"Formato Siigo · Excel plano"},
+          {id:"siigo",     icon:Download,  tone:"brand",   title:"Formato Siigo",          desc:"Exportación directa para el ERP"},
+        ].map(r=>{
+          const Icon=r.icon;
+          const tone={
+            danger:{background:"#fef2f2",color:"#dc2626"},
+            brand:{background:"#eff6ff",color:"#2563eb"},
+            violet:{background:"#faf5ff",color:"#7c3aed"},
+            warning:{background:"#fffbeb",color:"#d97706"},
+            success:{background:"#f0fdf4",color:"#16a34a"},
+          }[r.tone];
+          const disabled=[
+            ["difs",totalDifs===0],
+            ["diferencias",baseCompleta.length===0],
+            ["captura",capFinal.length===0],
+            ["sinconteo",sinConteo.length===0],
+            ["ajuste",baseCompleta.length===0],
+            ["siigo",baseCompleta.length===0],
+          ].find(x=>x[0]===r.id)?.[1];
+          const onClick=()=>{
+            if(disabled)return;
+            if(r.id==="difs")return setVerDifs(v=>!v);
+            if(r.id==="ajuste")return expXLSX(baseCompleta.map(c=>[c.codigo,c.cantFinal,c.saldo,c.diferencia,TODAY(),c.ubicacion||"BODEGA"]),["CODIGO","CANTIDAD","SALDO","DIFERENCIA","FECH_CORTE","BODEGA"],"ajuste_inventario.xlsx","AJUSTE INVENTARIO");
+            if(r.id==="siigo")return expSiigo();
+            return setVista(r.id);
+          };
+          return(
+            <button key={r.id} onClick={onClick} disabled={disabled}
+              className="group flex items-center gap-3.5 rounded-xl border border-border-subtle bg-surface-raised px-4 py-4 text-left transition-colors hover:border-border-strong hover:bg-surface-overlay disabled:cursor-not-allowed disabled:opacity-50 dark:bg-surface-raised">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg" style={tone}>
+                <Icon size={18}/>
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold text-slate-900 dark:text-[hsl(220_10%_96%)]">{r.title}</span>
+                <span className="mt-0.5 block text-xs text-muted-foreground truncate">{r.desc}</span>
+              </span>
+              <ChevronLeft size={16} className="rotate-180 text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-slate-400"/>
+            </button>
+          );
+        })}
+      {/* Diferencias de Conteos — panel expandido por conteo */}
+      {verDifs&&(
+        <div className="mt-4">
+          <div className="mb-3 flex items-center justify-between">
+            <Button variant="outline" size="sm" onClick={()=>setVerDifs(false)}><ChevronLeft size={15}/> Ocultar diferencias</Button>
           </div>
-          <div className="mb-2.5 text-[32px] font-black leading-none tabular-nums" style={{color:"#dc2626"}}>{totalDifs}</div>
-          <Button className="w-full" style={{background:"#dc2626"}} onClick={()=>setVerDifs(v=>!v)}>{verDifs?"Ocultar diferencias":"Ver diferencias"}</Button>
-          {verDifs&&(
-            <div className="mt-3">
-              {conteosDifs.length===0?(
-                <div className="flex items-center gap-1.5 rounded-lg bg-green-50 px-3.5 py-1.5 text-[13px] font-semibold text-green-700"><CheckCircle size={14}/> Ningún conteo presentó diferencias</div>
-              ):conteosDifs.map(({conteo:c,difs},i)=>(
-                <div key={i} className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-1.5 mb-2.5">
-                  <div className="flex justify-between items-center mb-2 gap-2">
-                    <div>
-                      <div className="font-bold text-[13px] text-destructive">{c.nombre}</div>
-                      <div className="text-[11px] text-muted-foreground flex items-center gap-1"><MapPin size={11}/> {c.locLabel} · {difs.length} productos</div>
-                    </div>
-                    <div className="flex gap-1.5">
-                      <button onClick={()=>expPDF(difs,c.nombre)}
-                        className="inline-flex items-center gap-1 rounded-md bg-red-600 text-white px-2.5 py-1 text-[11px] font-bold hover:bg-red-700"><Printer size={11}/> PDF</button>
-                      <button onClick={()=>expXLSX(difs.map(d=>[d.codigo,d.ean||"",d.nombre,d.referencia,d.c1,d.c2,d.dif,d.u1,d.u2]),["CODIGO","EAN","NOMBRE","REFERENCIA","C1","C2","DIFERENCIA","USUARIO_C1","USUARIO_C2"],`difs_${c.nombre?.replace(/ /g,"_")}.xlsx`,`DIFERENCIAS ${c.nombre}`)}
-                        className="inline-flex items-center gap-1 rounded-md bg-blue-800 text-white px-2.5 py-1 text-[11px] font-bold hover:bg-blue-900"><Download size={10}/> Excel</button>
-                    </div>
-                  </div>
-                  <table className="w-full text-[11px]">
-                    <thead><tr className="bg-red-200">
-                      {["Código","EAN","Nombre","C1","C2","Dif","U.C1","U.C2"].map(h=><th key={h} className="px-2 py-1 text-left font-bold">{h}</th>)}
-                    </tr></thead>
-                    <tbody>
-                      {difs.map((d,j)=>(
-                        <tr key={j} className="border-b border-red-100">
-                          <td className="px-2 py-1 font-mono">{d.codigo}</td>
-                          <td className="px-2 py-1 text-[10px] text-muted-foreground">{d.ean||"—"}</td>
-                          <td className="px-2 py-1 font-medium">{d.nombre.substring(0,25)}</td>
-                          <td className="px-2 py-1 text-center font-bold">{d.c1}</td>
-                          <td className="px-2 py-1 text-center font-bold">{d.c2}</td>
-                          <td className="px-2 py-1 text-center font-bold text-destructive">{d.dif>0?"+"+d.dif:d.dif}</td>
-                          <td className="px-2 py-1 text-muted-foreground">{d.u1}</td>
-                          <td className="px-2 py-1 text-muted-foreground">{d.u2}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+          {conteosDifs.length===0?(
+            <div className="flex w-full items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-[13px] font-semibold" style={{background:"hsl(139_84%_96%)",color:"#1B9D4A"}}>
+              <CheckCircle size={14}/> Ningún conteo presentó diferencias
+            </div>
+          ):conteosDifs.map(({conteo:c,difs},i)=>(
+            <div key={i} className="mb-3 rounded-xl border p-3" style={{borderColor:"#fecaca",background:"#fef2f2"}}>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <div>
+                  <div className="text-[13px] font-bold" style={{color:"#C52020"}}>{c.nombre}</div>
+                  <div className="flex items-center gap-1 text-[11px] text-muted-foreground"><MapPin size={11}/> {c.locLabel} · {difs.length} productos</div>
                 </div>
-              ))}
+                <div className="flex gap-1.5">
+                  <button onClick={()=>expPDF(difs,c.nombre)} className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-bold text-white" style={{background:"#DC2626"}}><Printer size={11}/> PDF</button>
+                  <button onClick={()=>expXLSX(difs.map(d=>[d.codigo,d.ean||"",d.nombre,d.referencia,d.c1,d.c2,d.dif,d.u1,d.u2]),["CODIGO","EAN","NOMBRE","REFERENCIA","C1","C2","DIFERENCIA","USUARIO_C1","USUARIO_C2"],`difs_${c.nombre?.replace(/ /g,"_")}.xlsx`,`DIFERENCIAS ${c.nombre}`)} className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-bold text-white" style={{background:"#1e40af"}}><Download size={10}/> Excel</button>
+                </div>
+              </div>
+              <table className="w-full text-[11px]">
+                <thead><tr style={{background:"#fee2e2"}}>{["Código","EAN","Nombre","C1","C2","Dif","U.C1","U.C2"].map(h=><th key={h} className="px-2 py-1 text-left font-bold">{h}</th>)}</tr></thead>
+                <tbody>{difs.map((d,j)=>(
+                  <tr key={j} className="border-b" style={{borderColor:"#fecaca"}}>
+                    <td className="px-2 py-1 font-mono">{d.codigo}</td>
+                    <td className="px-2 py-1 text-[10px] text-muted-foreground">{d.ean||"—"}</td>
+                    <td className="px-2 py-1 font-medium">{d.nombre.substring(0,25)}</td>
+                    <td className="px-2 py-1 text-center font-bold">{d.c1}</td>
+                    <td className="px-2 py-1 text-center font-bold">{d.c2}</td>
+                    <td className="px-2 py-1 text-center font-bold" style={{color:"#C52020"}}>{d.dif>0?"+"+d.dif:d.dif}</td>
+                    <td className="px-2 py-1 text-muted-foreground">{d.u1}</td>
+                    <td className="px-2 py-1 text-muted-foreground">{d.u2}</td>
+                  </tr>))}
+                </tbody>
+              </table>
             </div>
-          )}
-        </Card>
-
-        {/* Sin Conteo */}
-        <Card className="p-4">
-          <div className="flex items-center gap-2.5 mb-3">
-            <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{background:"#fffbeb"}}><Circle size={20} style={{color:"#d97706"}}/></div>
-            <div><div className="font-bold text-sm text-slate-900">Sin Conteo</div><div className="text-[11px] text-muted-foreground">Productos no inventariados</div></div>
-          </div>
-          <div className="mb-2.5 text-[32px] font-black leading-none tabular-nums" style={{color:"#d97706"}}>{sinConteo.length}</div>
-          <Button className="w-full" onClick={()=>setVista("sinconteo")} disabled={sinConteo.length===0}><Eye size={15}/> Ver en pantalla</Button>
-          <Button className="w-full mt-2" variant="outline" onClick={()=>exportar("sinconteo")} disabled={sinConteo.length===0}><Download size={15}/> Excel</Button>
-        </Card>
-
-        {/* Diferencia Inventario */}
-        <Card className="p-4">
-          <div className="flex items-center gap-2.5 mb-3">
-            <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{background:"#eff6ff"}}><Scale size={20} style={{color:"#2563eb"}}/></div>
-            <div><div className="font-bold text-sm text-slate-900">Diferencia Inventario</div><div className="text-[11px] text-muted-foreground">Físico vs Sistema · base completa</div></div>
-          </div>
-          <div className="mb-2.5 text-[32px] font-black leading-none tabular-nums" style={{color:"#2563eb"}}>{baseCompleta.length}</div>
-          <Button className="w-full" onClick={()=>setVista("diferencias")} disabled={baseCompleta.length===0}><Eye size={15}/> Ver en pantalla</Button>
-          <Button className="w-full mt-2" variant="outline" onClick={()=>exportar("diferencias")} disabled={baseCompleta.length===0}><Download size={15}/> Excel</Button>
-        </Card>
-
-        {/* Ajuste */}
-        <Card className="p-4">
-          <div className="flex items-center gap-2.5 mb-3">
-            <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{background:"#f0fdf4"}}><Wrench size={20} style={{color:"#16a34a"}}/></div>
-            <div><div className="font-bold text-sm text-slate-900">Ajuste de Inventario</div><div className="text-[11px] text-muted-foreground">Código · Cantidad · Fecha · base completa</div></div>
-          </div>
-          <div className="mb-2.5 text-[32px] font-black leading-none tabular-nums" style={{color:"#16a34a"}}>{baseCompleta.length}</div>
-          <Button className="w-full" onClick={()=>expXLSX(baseCompleta.map(c=>[c.codigo,c.cantFinal,c.saldo,c.diferencia,TODAY(),c.ubicacion||"BODEGA"]),["CODIGO","CANTIDAD","SALDO","DIFERENCIA","FECH_CORTE","BODEGA"],"ajuste_inventario.xlsx","AJUSTE INVENTARIO")} disabled={baseCompleta.length===0}><Download size={15}/> Exportar Excel</Button>
-          <Button className="w-full mt-2" variant="outline" onClick={expSiigo} disabled={baseCompleta.length===0}><Download size={15}/> Formato Siigo</Button>
-        </Card>
-
-        {/* Reporte de Captura */}
-        <Card className="p-4">
-          <div className="flex items-center gap-2.5 mb-3">
-            <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{background:"#faf5ff"}}><FileText size={20} style={{color:"#7c3aed"}}/></div>
-            <div><div className="font-bold text-sm text-slate-900">Reporte de Captura</div><div className="text-[11px] text-muted-foreground">C1·C2·C3 · una fila por estado</div></div>
-          </div>
-          <div className="mb-2.5 text-[32px] font-black leading-none tabular-nums" style={{color:"#7c3aed"}}>{capFinal.length}</div>
-          <Button className="w-full" onClick={()=>setVista("captura")} disabled={capFinal.length===0}><Eye size={15}/> Ver en pantalla</Button>
-          <Button className="w-full mt-2" variant="outline" onClick={()=>exportar("captura")} disabled={capFinal.length===0}><Download size={15}/> Excel</Button>
-        </Card>
-
-      </div>
-    </Section>
+          ))}
+        </div>
+      )}
+      </Section>
   );
 }
