@@ -78,6 +78,7 @@ export function VReportes({G,showToast,usuario}){
         ubicacion:conteo?.ubicacion||"",
         localizacion:conteo?.localizacion||"",
         nro:conteo?.nro||"",
+        conteoNombre:conteo?.nombre||"",
         c1:sumC1||"",c2:sumC2||"",c3:sumC3||"",
         cantFinal:final,
         diferencia:final-(p.saldo||0),
@@ -115,6 +116,8 @@ export function VReportes({G,showToast,usuario}){
       ubicacion:conteo?.ubicacion||p.ubicacion||"",
       localizacion:conteo?.localizacion||p.localizacion||"",
       nro:conteo?.nro||"",
+      conteoNombre:conteo?.nombre||"",
+      usuario:last?.usuario||"",
       c1:sumC1||"",c2:sumC2||"",c3:sumC3||"",
       cantFinal:final,
       contado,
@@ -181,7 +184,13 @@ export function VReportes({G,showToast,usuario}){
         {key:"valSis",label:"Valor sistema",type:"money",width:16},
       ]},
   };
-  const exportar=(key)=>{const r=repCfg[key];exportReporteXLSX({title:r.title,meta:metaRep,columns:r.columns,rows:r.rows,groupBy:r.groupBy,sheetName:r.sheetName,fname:`${r.nombreArch}_${TODAY().replace(/\//g,"-")}.xlsx`,showToast});};
+  // Exporta usando las FILAS FILTRADAS que el grid pasó (onExport(rowsF)). Si no viene
+  // nada (llamado fuera del grid, ej: botón Excel del índice), exporta todas.
+  // Regla: el Excel respeta los filtros de la pantalla pero SIEMPRE trae todas las columnas.
+  const exportar=(key,rowsFiltradas=null)=>{
+    const r=repCfg[key];
+    exportReporteXLSX({title:r.title,meta:metaRep,columns:r.columns,rows:(rowsFiltradas&&rowsFiltradas.length!==r.rows.length)?rowsFiltradas:r.rows,groupBy:r.groupBy,sheetName:r.sheetName,fname:`${r.nombreArch}_${TODAY().replace(/\//g,"-")}.xlsx`,showToast});
+  };
 
   return(
     <Section>
@@ -197,7 +206,7 @@ export function VReportes({G,showToast,usuario}){
       {vista&&(
         <div>
           <Button variant="outline" size="sm" className="mb-3" onClick={()=>setVista(null)}><ChevronLeft size={15}/> Volver a reportes</Button>
-          <ReporteGrid title={repCfg[vista].title} meta={metaRep} columns={repCfg[vista].columns} rows={repCfg[vista].rows} groupBy={repCfg[vista].groupBy} onExport={()=>exportar(vista)}/>
+          <ReporteGrid title={repCfg[vista].title} meta={metaRep} columns={repCfg[vista].columns} rows={repCfg[vista].rows} groupBy={repCfg[vista].groupBy} onExport={(rowsF)=>exportar(vista,rowsF)}/>
         </div>
       )}
 
