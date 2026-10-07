@@ -54,8 +54,13 @@ export function VUsuarios({usuario,G,rerender,showToast}){
     return `Hola ${u.nombre}! Tus datos para TOMFIC:\n🔗 ${origin}\n🏢 Empresa: ${slug}\n👤 Usuario: ${u.nombre}\n🔑 Clave: ${u.pass}\n\nIngresa en la pestaña «Equipo».`;
   };
 
+  const EMAIL_RE=/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
   const guardar=async()=>{
     if(!form.nombre.trim()||(!form.editId&&!form.pass.trim()))return showToast("Completa nombre y contraseña","err");
+    // Validación de correo: si el usuario escribió algo, debe ser un email con forma válida.
+    // (Le llegan los accesos por ahí; guardarlo corrupto hace que el usuario jamás reciba su clave.)
+    if(form.correo&&form.correo.trim()&&!EMAIL_RE.test(form.correo.trim()))return showToast(`El correo «${form.correo.trim()}» no parece válido. Déjalo vacío o escríbelo completo (ej: nombre@empresa.com)`,"err");
+    if(form.telefono&&form.telefono.trim()&&!/^[+\d][\d\s\-()]{6,}$/.test(form.telefono.trim()))return showToast("El teléfono no parece válido (ej: +57 300 123 4567)","err");
     if(!form.editId){
       const duplicado=G.usuarios.find(u=>(u.nombre||"").toUpperCase()===form.nombre.trim().toUpperCase());
       if(duplicado){
@@ -233,13 +238,13 @@ export function VUsuarios({usuario,G,rerender,showToast}){
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead><tr className="bg-slate-50 text-slate-600 border-b border-slate-200">
-              {["Usuario","Contraseña","Contacto","Rol","Creado","Estado","Acciones"].map(h=>(
+              {["Usuario","Contacto","Rol","Creado","Estado","Acciones"].map(h=>(
                 <th key={h} className="px-3.5 py-1.5 text-left font-semibold whitespace-nowrap">{h}</th>
               ))}
             </tr></thead>
             <tbody>
               {usuariosFiltrados.length===0&&(
-                <tr><td colSpan={7} className="px-3.5 py-8 text-center text-sm text-slate-400">Sin usuarios que coincidan con "{busqUser}".</td></tr>
+                <tr><td colSpan={6} className="px-3.5 py-8 text-center text-sm text-slate-400">Sin usuarios que coincidan con "{busqUser}".</td></tr>
               )}
               {usuariosFiltrados.map((u)=>(
                 <tr key={u.id} className="border-b last:border-0 hover:bg-slate-50 transition-colors">
@@ -249,7 +254,6 @@ export function VUsuarios({usuario,G,rerender,showToast}){
                       <b>{u.nombre}</b>
                     </div>
                   </td>
-                  <td className="px-3.5 py-1.5 font-mono text-xs text-muted-foreground">{u.pass||"—"}</td>
                   <td className="px-3.5 py-1.5 text-xs text-muted-foreground">
                     {u.correo&&<div className="flex items-center gap-1"><Mail size={11}/> {u.correo}</div>}
                     {u.telefono&&<div className="flex items-center gap-1"><Smartphone size={11}/> {u.telefono}</div>}
@@ -374,7 +378,7 @@ export function VUsuarios({usuario,G,rerender,showToast}){
               <div className="max-h-[320px] overflow-y-auto mb-4 rounded-lg border">
                 <table className="w-full text-xs">
                   <thead><tr className="bg-slate-50 text-slate-600 border-b border-slate-200 sticky top-0">
-                    {["Nombre","Contraseña","Correo","Teléfono","Rol"].map(h=>(
+                    {["Nombre","Correo","Teléfono","Rol"].map(h=>(
                       <th key={h} className="px-2.5 py-2 text-left font-semibold">{h}</th>
                     ))}
                   </tr></thead>
@@ -384,7 +388,6 @@ export function VUsuarios({usuario,G,rerender,showToast}){
                       return(
                         <tr key={i} className={`border-b last:border-0 ${duplicado?"bg-amber-50":""}`}>
                           <td className="px-2.5 py-1.5 font-bold">{u.nombre}{duplicado&&<span className="text-[10px] text-amber-600 ml-1.5 inline-flex items-center gap-0.5"><AlertTriangle size={10}/> Duplicado</span>}</td>
-                          <td className="px-2.5 py-1.5 font-mono text-primary">{u.pass}</td>
                           <td className="px-2.5 py-1.5 text-muted-foreground">{u.correo||"—"}</td>
                           <td className="px-2.5 py-1.5 text-muted-foreground">{u.telefono||"—"}</td>
                           <td className="px-2.5 py-1.5"><UIBadge variant="secondary" className={u.rol==="admin"?"bg-blue-100 text-blue-700":"bg-green-100 text-green-700"}>{u.rol==="admin"?"ADMIN":"CAPTURADOR"}</UIBadge></td>
