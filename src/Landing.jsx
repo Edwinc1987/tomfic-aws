@@ -285,7 +285,7 @@ export default function Landing({ onEnter, onRegister, onLead, content, preview 
             </h1>
             <p className="mt-5 text-lg text-slate-300 max-w-md">{hero.subtitle}</p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Button size="lg" onClick={openReg} style={{ background: P }}>{hero.ctaPrimary} <ArrowRight size={18} /></Button>
+              <Button size="lg" onClick={go} style={{ background: P }}>{hero.ctaPrimary} <ArrowRight size={18} /></Button>
               <Button size="lg" variant="outline" className="bg-transparent text-white border-white/30 hover:bg-white/10 hover:text-white" asChild>
                 <a href="#caracteristicas">{hero.ctaSecondary}</a>
               </Button>
@@ -457,7 +457,7 @@ export default function Landing({ onEnter, onRegister, onLead, content, preview 
         <div className="mx-auto max-w-3xl px-5 text-center">
           <h2 className="text-3xl md:text-4xl font-black tracking-tight">¿Listo para tu próxima toma física?</h2>
           <p className="mt-4 text-white/80">Entra al sistema y crea tu primer inventario en minutos.</p>
-          <Button size="lg" onClick={openReg} className="mt-8 bg-white hover:bg-white/90" style={{ color: P }}>
+          <Button size="lg" onClick={go} className="mt-8 bg-white hover:bg-white/90" style={{ color: P }}>
             {hero.ctaPrimary} <ArrowRight size={18} />
           </Button>
         </div>

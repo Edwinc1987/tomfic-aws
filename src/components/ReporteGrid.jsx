@@ -11,7 +11,12 @@ export function ReporteGrid({ title, meta, columns, rows, groupBy, nameKey = "no
   const [q, setQ] = useState("");
   const [fCat, setFCat] = useState("");
   const [fEstado, setFEstado] = useState("");
+  const [fUbi, setFUbi] = useState("");
+  const [fLoc, setFLoc] = useState("");
+  const [fUser, setFUser] = useState("");
+  const [fCont, setFCont] = useState("");
   const [soloDif, setSoloDif] = useState(false);
+  const [soloNeg, setSoloNeg] = useState(false);
   const [ocultas, setOcultas] = useState(() => new Set());
   const [showMas, setShowMas] = useState(false);
   const [showCols, setShowCols] = useState(false);
@@ -19,21 +24,37 @@ export function ReporteGrid({ title, meta, columns, rows, groupBy, nameKey = "no
   const hasDif = columns.some(c => c.key === "diferencia");
   const hasEstado = columns.some(c => c.type === "estado");
   const estadoKey = (columns.find(c => c.type === "estado") || {}).key;
+  // Disponibilidad de filtros avanzados: solo si las filas trajeron el dato.
+  const hasUbi = rows.some(r => r.ubicacion);
+  const hasLoc = rows.some(r => r.localizacion);
+  const hasUser = rows.some(r => r.usuario);
+  const hasCont = rows.some(r => r.conteoNombre || r.conteo);
+  const contKey = hasCont ? (rows[0].conteoNombre !== undefined ? "conteoNombre" : "conteo") : null;
+  const hasSaldo = columns.some(c => c.key === "saldo");
 
   const cats = groupBy ? [...new Set(rows.map(r => r[groupBy] || "Sin categoría"))].sort((a, b) => a.localeCompare(b)) : [];
   const estados = hasEstado ? [...new Set(rows.map(r => r[estadoKey]).filter(Boolean))].sort() : [];
+  const ubis = hasUbi ? [...new Set(rows.map(r => r.ubicacion).filter(Boolean))].sort() : [];
+  const locsTodas = hasLoc ? [...new Set((fUbi ? rows.filter(r => r.ubicacion === fUbi) : rows).map(r => r.localizacion).filter(Boolean))].sort() : [];
+  const usuariosL = hasUser ? [...new Set(rows.map(r => r.usuario).filter(Boolean))].sort() : [];
+  const conteosL = hasCont ? [...new Set(rows.map(r => r[contKey]).filter(Boolean))].sort() : [];
 
   const nq = q.trim().toLowerCase();
   const rowsF = rows.filter(r => {
     if (nq && ![r.codigo, r.nombre, r.ean].some(v => String(v || "").toLowerCase().includes(nq))) return false;
     if (fCat && (r[groupBy] || "Sin categoría") !== fCat) return false;
     if (fEstado && r[estadoKey] !== fEstado) return false;
+    if (fUbi && r.ubicacion !== fUbi) return false;
+    if (fLoc && r.localizacion !== fLoc) return false;
+    if (fUser && r.usuario !== fUser) return false;
+    if (fCont && r[contKey] !== fCont) return false;
     if (soloDif && Number(r.diferencia || 0) === 0) return false;
+    if (soloNeg && Number(r.saldo || 0) >= 0) return false;
     return true;
   });
 
-  const nFiltros = [fCat, fEstado, soloDif].filter(Boolean).length;
-  const limpiar = () => { setQ(""); setFCat(""); setFEstado(""); setSoloDif(false); };
+  const nFiltros = [fCat, fEstado, fUbi, fLoc, fUser, fCont, soloDif, soloNeg].filter(Boolean).length;
+  const limpiar = () => { setQ(""); setFCat(""); setFEstado(""); setFUbi(""); setFLoc(""); setFUser(""); setFCont(""); setSoloDif(false); setSoloNeg(false); };
   const visibles = columns.filter(c => !ocultas.has(c.key));
   const toggleCol = k => setOcultas(s => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n; });
 
@@ -93,7 +114,16 @@ export function ReporteGrid({ title, meta, columns, rows, groupBy, nameKey = "no
               </select>
             </label>
           )}
-          {(hasEstado || hasDif) && (
+          {fEstado && (
+            <label className={sel}>
+              <span className="text-slate-400 text-[11px] font-normal">Estado</span>
+              <select value={fEstado} onChange={e => setFEstado(e.target.value)} className="bg-transparent outline-none text-[13px] font-semibold text-slate-700 max-w-[140px]">
+                <option value="">Todos</option>
+                {estados.map(e => <option key={e} value={e}>{e}</option>)}
+              </select>
+            </label>
+          )}
+          {(hasEstado || hasDif || hasUbi || hasUser || hasCont || (hasDif && hasSaldo)) && (
             <button className={btn} onClick={() => setShowMas(v => !v)}>
               <SlidersHorizontal size={15} /> Más filtros
               {nFiltros > 0 && <span className="absolute -top-2 -right-2 bg-red-600 text-white text-[10px] font-bold w-[18px] h-[18px] rounded-full grid place-items-center">{nFiltros}</span>}
@@ -101,23 +131,55 @@ export function ReporteGrid({ title, meta, columns, rows, groupBy, nameKey = "no
           )}
           <span className="flex-1" />
           <button className={btn} onClick={() => setShowCols(v => !v)}><Columns size={15} /> Columnas</button>
-          {onExport && <button className={btn + " text-blue-700 border-blue-200 hover:bg-blue-50"} onClick={onExport}><Download size={15} /> Descargar</button>}
+          {onExport && <button className={btn + " text-blue-700 border-blue-200 hover:bg-blue-50"} onClick={() => onExport(rowsF)}><Download size={15} /> Descargar</button>}
         </div>
 
-        {showMas && (hasEstado || hasDif) && (
+        {showMas && (
           <div className="mt-2.5 flex items-center gap-3 flex-wrap rounded-lg bg-slate-50 border border-slate-200 px-3 py-2.5">
-            {hasEstado && (
+            {hasUbi && (
               <label className={sel}>
-                <span className="text-slate-400 text-[11px] font-normal">Estado</span>
-                <select value={fEstado} onChange={e => setFEstado(e.target.value)} className="bg-transparent outline-none text-[13px] font-semibold text-slate-700">
-                  <option value="">Todos</option>
-                  {estados.map(e => <option key={e} value={e}>{e}</option>)}
+                <span className="text-slate-400 text-[11px] font-normal">Ubicación</span>
+                <select value={fUbi} onChange={e => { setFUbi(e.target.value); setFLoc(""); }} className="bg-transparent outline-none text-[13px] font-semibold text-slate-700 max-w-[150px]">
+                  <option value="">Todas</option>
+                  {ubis.map(u => <option key={u} value={u}>{u}</option>)}
                 </select>
               </label>
             )}
-            {hasDif && (
+            {hasLoc && (
+              <label className={sel}>
+                <span className="text-slate-400 text-[11px] font-normal">Localización</span>
+                <select value={fLoc} onChange={e => setFLoc(e.target.value)} className="bg-transparent outline-none text-[13px] font-semibold text-slate-700 max-w-[150px]">
+                  <option value="">Todas</option>
+                  {locsTodas.map(l => <option key={l} value={l}>{l}</option>)}
+                </select>
+              </label>
+            )}
+            {hasUser && (
+              <label className={sel}>
+                <span className="text-slate-400 text-[11px] font-normal">Capturador</span>
+                <select value={fUser} onChange={e => setFUser(e.target.value)} className="bg-transparent outline-none text-[13px] font-semibold text-slate-700 max-w-[140px]">
+                  <option value="">Todos</option>
+                  {usuariosL.map(u => <option key={u} value={u}>{u}</option>)}
+                </select>
+              </label>
+            )}
+            {hasCont && (
+              <label className={sel}>
+                <span className="text-slate-400 text-[11px] font-normal">Conteo</span>
+                <select value={fCont} onChange={e => setFCont(e.target.value)} className="bg-transparent outline-none text-[13px] font-semibold text-slate-700 max-w-[160px]">
+                  <option value="">Todos</option>
+                  {conteosL.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </label>
+            )}
+            {hasDif && !hasEstado && !hasUbi && !hasUser && !hasCont && (
               <label className="inline-flex items-center gap-2 text-[13px] text-slate-700 font-semibold cursor-pointer">
                 <input type="checkbox" checked={soloDif} onChange={e => setSoloDif(e.target.checked)} /> Solo con diferencia
+              </label>
+            )}
+            {hasDif && hasSaldo && (
+              <label className="inline-flex items-center gap-2 text-[13px] text-slate-700 font-semibold cursor-pointer">
+                <input type="checkbox" checked={soloNeg} onChange={e => setSoloNeg(e.target.checked)} /> Solo saldos negativos
               </label>
             )}
           </div>
@@ -138,7 +200,12 @@ export function ReporteGrid({ title, meta, columns, rows, groupBy, nameKey = "no
           <div className="mt-2.5 flex items-center gap-2 flex-wrap">
             {fCat && <span className="inline-flex items-center gap-1.5 bg-white border border-slate-200 rounded-full pl-3 pr-1 py-1 text-[12px] text-slate-600">Categoría: <b className="text-slate-900">{fCat}</b><button onClick={() => setFCat("")} className="w-4 h-4 grid place-items-center rounded-full bg-slate-100 text-slate-400"><X size={11} /></button></span>}
             {fEstado && <span className="inline-flex items-center gap-1.5 bg-white border border-slate-200 rounded-full pl-3 pr-1 py-1 text-[12px] text-slate-600">Estado: <b className="text-slate-900">{fEstado}</b><button onClick={() => setFEstado("")} className="w-4 h-4 grid place-items-center rounded-full bg-slate-100 text-slate-400"><X size={11} /></button></span>}
+            {fUbi && <span className="inline-flex items-center gap-1.5 bg-white border border-slate-200 rounded-full pl-3 pr-1 py-1 text-[12px] text-slate-600">Ubicación: <b className="text-slate-900">{fUbi}</b><button onClick={() => { setFUbi(""); setFLoc(""); }} className="w-4 h-4 grid place-items-center rounded-full bg-slate-100 text-slate-400"><X size={11} /></button></span>}
+            {fLoc && <span className="inline-flex items-center gap-1.5 bg-white border border-slate-200 rounded-full pl-3 pr-1 py-1 text-[12px] text-slate-600">Localización: <b className="text-slate-900">{fLoc}</b><button onClick={() => setFLoc("")} className="w-4 h-4 grid place-items-center rounded-full bg-slate-100 text-slate-400"><X size={11} /></button></span>}
+            {fUser && <span className="inline-flex items-center gap-1.5 bg-white border border-slate-200 rounded-full pl-3 pr-1 py-1 text-[12px] text-slate-600">Capturador: <b className="text-slate-900">{fUser}</b><button onClick={() => setFUser("")} className="w-4 h-4 grid place-items-center rounded-full bg-slate-100 text-slate-400"><X size={11} /></button></span>}
+            {fCont && <span className="inline-flex items-center gap-1.5 bg-white border border-slate-200 rounded-full pl-3 pr-1 py-1 text-[12px] text-slate-600">Conteo: <b className="text-slate-900">{fCont}</b><button onClick={() => setFCont("")} className="w-4 h-4 grid place-items-center rounded-full bg-slate-100 text-slate-400"><X size={11} /></button></span>}
             {soloDif && <span className="inline-flex items-center gap-1.5 bg-white border border-slate-200 rounded-full pl-3 pr-1 py-1 text-[12px] text-slate-600">Solo con diferencia<button onClick={() => setSoloDif(false)} className="w-4 h-4 grid place-items-center rounded-full bg-slate-100 text-slate-400"><X size={11} /></button></span>}
+            {soloNeg && <span className="inline-flex items-center gap-1.5 bg-white border border-slate-200 rounded-full pl-3 pr-1 py-1 text-[12px] text-slate-600">Solo saldos negativos<button onClick={() => setSoloNeg(false)} className="w-4 h-4 grid place-items-center rounded-full bg-slate-100 text-slate-400"><X size={11} /></button></span>}
             <button onClick={limpiar} className="text-[12px] text-blue-600 font-semibold ml-1">Limpiar filtros</button>
           </div>
         )}

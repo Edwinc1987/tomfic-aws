@@ -79,6 +79,10 @@ export const SB={
   deleteProductosByIds:async(ids)=>{for(let i=0;i<ids.length;i+=200){const{error}=await supabase.from("productos").delete().in("id",ids.slice(i,i+200));if(error)throw error;}},
   upsertInventario:(inv)=>supabase.from("inventarios").upsert(inv,{onConflict:"id"}),
   upsertConteo:(c)=>supabase.from("conteos").upsert(c,{onConflict:"id"}),
+  // Lee la fila del conteo en la nube (solo capturas_data y marcas de cierre) para el
+  // merge de capturas antes de subir: evita que un dispositivo con copia local vieja
+  // pise capturas que otro dispositivo guardó mientras tanto (pérdida del C3/desempate).
+  getConteo:(id)=>supabase.from("conteos").select("*").eq("id",id).maybeSingle(),
   closeConteoRound:(id,ronda)=>supabase.rpc("close_count_round",{p_count_id:id,p_round:ronda}),
   reopenConteoRound:(id,ronda)=>supabase.rpc("reopen_count_round",{p_count_id:id,p_round:ronda}),
   deleteConteo:(id)=>supabase.from("conteos").delete().eq("id",id),

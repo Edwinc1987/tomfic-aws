@@ -78,6 +78,7 @@ export function VReportes({G,showToast,usuario}){
         ubicacion:conteo?.ubicacion||"",
         localizacion:conteo?.localizacion||"",
         nro:conteo?.nro||"",
+        conteoNombre:conteo?.nombre||"",
         c1:sumC1||"",c2:sumC2||"",c3:sumC3||"",
         cantFinal:final,
         diferencia:final-(p.saldo||0),
@@ -103,9 +104,13 @@ export function VReportes({G,showToast,usuario}){
     const r=capByProd[p.id];
     const sumC1=r?r.c1:0,sumC2=r?r.c2:0,sumC3=r?r.c3:0;
     const contado=!!r;
-    const final=(r&&r.aju!==null)?r.aju:(contado?(sumC3||sumC2||sumC1):0); // el ajuste manda
+    const capsProd=r?caps.filter(c=>c.productoId===p.id&&["C1","C2","C3"].includes(c.ronda)):[];
+    // Desempate: si hay C3 (ronda cerrada o capturas registradas), el físico es SIEMPRE el C3 —
+    // incluso cuando el árbitro contó 0 (producto agotado: físico 0 es un resultado válido).
+    // Solo cae a C2/C1 cuando C3 no existe.
+    const hayC3=contado&&capsProd.some(c=>c.ronda==="C3");
+    const final=(r&&r.aju!==null)?r.aju:(contado?(hayC3?sumC3:(sumC2>0||sumC1>0?(sumC2||sumC1):Math.max(sumC2,sumC1))):0); // el ajuste manda
      const last=r?r.last:null;
-     const capsProd=r?caps.filter(c=>c.productoId===p.id&&["C1","C2","C3"].includes(c.ronda)):[];
      const rondaFinal=capsProd.some(c=>c.ronda==="C3")?"C3":capsProd.some(c=>c.ronda==="C2")?"C2":"C1";
      const estadosFinal={};
      capsProd.filter(c=>c.ronda===rondaFinal).forEach(c=>{const estado=c.estado||"BUENO";estadosFinal[estado]=(estadosFinal[estado]||0)+c.cantidad;});
@@ -115,6 +120,8 @@ export function VReportes({G,showToast,usuario}){
       ubicacion:conteo?.ubicacion||p.ubicacion||"",
       localizacion:conteo?.localizacion||p.localizacion||"",
       nro:conteo?.nro||"",
+      conteoNombre:conteo?.nombre||"",
+      usuario:last?.usuario||"",
       c1:sumC1||"",c2:sumC2||"",c3:sumC3||"",
       cantFinal:final,
       contado,
@@ -181,7 +188,13 @@ export function VReportes({G,showToast,usuario}){
         {key:"valSis",label:"Valor sistema",type:"money",width:16},
       ]},
   };
-  const exportar=(key)=>{const r=repCfg[key];exportReporteXLSX({title:r.title,meta:metaRep,columns:r.columns,rows:r.rows,groupBy:r.groupBy,sheetName:r.sheetName,fname:`${r.nombreArch}_${TODAY().replace(/\//g,"-")}.xlsx`,showToast});};
+  // Exporta usando las FILAS FILTRADAS que el grid pasó (onExport(rowsF)). Si no viene
+  // nada (llamado fuera del grid, ej: botón Excel del índice), exporta todas.
+  // Regla: el Excel respeta los filtros de la pantalla pero SIEMPRE trae todas las columnas.
+  const exportar=(key,rowsFiltradas=null)=>{
+    const r=repCfg[key];
+    exportReporteXLSX({title:r.title,meta:metaRep,columns:r.columns,rows:(rowsFiltradas&&rowsFiltradas.length!==r.rows.length)?rowsFiltradas:r.rows,groupBy:r.groupBy,sheetName:r.sheetName,fname:`${r.nombreArch}_${TODAY().replace(/\//g,"-")}.xlsx`,showToast});
+  };
 
   return(
     <Section>
@@ -197,7 +210,7 @@ export function VReportes({G,showToast,usuario}){
       {vista&&(
         <div>
           <Button variant="outline" size="sm" className="mb-3" onClick={()=>setVista(null)}><ChevronLeft size={15}/> Volver a reportes</Button>
-          <ReporteGrid title={repCfg[vista].title} meta={metaRep} columns={repCfg[vista].columns} rows={repCfg[vista].rows} groupBy={repCfg[vista].groupBy} onExport={()=>exportar(vista)}/>
+          <ReporteGrid title={repCfg[vista].title} meta={metaRep} columns={repCfg[vista].columns} rows={repCfg[vista].rows} groupBy={repCfg[vista].groupBy} onExport={(rowsF)=>exportar(vista,rowsF)}/>
         </div>
       )}
 

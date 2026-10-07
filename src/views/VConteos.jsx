@@ -97,16 +97,20 @@ export function VConteos({G,rerender,showToast,usuario,recargar}){
     const nCaps=Object.values(G.capturas).filter(x=>x.conteoId===c.id).length;
     if(!window.confirm(`¿Eliminar el conteo «${c.nombre}»${nCaps?` y sus ${nCaps} captura${nCaps===1?"":"s"}`:""}? Esta acción no se puede deshacer.`))return;
     G.conteos=G.conteos.filter(x=>x.id!==c.id);
-    Object.keys(G.capturas).forEach(k=>{if(G.capturas[k].conteoId===c.id)delete G.capturas[k];});
-    rerender();showToast("Conteo eliminado","warn");
+    Object.keys(G.capturas).forEach(k=>{if(G.capturas[k].conteoId===c.id){delete G.capturas[k];}});
+    // Borrado inmediato en la nube (no esperar al sync: si el usuario recarga antes, el conteo reaparece).
+    SB.deleteConteo(c.id).catch((e)=>showToast("No se pudo borrar de la nube: "+(e.message||e),"err"));
+    showToast("Conteo eliminado","warn");
   };
-  // Qué rondas se pueden reabrir según lo ya cerrado
+  // Qué rondas se pueden reabrir según lo ya cerrado. Fuente de verdad ÚNICA:
+  // rondaCerrada() (arreglo rondasCerradas si existe; si no, flags/estado legacy).
   const rondasReabribles=(c)=>{
-    const r=[];const rc=c.rondasCerradas||[];
-    if(rc.includes("C3"))return r;
+    const r=[];
+    const c3Cerrado=rondaCerrada(c,"C3");
+    if(c3Cerrado)return r; // tras el desempate el proceso está terminado
     if(rondaCerrada(c,"C1"))r.push("C1");
     if(c.tipo==="2conteos"&&rondaCerrada(c,"C2"))r.push("C2");
-    if(c.usuarioC3&&c.estado==="completado")r.push("C3");
+    if(c.usuarioC3&&c.estado==="completado"&&!c3Cerrado)r.push("C3");
     return r;
   };
 

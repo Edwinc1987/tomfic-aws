@@ -65,7 +65,41 @@ const doSync=async()=>{
     for(const id in _snap.hist){if(!curH[id]&&!curInv[id]){await SB.deleteInventario(id);delete _snap.hist[id];}}
     const curC={};
     G.inventarios.forEach(inv=>{const d=G._inventarioDatos[inv.id]||{conteos:[],capturas:{}};d.conteos.forEach(c=>{curC[c.id]=serConteo(c,inv.id,d.capturas);});});
-    for(const id in curC){const s=JSON.stringify(curC[id]);if(_snap.c[id]!==s){await SB.upsertConteo(curC[id]);_snap.c[id]=s;}}
+    for(const id in curC){
+      const s=JSON.stringify(curC[id]);
+      if(_snap.c[id]!==s){
+        // MERGE de capturas antes de subir: la fila de la nube puede tener capturas
+        // que ESTE dispositivo no tiene (guardadas por otro usuario dispostio mientras
+        // este estaba abierto). Upsertear sin fusionar las pisa (pérdida del desempate C3).
+        // Regla: por clave de captura, gana la más reciente por (fecha+hora); una
+        // captura eliminada localmente queda en tombstones y no revive desde la nube.
+        try{
+          const filaNube=await SB.getConteo(id);
+          if(filaNube&&filaNube.capturas_data&&filaNube.capturas_data!==curC[id].capturas_data){
+            const pJson=(v,f)=>{try{return v?JSON.parse(v):f;}catch(e){return f;}};
+            const capsNube=pJson(filaNube.capturas_data,{})||{};
+            const capsLoc=pJson(curC[id].capturas_data,{})||{};
+            const tomb=(G._capturasBorradas&&G._capturasBorradas[id])||new Set();
+            const sello=(cap)=>((cap&&cap.fecha||"")+"|"+(cap&&cap.hora||""));
+            const merged={...capsNube};
+            // locales ganan si son más nuevas (o la nube no tiene la clave)
+            for(const k in capsLoc){
+              const ln=merged[k];
+              if(!ln||sello(capsLoc[k])>=sello(ln))merged[k]=capsLoc[k];
+              else merged[k]=ln;
+            }
+            // tombstones + claves que estaban en la nube y ya no local ni nube
+            const finales={};
+            for(const k in merged){if(!tomb.has(k))finales[k]=merged[k];}
+            // si algún tombstone era clave de la nube, la RPC debe borrarlo también:
+            for(const k of tomb){if(capsNube[k]&&!finales[k])delete finales[k];}
+            curC[id].capturas_data=JSON.stringify(finales);
+          }
+        }catch(mErr){console.warn("[TOMFIC sync] merge capturas falló (se sube la copia local):",mErr);}
+        await SB.upsertConteo(curC[id]);
+        _snap.c[id]=JSON.stringify(curC[id]);
+      }
+    }
     for(const id in _snap.c){if(!curC[id]){await SB.deleteConteo(id);delete _snap.c[id];}}
     if(G.tenantId){
       for(const inv of G.inventarios){
