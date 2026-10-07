@@ -104,9 +104,13 @@ export function VReportes({G,showToast,usuario}){
     const r=capByProd[p.id];
     const sumC1=r?r.c1:0,sumC2=r?r.c2:0,sumC3=r?r.c3:0;
     const contado=!!r;
-    const final=(r&&r.aju!==null)?r.aju:(contado?(sumC3||sumC2||sumC1):0); // el ajuste manda
+    const capsProd=r?caps.filter(c=>c.productoId===p.id&&["C1","C2","C3"].includes(c.ronda)):[];
+    // Desempate: si hay C3 (ronda cerrada o capturas registradas), el físico es SIEMPRE el C3 —
+    // incluso cuando el árbitro contó 0 (producto agotado: físico 0 es un resultado válido).
+    // Solo cae a C2/C1 cuando C3 no existe.
+    const hayC3=contado&&capsProd.some(c=>c.ronda==="C3");
+    const final=(r&&r.aju!==null)?r.aju:(contado?(hayC3?sumC3:(sumC2>0||sumC1>0?(sumC2||sumC1):Math.max(sumC2,sumC1))):0); // el ajuste manda
      const last=r?r.last:null;
-     const capsProd=r?caps.filter(c=>c.productoId===p.id&&["C1","C2","C3"].includes(c.ronda)):[];
      const rondaFinal=capsProd.some(c=>c.ronda==="C3")?"C3":capsProd.some(c=>c.ronda==="C2")?"C2":"C1";
      const estadosFinal={};
      capsProd.filter(c=>c.ronda===rondaFinal).forEach(c=>{const estado=c.estado||"BUENO";estadosFinal[estado]=(estadosFinal[estado]||0)+c.cantidad;});
