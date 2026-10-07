@@ -7,6 +7,7 @@ import CamScanner from "@/components/CamScanner";
 import BtnNotas from "@/components/BtnNotas";
 import SyncStatus from "@/components/SyncStatus";
 import { G, SB, supabase, ID, TODAY, HOUR, conteoCompleto, nU, getStInv, card, inp, selectInventory } from "@/lib/data";
+import { scheduleSync } from "@/lib/sync";
 
 function EstBadge({e}){
   const m={BUENO:["#dcfce7","#166534"],VENCIDO:["#fee2e2","#dc2626"],AVERIADO:["#fef3c7","#92400e"],"NO APTO VENTA":["#fee2e2","#991b1b"],BAJAS:["#fef9c3","#854d0e"],"SIN REVISAR":["#f1f5f9","#475569"]};
@@ -858,7 +859,7 @@ export function ModCapturador({usuario,setUsuario,logout,G,rerender,recargar,sho
                         setTimeout(()=>unidadesRef.current?.focus(),80);
                       }}
                         style={{background:"#fef9c3",color:"#92400e",border:"1px solid #fde047",borderRadius:6,padding:"3px 10px",cursor:"pointer",fontWeight:700,fontSize:11,marginRight:4,display:"inline-flex",alignItems:"center",gap:3}}><Pencil size={10}/> Editar</button>
-                      <button onClick={()=>{caps.forEach(c=>{const k=Object.keys(G.capturas).find(k=>G.capturas[k]===c);if(k)delete G.capturas[k];});rerender();showToast("Eliminado","warn");}}
+                      <button onClick={()=>{if(!window.confirm(`¿Borrar las capturas de ${p?.nombre||"este producto"}? Esta acción no se puede deshacer.`))return;caps.forEach(c=>{const k=Object.keys(G.capturas).find(k=>G.capturas[k]===c);if(k){delete G.capturas[k];if(!G._capturasBorradas)G._capturasBorradas={};if(!G._capturasBorradas[miConteo.id])G._capturasBorradas[miConteo.id]=new Set();G._capturasBorradas[miConteo.id].add(k);}});rerender();showToast("Capturas borradas","warn");scheduleSync();}}
                         style={{background:"#fef2f2",color:"#dc2626",border:"1px solid #fecaca",borderRadius:6,padding:"3px 10px",cursor:"pointer",fontWeight:700,fontSize:11}}>Borrar</button>
                     </td>
                   </tr>
