@@ -114,7 +114,7 @@ export function ReporteGrid({ title, meta, columns, rows, groupBy, nameKey = "no
               </select>
             </label>
           )}
-          {fEstado && (
+          {hasEstado && (
             <label className={sel}>
               <span className="text-slate-400 text-[11px] font-normal">Estado</span>
               <select value={fEstado} onChange={e => setFEstado(e.target.value)} className="bg-transparent outline-none text-[13px] font-semibold text-slate-700 max-w-[140px]">
